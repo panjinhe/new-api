@@ -63,3 +63,28 @@ func TestGPT52CompletionRatios(t *testing.T) {
 		}
 	}
 }
+
+func TestGPT54MiniDefaultPricing(t *testing.T) {
+	InitRatioSettings()
+
+	modelRatio, ok, _ := GetModelRatio("gpt-5.4-mini")
+	if !ok {
+		t.Fatal("expected model ratio for gpt-5.4-mini to exist")
+	}
+	if modelRatio != 0.375 {
+		t.Fatalf("unexpected model ratio for gpt-5.4-mini: got %v want %v", modelRatio, 0.375)
+	}
+
+	cacheRatio, ok := GetCacheRatio("gpt-5.4-mini")
+	if !ok {
+		t.Fatal("expected cache ratio for gpt-5.4-mini to exist")
+	}
+	if cacheRatio != 0.1 {
+		t.Fatalf("unexpected cache ratio for gpt-5.4-mini: got %v want %v", cacheRatio, 0.1)
+	}
+
+	completionRatio := GetCompletionRatio("gpt-5.4-mini")
+	if completionRatio != 6 {
+		t.Fatalf("unexpected completion ratio for gpt-5.4-mini: got %v want %v", completionRatio, 6.0)
+	}
+}
