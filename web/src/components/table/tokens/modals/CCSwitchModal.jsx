@@ -27,7 +27,7 @@ import {
   Typography,
 } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { selectFilter } from '../../../../helpers';
+import { encodeToBase64, selectFilter } from '../../../../helpers';
 
 const APP_CONFIGS = {
   claude: {
@@ -63,6 +63,28 @@ function getServerAddress() {
   return window.location.origin;
 }
 
+function buildCodexImportConfig(endpoint, model, apiKey) {
+  const config = [
+    'model_provider = "ahepai"',
+    `model = "${model}"`,
+    'model_reasoning_effort = "high"',
+    'disable_response_storage = true',
+    '',
+    '[model_providers.ahepai]',
+    'name = "ahepai"',
+    `base_url = "${endpoint}"`,
+    'wire_api = "responses"',
+    'requires_openai_auth = true',
+  ].join('\n');
+
+  return {
+    auth: {
+      OPENAI_API_KEY: apiKey,
+    },
+    config,
+  };
+}
+
 function buildCCSwitchURL(app, name, models, apiKey) {
   const serverAddress = getServerAddress();
   const endpoint = app === 'codex' ? serverAddress + '/v1' : serverAddress;
@@ -70,8 +92,14 @@ function buildCCSwitchURL(app, name, models, apiKey) {
   params.set('resource', 'provider');
   params.set('app', app);
   params.set('name', name);
-  params.set('endpoint', endpoint);
-  params.set('apiKey', apiKey);
+  if (app === 'codex') {
+    const codexConfig = buildCodexImportConfig(endpoint, models.model, apiKey);
+    params.set('configFormat', 'json');
+    params.set('config', encodeToBase64(JSON.stringify(codexConfig)));
+  } else {
+    params.set('endpoint', endpoint);
+    params.set('apiKey', apiKey);
+  }
   for (const [k, v] of Object.entries(models)) {
     if (v) params.set(k, v);
   }
