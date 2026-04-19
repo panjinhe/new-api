@@ -8,6 +8,7 @@ upload
 build
 *.db-journal
 logs
+runtime
 web/dist
 .env
 one-api
@@ -22,6 +23,7 @@ tiktoken_cache
 web/bun.lock
 plans
 .claude
+头像001.jpg
 
 electron/node_modules
 electron/dist
