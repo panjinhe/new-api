@@ -39,6 +39,8 @@ type CodexOAuthAuthorizationFlow struct {
 	AuthorizeURL string
 }
 
+type codexOAuthRefreshFunc func(context.Context, string, string) (*CodexOAuthTokenResult, error)
+
 func RefreshCodexOAuthToken(ctx context.Context, refreshToken string) (*CodexOAuthTokenResult, error) {
 	return RefreshCodexOAuthTokenWithProxy(ctx, refreshToken, "")
 }
@@ -49,6 +51,14 @@ func RefreshCodexOAuthTokenWithProxy(ctx context.Context, refreshToken string, p
 		return nil, err
 	}
 	return refreshCodexOAuthToken(ctx, client, codexOAuthTokenURL, codexOAuthClientID, refreshToken)
+}
+
+func ResolveCodexOAuthKeyInput(ctx context.Context, rawInput string) (*CodexOAuthKey, error) {
+	return ResolveCodexOAuthKeyInputWithProxy(ctx, rawInput, "")
+}
+
+func ResolveCodexOAuthKeyInputWithProxy(ctx context.Context, rawInput string, proxyURL string) (*CodexOAuthKey, error) {
+	return resolveCodexOAuthKeyInput(ctx, rawInput, proxyURL, RefreshCodexOAuthTokenWithProxy)
 }
 
 func ExchangeCodexAuthorizationCode(ctx context.Context, code string, verifier string) (*CodexOAuthTokenResult, error) {
@@ -82,6 +92,71 @@ func CreateCodexOAuthAuthorizationFlow() (*CodexOAuthAuthorizationFlow, error) {
 		Challenge:    challenge,
 		AuthorizeURL: u,
 	}, nil
+}
+
+func resolveCodexOAuthKeyInput(
+	ctx context.Context,
+	rawInput string,
+	proxyURL string,
+	refreshFn codexOAuthRefreshFunc,
+) (*CodexOAuthKey, error) {
+	trimmed := strings.TrimSpace(rawInput)
+	if trimmed == "" {
+		return nil, errors.New("empty codex oauth input")
+	}
+
+	var key CodexOAuthKey
+	if strings.HasPrefix(trimmed, "{") {
+		if err := common.Unmarshal([]byte(trimmed), &key); err != nil {
+			return nil, errors.New("codex channel: invalid oauth key json")
+		}
+	} else {
+		key.RefreshToken = trimmed
+	}
+
+	key.AccessToken = strings.TrimSpace(key.AccessToken)
+	key.RefreshToken = strings.TrimSpace(key.RefreshToken)
+	key.AccountID = strings.TrimSpace(key.AccountID)
+	key.Email = strings.TrimSpace(key.Email)
+	key.Type = strings.TrimSpace(key.Type)
+	key.LastRefresh = strings.TrimSpace(key.LastRefresh)
+	key.Expired = strings.TrimSpace(key.Expired)
+	key.IDToken = strings.TrimSpace(key.IDToken)
+
+	needsRefresh := key.RefreshToken != "" && (key.AccessToken == "" || key.AccountID == "")
+	if needsRefresh {
+		res, err := refreshFn(ctx, key.RefreshToken, proxyURL)
+		if err != nil {
+			return nil, err
+		}
+		key.AccessToken = strings.TrimSpace(res.AccessToken)
+		key.RefreshToken = strings.TrimSpace(res.RefreshToken)
+		key.LastRefresh = time.Now().Format(time.RFC3339)
+		key.Expired = res.ExpiresAt.Format(time.RFC3339)
+	}
+
+	if key.AccountID == "" && key.AccessToken != "" {
+		if accountID, ok := ExtractCodexAccountIDFromJWT(key.AccessToken); ok {
+			key.AccountID = accountID
+		}
+	}
+	if key.Email == "" && key.AccessToken != "" {
+		if email, ok := ExtractEmailFromJWT(key.AccessToken); ok {
+			key.Email = email
+		}
+	}
+	if key.Type == "" && (key.AccessToken != "" || key.RefreshToken != "") {
+		key.Type = "codex"
+	}
+
+	if key.AccessToken == "" {
+		return nil, errors.New("codex channel: access_token is required")
+	}
+	if key.AccountID == "" {
+		return nil, errors.New("codex channel: account_id is required")
+	}
+
+	return &key, nil
 }
 
 func refreshCodexOAuthToken(

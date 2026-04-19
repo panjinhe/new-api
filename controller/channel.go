@@ -433,7 +433,11 @@ func validateTwoFactorAuth(twoFA *model.TwoFA, code string) bool {
 }
 
 // validateChannel 通用的渠道校验函数
-func validateChannel(channel *model.Channel, isAdd bool) error {
+func validateChannel(ctx context.Context, channel *model.Channel, isAdd bool) error {
+	if channel == nil {
+		return fmt.Errorf("channel cannot be empty")
+	}
+
 	// 校验 channel settings
 	if err := channel.ValidateSettings(); err != nil {
 		return fmt.Errorf("渠道额外设置[channel setting] 格式错误：%s", err.Error())
@@ -441,7 +445,7 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 
 	// 如果是添加操作，检查 channel 和 key 是否为空
 	if isAdd {
-		if channel == nil || channel.Key == "" {
+		if channel.Key == "" {
 			return fmt.Errorf("channel cannot be empty")
 		}
 
@@ -473,19 +477,18 @@ func validateChannel(channel *model.Channel, isAdd bool) error {
 	if channel.Type == constant.ChannelTypeCodex {
 		trimmedKey := strings.TrimSpace(channel.Key)
 		if isAdd || trimmedKey != "" {
-			if !strings.HasPrefix(trimmedKey, "{") {
-				return fmt.Errorf("Codex key must be a valid JSON object")
+			refreshCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			defer cancel()
+
+			oauthKey, err := service.ResolveCodexOAuthKeyInputWithProxy(refreshCtx, trimmedKey, channel.GetSetting().Proxy)
+			if err != nil {
+				return fmt.Errorf("Codex 密钥处理失败：%s", err.Error())
 			}
-			var keyMap map[string]any
-			if err := common.Unmarshal([]byte(trimmedKey), &keyMap); err != nil {
-				return fmt.Errorf("Codex key must be a valid JSON object")
+			encoded, err := common.Marshal(oauthKey)
+			if err != nil {
+				return fmt.Errorf("Codex key JSON encode failed")
 			}
-			if v, ok := keyMap["access_token"]; !ok || v == nil || strings.TrimSpace(fmt.Sprintf("%v", v)) == "" {
-				return fmt.Errorf("Codex key JSON must include access_token")
-			}
-			if v, ok := keyMap["account_id"]; !ok || v == nil || strings.TrimSpace(fmt.Sprintf("%v", v)) == "" {
-				return fmt.Errorf("Codex key JSON must include account_id")
-			}
+			channel.Key = string(encoded)
 		}
 	}
 
@@ -572,7 +575,7 @@ func AddChannel(c *gin.Context) {
 	}
 
 	// 使用统一的校验函数
-	if err := validateChannel(addChannelRequest.Channel, true); err != nil {
+	if err := validateChannel(c.Request.Context(), addChannelRequest.Channel, true); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": err.Error(),
@@ -848,7 +851,7 @@ func UpdateChannel(c *gin.Context) {
 	}
 
 	// 使用统一的校验函数
-	if err := validateChannel(&channel.Channel, false); err != nil {
+	if err := validateChannel(c.Request.Context(), &channel.Channel, false); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": err.Error(),
