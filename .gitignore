@@ -14,6 +14,7 @@ web/dist
 one-api
 new-api
 /__debug_bin*
+*.db.bak-*
 .DS_Store
 tiktoken_cache
 .eslintcache
@@ -23,6 +24,7 @@ tiktoken_cache
 web/bun.lock
 plans
 .claude
+.playwright-cli/
 头像001.jpg
 
 electron/node_modules
