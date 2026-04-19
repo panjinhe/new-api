@@ -56,11 +56,11 @@ func InitOptionMap() {
 	common.OptionMap["EmailDomainRestrictionEnabled"] = strconv.FormatBool(common.EmailDomainRestrictionEnabled)
 	common.OptionMap["EmailAliasRestrictionEnabled"] = strconv.FormatBool(common.EmailAliasRestrictionEnabled)
 	common.OptionMap["EmailDomainWhitelist"] = strings.Join(common.EmailDomainWhitelist, ",")
-	common.OptionMap["SMTPServer"] = ""
-	common.OptionMap["SMTPFrom"] = ""
+	common.OptionMap["SMTPServer"] = common.SMTPServer
+	common.OptionMap["SMTPFrom"] = common.SMTPFrom
 	common.OptionMap["SMTPPort"] = strconv.Itoa(common.SMTPPort)
-	common.OptionMap["SMTPAccount"] = ""
-	common.OptionMap["SMTPToken"] = ""
+	common.OptionMap["SMTPAccount"] = common.SMTPAccount
+	common.OptionMap["SMTPToken"] = common.SMTPToken
 	common.OptionMap["SMTPSSLEnabled"] = strconv.FormatBool(common.SMTPSSLEnabled)
 	common.OptionMap["SMTPForceAuthLogin"] = strconv.FormatBool(common.SMTPForceAuthLogin)
 	common.OptionMap["Notice"] = ""
@@ -225,6 +225,12 @@ func UpdateOption(key string, value string) error {
 func updateOptionMap(key string, value string) (err error) {
 	common.OptionMapRWMutex.Lock()
 	defer common.OptionMapRWMutex.Unlock()
+
+	if common.IsSMTPEnvOverride(key) {
+		common.OptionMap[key] = common.GetSMTPOptionValue(key)
+		return nil
+	}
+
 	common.OptionMap[key] = value
 
 	// 检查是否是模型配置 - 使用更规范的方式处理
