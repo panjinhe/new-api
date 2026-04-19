@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -85,6 +85,7 @@ func ClaudeErrorWrapperLocal(err error, code string, statusCode int) *dto.Claude
 
 func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFail bool) (newApiErr *types.NewAPIError) {
 	newApiErr = types.InitOpenAIError(types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
+	headerMetadata := buildRelevantResponseMetadata(resp)
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -114,6 +115,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		// General format error (OpenAI, Anthropic, Gemini, etc.)
 		oaiError := errResponse.TryToOpenAIError()
 		if oaiError != nil {
+			oaiError.Metadata = mergeOpenAIErrorMetadata(oaiError.Metadata, headerMetadata)
 			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode)
 			if showBodyWhenFail {
 				newApiErr.Err = buildErrWithBody(newApiErr.Error())
@@ -121,11 +123,124 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 			return
 		}
 	}
-	newApiErr = types.NewOpenAIError(errors.New(errResponse.ToMessage()), types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
+	newApiErr = types.WithOpenAIError(types.OpenAIError{
+		Message:  errResponse.ToMessage(),
+		Type:     string(types.ErrorCodeBadResponseStatusCode),
+		Code:     types.ErrorCodeBadResponseStatusCode,
+		Metadata: mergeOpenAIErrorMetadata(errResponse.Metadata, headerMetadata),
+	}, resp.StatusCode)
 	if showBodyWhenFail {
 		newApiErr.Err = buildErrWithBody(newApiErr.Error())
 	}
 	return
+}
+
+func mergeOpenAIErrorMetadata(primary json.RawMessage, secondary map[string]interface{}) json.RawMessage {
+	if len(primary) == 0 && len(secondary) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]interface{})
+	if len(primary) > 0 && common.GetJsonType(primary) == "object" {
+		_ = common.Unmarshal(primary, &merged)
+	}
+	for key, value := range secondary {
+		if _, exists := merged[key]; !exists {
+			merged[key] = value
+		}
+	}
+	if len(merged) == 0 {
+		return primary
+	}
+	encoded, err := common.Marshal(merged)
+	if err != nil {
+		return primary
+	}
+	return encoded
+}
+
+func buildRelevantResponseMetadata(resp *http.Response) map[string]interface{} {
+	if resp == nil {
+		return nil
+	}
+
+	metadata := make(map[string]interface{})
+	now := time.Now()
+
+	if retryAfter := strings.TrimSpace(resp.Header.Get("Retry-After")); retryAfter != "" {
+		metadata["retry_after"] = retryAfter
+		if resetAt, seconds, ok := parseRetryAfterHeader(retryAfter, now); ok {
+			metadata["retry_after_seconds"] = seconds
+			if resetAt > 0 {
+				metadata["reset_at"] = resetAt
+			}
+		}
+	}
+
+	for _, key := range []string{"X-RateLimit-Reset", "X-Ratelimit-Reset"} {
+		if value := strings.TrimSpace(resp.Header.Get(key)); value != "" {
+			metadata["rate_limit_reset"] = value
+			if resetAt, ok := parseResetTimestampValue(value, now); ok && resetAt > 0 {
+				if _, exists := metadata["reset_at"]; !exists {
+					metadata["reset_at"] = resetAt
+				}
+			}
+			break
+		}
+	}
+
+	if len(metadata) == 0 {
+		return nil
+	}
+	return metadata
+}
+
+func parseRetryAfterHeader(value string, now time.Time) (resetAt int64, seconds int64, ok bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0, 0, false
+	}
+	if secs, err := strconv.ParseInt(trimmed, 10, 64); err == nil && secs >= 0 {
+		return now.Add(time.Duration(secs) * time.Second).Unix(), secs, true
+	}
+	if parsed, err := http.ParseTime(trimmed); err == nil {
+		secs := int64(parsed.Sub(now).Seconds())
+		if secs < 0 {
+			secs = 0
+		}
+		return parsed.Unix(), secs, true
+	}
+	return 0, 0, false
+}
+
+func parseResetTimestampValue(value string, now time.Time) (int64, bool) {
+	trimmed := strings.TrimSpace(strings.ToLower(value))
+	if trimmed == "" {
+		return 0, false
+	}
+
+	if duration, err := time.ParseDuration(trimmed); err == nil {
+		return now.Add(duration).Unix(), true
+	}
+	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+		return parsed.Unix(), true
+	}
+
+	num, err := strconv.ParseFloat(trimmed, 64)
+	if err != nil {
+		return 0, false
+	}
+	if num <= 0 {
+		return 0, false
+	}
+	switch {
+	case num >= 1e12:
+		return int64(num / 1000), true
+	case num >= 1e9:
+		return int64(num), true
+	default:
+		return now.Add(time.Duration(num) * time.Second).Unix(), true
+	}
 }
 
 func ResetStatusCode(newApiErr *types.NewAPIError, statusCodeMappingStr string) {

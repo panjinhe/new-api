@@ -59,6 +59,7 @@ const (
 	ErrorCodeChannelAwsClientError        ErrorCode = "channel:aws_client_error"
 	ErrorCodeChannelInvalidKey            ErrorCode = "channel:invalid_key"
 	ErrorCodeChannelResponseTimeExceeded  ErrorCode = "channel:response_time_exceeded"
+	ErrorCodeChannelCodexQuotaExhausted   ErrorCode = "channel:codex_quota_exhausted"
 
 	// client request error
 	ErrorCodeReadRequestBodyFailed ErrorCode = "read_request_body_failed"
@@ -393,6 +394,16 @@ func ErrOptionWithNoRecordErrorLog() NewAPIErrorOptions {
 func ErrOptionWithStatusCode(statusCode int) NewAPIErrorOptions {
 	return func(e *NewAPIError) {
 		e.StatusCode = statusCode
+	}
+}
+
+func ErrOptionWithErrorCode(errorCode ErrorCode) NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		e.errorCode = errorCode
+		if openAIError, ok := e.RelayError.(OpenAIError); ok {
+			openAIError.Code = errorCode
+			e.RelayError = openAIError
+		}
 	}
 }
 

@@ -820,6 +820,9 @@ func testAllChannels(notify bool) error {
 			if channel.Status == common.ChannelStatusManuallyDisabled {
 				continue
 			}
+			if !notify && service.ShouldSkipAutoTestForCodexQuota(channel, common.GetTimestamp()) {
+				continue
+			}
 			isChannelEnabled := channel.Status == common.ChannelStatusEnabled
 			tik := time.Now()
 			result := testChannel(channel, "", "", false)
@@ -844,7 +847,11 @@ func testAllChannels(notify bool) error {
 
 			// disable channel
 			if isChannelEnabled && shouldBanChannel && channel.GetAutoBan() {
-				processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
+				keyIndex := -1
+				if channel.ChannelInfo.IsMultiKey {
+					keyIndex = common.GetContextKeyInt(result.context, constant.ContextKeyChannelMultiKeyIndex)
+				}
+				processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), keyIndex, channel.GetAutoBan()), newAPIError)
 			}
 
 			// enable channel

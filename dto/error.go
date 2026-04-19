@@ -43,6 +43,9 @@ func (e GeneralErrorResponse) TryToOpenAIError() *types.OpenAIError {
 	if len(e.Error) > 0 {
 		err := common.Unmarshal(e.Error, &openAIError)
 		if err == nil && openAIError.Message != "" {
+			if len(openAIError.Metadata) == 0 && len(e.Metadata) > 0 {
+				openAIError.Metadata = e.Metadata
+			}
 			return &openAIError
 		}
 	}
