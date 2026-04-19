@@ -28,8 +28,8 @@ const SIDEBAR_REFRESH_EVENT = 'sidebar-refresh';
 export const DEFAULT_ADMIN_CONFIG = {
   chat: {
     enabled: true,
-    playground: true,
-    chat: true,
+    playground: false,
+    chat: false,
   },
   console: {
     enabled: true,

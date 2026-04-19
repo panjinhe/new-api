@@ -42,8 +42,8 @@ export default function SettingsSidebarModulesAdmin(props) {
   const [sidebarModulesAdmin, setSidebarModulesAdmin] = useState({
     chat: {
       enabled: true,
-      playground: true,
-      chat: true,
+      playground: false,
+      chat: false,
     },
     console: {
       enabled: true,
@@ -103,8 +103,8 @@ export default function SettingsSidebarModulesAdmin(props) {
     const defaultModules = {
       chat: {
         enabled: true,
-        playground: true,
-        chat: true,
+        playground: false,
+        chat: false,
       },
       console: {
         enabled: true,
@@ -178,7 +178,7 @@ export default function SettingsSidebarModulesAdmin(props) {
       } catch (error) {
         // 使用默认配置
         const defaultModules = {
-          chat: { enabled: true, playground: true, chat: true },
+          chat: { enabled: true, playground: false, chat: false },
           console: {
             enabled: true,
             detail: true,

@@ -66,8 +66,8 @@ const NotificationSettings = ({
   const [sidebarModulesUser, setSidebarModulesUser] = useState({
     chat: {
       enabled: true,
-      playground: true,
-      chat: true,
+      playground: false,
+      chat: false,
     },
     console: {
       enabled: true,
@@ -156,7 +156,7 @@ const NotificationSettings = ({
 
   const resetSidebarModules = () => {
     const defaultConfig = {
-      chat: { enabled: true, playground: true, chat: true },
+      chat: { enabled: true, playground: false, chat: false },
       console: {
         enabled: true,
         detail: true,

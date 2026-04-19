@@ -456,11 +456,11 @@ func calculateUserPermissions(userRole int) map[string]interface{} {
 func generateDefaultSidebarConfig(userRole int) string {
 	defaultConfig := map[string]interface{}{}
 
-	// 聊天区域 - 所有用户都可以访问
+	// 聊天区域 - 默认隐藏入口，用户后续可在设置中自行开启
 	defaultConfig["chat"] = map[string]interface{}{
 		"enabled":    true,
-		"playground": true,
-		"chat":       true,
+		"playground": false,
+		"chat":       false,
 	}
 
 	// 控制台区域 - 所有用户都可以访问
