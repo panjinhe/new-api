@@ -45,6 +45,7 @@ import {
 } from '../../components/table/channels/codexUsageUtils';
 
 const CODEX_USAGE_CACHE_TTL_MS = 60 * 1000;
+const CODEX_USAGE_BATCH_CONCURRENCY = 4;
 
 export const useChannelsData = () => {
   const { t } = useTranslation();
@@ -98,6 +99,7 @@ export const useChannelsData = () => {
   const [isStreamTest, setIsStreamTest] = useState(false);
   const [globalPassThroughEnabled, setGlobalPassThroughEnabled] =
     useState(false);
+  const [codexBatchLoading, setCodexBatchLoading] = useState(false);
 
   const fetchGlobalPassThroughEnabled = async () => {
     try {
@@ -730,6 +732,78 @@ export const useChannelsData = () => {
     });
   };
 
+  const getVisibleCodexChannelIds = () => {
+    const ids = [];
+    channels.forEach((channel) => {
+      if (channel?.children !== undefined) {
+        channel.children.forEach((child) => {
+          if (child?.type === CODEX_CHANNEL_TYPE && child?.id) {
+            ids.push(child.id);
+          }
+        });
+        return;
+      }
+      if (channel?.type === CODEX_CHANNEL_TYPE && channel?.id) {
+        ids.push(channel.id);
+      }
+    });
+    return ids;
+  };
+
+  const queryVisibleCodexUsage = async () => {
+    const channelIds = getVisibleCodexChannelIds();
+    if (channelIds.length === 0) {
+      showInfo(t('当前页没有 Codex 渠道'));
+      return;
+    }
+
+    setCodexBatchLoading(true);
+    channelIds.forEach((channelId) => {
+      markCodexUsageLoading(channelId);
+    });
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    try {
+      for (
+        let i = 0;
+        i < channelIds.length;
+        i += CODEX_USAGE_BATCH_CONCURRENCY
+      ) {
+        const batch = channelIds.slice(i, i + CODEX_USAGE_BATCH_CONCURRENCY);
+        await Promise.all(
+          batch.map(async (channelId) => {
+            const payload = await fetchCodexUsageForChannel(channelId);
+            applyCodexUsagePayload(channelId, payload);
+            if (payload?.success === false) {
+              failureCount += 1;
+            } else {
+              successCount += 1;
+            }
+          }),
+        );
+      }
+
+      if (failureCount === 0) {
+        showSuccess(
+          t('已完成当前页 {{count}} 个 Codex 渠道查询', {
+            count: successCount,
+          }),
+        );
+      } else {
+        showInfo(
+          t('当前页 Codex 查询完成：成功 {{success}} 个，失败 {{failure}} 个', {
+            success: successCount,
+            failure: failureCount,
+          }),
+        );
+      }
+    } finally {
+      setCodexBatchLoading(false);
+    }
+  };
+
   // Tag edit
   const submitTagEdit = async (type, data) => {
     switch (type) {
@@ -1273,6 +1347,11 @@ export const useChannelsData = () => {
     return keys;
   }, [channelTypeCounts]);
 
+  const visibleCodexChannelCount = useMemo(
+    () => getVisibleCodexChannelIds().length,
+    [channels],
+  );
+
   return {
     // Basic states
     channels,
@@ -1317,6 +1396,8 @@ export const useChannelsData = () => {
     typeCounts,
     channelTypeCounts,
     availableTypeKeys,
+    visibleCodexChannelCount,
+    codexBatchLoading,
 
     // Model test states
     showModelTestModal,
@@ -1372,6 +1453,7 @@ export const useChannelsData = () => {
     testAllChannels,
     deleteAllDisabledChannels,
     updateAllChannelsBalance,
+    queryVisibleCodexUsage,
     updateChannelBalance,
     fixChannelsAbilities,
     checkOllamaVersion,
