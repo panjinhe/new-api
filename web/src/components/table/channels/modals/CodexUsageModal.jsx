@@ -342,7 +342,14 @@ const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
   );
 };
 
-const CodexUsageLoader = ({ t, record, initialPayload, onCopy }) => {
+const CodexUsageLoader = ({
+  t,
+  record,
+  initialPayload,
+  onCopy,
+  onFetchStart,
+  onFetched,
+}) => {
   const tt = typeof t === 'function' ? t : (v) => v;
   const [loading, setLoading] = useState(!initialPayload);
   const [payload, setPayload] = useState(initialPayload ?? null);
@@ -357,27 +364,32 @@ const CodexUsageLoader = ({ t, record, initialPayload, onCopy }) => {
     }
 
     if (mountedRef.current) setLoading(true);
+    onFetchStart?.();
     try {
       const res = await API.get(`/api/channel/${recordId}/codex/usage`, {
         skipErrorHandler: true,
       });
       if (!mountedRef.current) return;
-      setPayload(res?.data ?? null);
+      const nextPayload = res?.data ?? null;
+      setPayload(nextPayload);
+      onFetched?.(nextPayload);
       if (!res?.data?.success && !hasShownErrorRef.current) {
         hasShownErrorRef.current = true;
         showError(tt('获取用量失败'));
       }
     } catch (error) {
       if (!mountedRef.current) return;
+      const nextPayload = { success: false, message: String(error) };
       if (!hasShownErrorRef.current) {
         hasShownErrorRef.current = true;
         showError(tt('获取用量失败'));
       }
-      setPayload({ success: false, message: String(error) });
+      setPayload(nextPayload);
+      onFetched?.(nextPayload);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [recordId, tt]);
+  }, [recordId, onFetchStart, onFetched, tt]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -428,7 +440,14 @@ const CodexUsageLoader = ({ t, record, initialPayload, onCopy }) => {
   );
 };
 
-export const openCodexUsageModal = ({ t, record, payload, onCopy }) => {
+export const openCodexUsageModal = ({
+  t,
+  record,
+  payload,
+  onCopy,
+  onFetchStart,
+  onFetched,
+}) => {
   const tt = typeof t === 'function' ? t : (v) => v;
 
   Modal.info({
@@ -442,6 +461,8 @@ export const openCodexUsageModal = ({ t, record, payload, onCopy }) => {
         record={record}
         initialPayload={payload}
         onCopy={onCopy}
+        onFetchStart={onFetchStart}
+        onFetched={onFetched}
       />
     ),
     footer: (

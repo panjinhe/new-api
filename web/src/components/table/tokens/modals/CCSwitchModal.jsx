@@ -42,7 +42,7 @@ const APP_CONFIGS = {
   },
   codex: {
     label: 'Codex',
-    defaultName: 'My Codex',
+    defaultName: 'aheapi',
     modelFields: [{ key: 'model', label: '主模型' }],
   },
   gemini: {
@@ -65,13 +65,13 @@ function getServerAddress() {
 
 function buildCodexImportConfig(endpoint, model, apiKey) {
   const config = [
-    'model_provider = "ahepai"',
+    'model_provider = "aheapi"',
     `model = "${model}"`,
     'model_reasoning_effort = "high"',
     'disable_response_storage = true',
     '',
-    '[model_providers.ahepai]',
-    'name = "ahepai"',
+    '[model_providers.aheapi]',
+    'name = "aheapi"',
     `base_url = "${endpoint}"`,
     'wire_api = "responses"',
     'requires_openai_auth = true',

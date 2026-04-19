@@ -275,6 +275,7 @@ const renderCodexWindowUsage = (record, field, updateChannelBalance, t) => {
 
   const usage = record.codex_usage || {};
   const percent = usage?.summary?.[field];
+  const triggerQuery = () => updateChannelBalance(record);
 
   if (usage.loading && percent == null) {
     return (
@@ -287,15 +288,35 @@ const renderCodexWindowUsage = (record, field, updateChannelBalance, t) => {
   if (usage.error && percent == null) {
     return (
       <Tooltip content={usage.error}>
-        <Tag color='red' shape='circle'>
-          {t('获取失败')}
-        </Tag>
+        <button
+          type='button'
+          className='cursor-pointer border-0 bg-transparent p-0'
+          onClick={triggerQuery}
+          aria-label={t('重新查询')}
+        >
+          <Tag color='red' shape='circle'>
+            {t('获取失败')}
+          </Tag>
+        </button>
       </Tooltip>
     );
   }
 
   if (percent == null) {
-    return '-';
+    return (
+      <Tooltip content={t('点击查看 Codex 帐号信息与用量')}>
+        <button
+          type='button'
+          className='cursor-pointer border-0 bg-transparent p-0'
+          onClick={triggerQuery}
+          aria-label={t('点击查询')}
+        >
+          <Tag color='grey' shape='circle'>
+            {t('点击查询')}
+          </Tag>
+        </button>
+      </Tooltip>
+    );
   }
 
   const displayPercent = clampPercent(percent);
@@ -307,7 +328,7 @@ const renderCodexWindowUsage = (record, field, updateChannelBalance, t) => {
       <button
         type='button'
         className='min-w-[120px] cursor-pointer border-0 bg-transparent p-0 text-left'
-        onClick={() => updateChannelBalance(record)}
+        onClick={triggerQuery}
         aria-label={usageLabel}
       >
         <div className='mb-1 flex items-center justify-between gap-2 text-xs text-semi-color-text-2'>

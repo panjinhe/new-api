@@ -45,7 +45,6 @@ import {
 } from '../../components/table/channels/codexUsageUtils';
 
 const CODEX_USAGE_CACHE_TTL_MS = 60 * 1000;
-const CODEX_USAGE_FETCH_CONCURRENCY = 4;
 
 export const useChannelsData = () => {
   const { t } = useTranslation();
@@ -373,73 +372,39 @@ export const useChannelsData = () => {
     return request;
   };
 
-  const syncCodexUsage = async (items) => {
-    if (!Array.isArray(items) || items.length === 0) {
-      return;
-    }
+  const applyCodexUsagePayload = (channelId, payload) => {
+    const fetchedAt = Date.now();
+    codexUsageCacheRef.current.set(channelId, {
+      payload,
+      fetchedAt,
+    });
 
-    const now = Date.now();
-    const codexChannels = items.filter(
-      (item) => item?.type === CODEX_CHANNEL_TYPE && item?.id,
-    );
-    if (codexChannels.length === 0) {
-      return;
-    }
+    updateChannelProperty(channelId, (currentChannel) => {
+      currentChannel.codex_usage = {
+        loading: false,
+        error: payload?.success === false ? payload?.message || '' : '',
+        payload,
+        summary: extractCodexUsageSummary(payload),
+        fetched_at: fetchedAt,
+      };
+    });
+  };
 
-    for (
-      let i = 0;
-      i < codexChannels.length;
-      i += CODEX_USAGE_FETCH_CONCURRENCY
-    ) {
-      const batch = codexChannels.slice(
-        i,
-        i + CODEX_USAGE_FETCH_CONCURRENCY,
-      );
-      await Promise.all(
-        batch.map(async (channel) => {
-          const cached = codexUsageCacheRef.current.get(channel.id);
-          const isFresh =
-            !!cached && now - cached.fetchedAt < CODEX_USAGE_CACHE_TTL_MS;
-          if (isFresh) {
-            return;
-          }
-
-          updateChannelProperty(channel.id, (currentChannel) => {
-            const currentUsage = currentChannel.codex_usage || {};
-            currentChannel.codex_usage = {
-              ...currentUsage,
-              loading: true,
-              error: '',
-              payload: currentUsage.payload || cached?.payload || null,
-              summary:
-                currentUsage.summary ||
-                (cached?.payload
-                  ? extractCodexUsageSummary(cached.payload)
-                  : null),
-              fetched_at: currentUsage.fetched_at || cached?.fetchedAt || 0,
-            };
-          });
-
-          const payload = await fetchCodexUsageForChannel(channel.id);
-          const fetchedAt = Date.now();
-          codexUsageCacheRef.current.set(channel.id, {
-            payload,
-            fetchedAt,
-          });
-
-          updateChannelProperty(channel.id, (currentChannel) => {
-            currentChannel.codex_usage = {
-              loading: false,
-              error:
-                payload?.success === false ? payload?.message || '' : '',
-              payload,
-              summary: extractCodexUsageSummary(payload),
-              fetched_at: fetchedAt,
-            };
-          });
-        }),
-      );
-    }
+  const markCodexUsageLoading = (channelId) => {
+    const cached = codexUsageCacheRef.current.get(channelId);
+    updateChannelProperty(channelId, (currentChannel) => {
+      const currentUsage = currentChannel.codex_usage || {};
+      currentChannel.codex_usage = {
+        ...currentUsage,
+        loading: true,
+        error: '',
+        payload: currentUsage.payload || cached?.payload || null,
+        summary:
+          currentUsage.summary ||
+          (cached?.payload ? extractCodexUsageSummary(cached.payload) : null),
+        fetched_at: currentUsage.fetched_at || cached?.fetchedAt || 0,
+      };
+    });
   };
 
   // Get form values helper
@@ -501,7 +466,6 @@ export const useChannelsData = () => {
         setTypeCounts({ ...type_counts, all: sumAll });
       }
       setChannelFormat(items, enableTagMode);
-      syncCodexUsage(items).catch(() => {});
       setChannelCount(total);
     } else {
       showError(message);
@@ -547,7 +511,6 @@ export const useChannelsData = () => {
         );
         setTypeCounts({ ...type_counts, all: sumAll });
         setChannelFormat(items, enableTagMode);
-        syncCodexUsage(items).catch(() => {});
         setChannelCount(total);
         setActivePage(page);
       } else {
@@ -907,10 +870,34 @@ export const useChannelsData = () => {
 
   const updateChannelBalance = async (record) => {
     if (record?.type === CODEX_CHANNEL_TYPE) {
+      const recordId = record?.id;
+      const recordFetchedAt = Number(record?.codex_usage?.fetched_at || 0);
+      const hasFreshPayload =
+        !!record?.codex_usage?.payload &&
+        Date.now() - recordFetchedAt < CODEX_USAGE_CACHE_TTL_MS;
+      if (recordId) {
+        const cached = codexUsageCacheRef.current.get(recordId);
+        const isFresh =
+          !!cached && Date.now() - cached.fetchedAt < CODEX_USAGE_CACHE_TTL_MS;
+        if (!hasFreshPayload && !isFresh) {
+          markCodexUsageLoading(recordId);
+        }
+      }
+
       openCodexUsageModal({
         t,
         record,
-        payload: record?.codex_usage?.payload ?? null,
+        payload: hasFreshPayload ? record?.codex_usage?.payload ?? null : null,
+        onFetchStart: () => {
+          if (recordId) {
+            markCodexUsageLoading(recordId);
+          }
+        },
+        onFetched: (payload) => {
+          if (recordId) {
+            applyCodexUsagePayload(recordId, payload);
+          }
+        },
         onCopy: async (text) => {
           const ok = await copy(text);
           if (ok) showSuccess(t('已复制'));
