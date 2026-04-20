@@ -40,6 +40,8 @@ var codexQuotaMessageKeywords = []string{
 	"five hour",
 }
 
+var fetchCodexWhamUsageForChannelFunc = fetchCodexWhamUsageForChannel
+
 type CodexQuotaState struct {
 	DisableKind  string `json:"disable_kind"`
 	Scope        string `json:"scope"`
@@ -224,6 +226,12 @@ func classifyCodexQuotaStateFromMetadata(metadata []byte, lowerMessage string) (
 		}, true
 	}
 
+	if scope == codexQuotaScopeUnknown {
+		if limitWindowSeconds, ok := parseInt64(meta["limit_window_seconds"]); ok {
+			scope = classifyCodexQuotaScopeByWindowDuration(limitWindowSeconds)
+		}
+	}
+
 	resetAt := extractCodexQuotaResetAt(meta, time.Now())
 	if resetAt == 0 {
 		if !isCodexQuotaMessage(lowerMessage) {
@@ -250,7 +258,7 @@ func resolveCodexQuotaStateFromUsage(ctx context.Context, channelID int, preferr
 	resolveCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	statusCode, body, err := fetchCodexWhamUsageForChannel(resolveCtx, channelID)
+	statusCode, body, err := fetchCodexWhamUsageForChannelFunc(resolveCtx, channelID)
 	if err != nil {
 		return nil, err
 	}

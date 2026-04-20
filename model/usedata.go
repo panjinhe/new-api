@@ -101,18 +101,68 @@ func increaseQuotaData(userId int, username string, modelName string, count int,
 	}
 }
 
+type quotaLogAggregate struct {
+	ModelName        string `gorm:"column:model_name"`
+	CreatedAt        int64  `gorm:"column:created_at"`
+	PromptTokens     int    `gorm:"column:prompt_tokens"`
+	CompletionTokens int    `gorm:"column:completion_tokens"`
+	Quota            int    `gorm:"column:quota"`
+}
+
+func aggregateQuotaDataFromLogs(tx *gorm.DB) (quotaData []*QuotaData, err error) {
+	var logRows []*quotaLogAggregate
+	if err = tx.Find(&logRows).Error; err != nil {
+		return nil, err
+	}
+
+	aggregated := make(map[string]*QuotaData, len(logRows))
+	for _, row := range logRows {
+		bucketAt := row.CreatedAt - (row.CreatedAt % 3600)
+		key := fmt.Sprintf("%s:%d", row.ModelName, bucketAt)
+		item, ok := aggregated[key]
+		if !ok {
+			item = &QuotaData{
+				ModelName: row.ModelName,
+				CreatedAt: bucketAt,
+			}
+			aggregated[key] = item
+		}
+		item.Count++
+		item.Quota += row.Quota
+		item.TokenUsed += row.PromptTokens + row.CompletionTokens
+	}
+
+	quotaData = make([]*QuotaData, 0, len(aggregated))
+	for _, item := range aggregated {
+		quotaData = append(quotaData, item)
+	}
+	return quotaData, nil
+}
+
 func GetQuotaDataByUsername(username string, startTime int64, endTime int64) (quotaData []*QuotaData, err error) {
-	var quotaDatas []*QuotaData
-	// 从quota_data表中查询数据
-	err = DB.Table("quota_data").Where("username = ? and created_at >= ? and created_at <= ?", username, startTime, endTime).Find(&quotaDatas).Error
-	return quotaDatas, err
+	tx := LOG_DB.Model(&Log{}).
+		Select("model_name, created_at, prompt_tokens, completion_tokens, quota").
+		Where("username = ? and type = ?", username, LogTypeConsume)
+	if startTime != 0 {
+		tx = tx.Where("created_at >= ?", startTime)
+	}
+	if endTime != 0 {
+		tx = tx.Where("created_at <= ?", endTime)
+	}
+	return aggregateQuotaDataFromLogs(tx)
 }
 
 func GetQuotaDataByUserId(userId int, startTime int64, endTime int64) (quotaData []*QuotaData, err error) {
-	var quotaDatas []*QuotaData
-	// 从quota_data表中查询数据
-	err = DB.Table("quota_data").Where("user_id = ? and created_at >= ? and created_at <= ?", userId, startTime, endTime).Find(&quotaDatas).Error
-	return quotaDatas, err
+	tx := LOG_DB.Model(&Log{}).
+		Select("model_name, created_at, prompt_tokens, completion_tokens, quota").
+		Where("user_id = ? and type = ?", userId, LogTypeConsume)
+	if startTime != 0 {
+		tx = tx.Where("created_at >= ?", startTime)
+	}
+	if endTime != 0 {
+		tx = tx.Where("created_at <= ?", endTime)
+	}
+	return aggregateQuotaDataFromLogs(tx)
 }
 
 func GetQuotaDataGroupByUser(startTime int64, endTime int64) (quotaData []*QuotaData, err error) {

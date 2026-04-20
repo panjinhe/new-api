@@ -1,9 +1,15 @@
 package service
 
 import (
+	"context"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,4 +60,28 @@ func TestResetStatusCode(t *testing.T) {
 			require.Equal(t, tc.expectedCode, newAPIError.StatusCode)
 		})
 	}
+}
+
+func TestRelayErrorHandlerMergesRelevantHeadersIntoMetadata(t *testing.T) {
+	resp := &http.Response{
+		StatusCode: http.StatusTooManyRequests,
+		Header:     make(http.Header),
+		Body: io.NopCloser(strings.NewReader(`{
+			"error": {
+				"message": "usage limit reached",
+				"type": "rate_limit_error",
+				"code": "rate_limit_exceeded"
+			}
+		}`)),
+	}
+	resp.Header.Set("Retry-After", "60")
+
+	apiErr := RelayErrorHandler(context.Background(), resp, false)
+	require.NotNil(t, apiErr)
+
+	metadata := make(map[string]interface{})
+	require.NoError(t, common.Unmarshal(apiErr.Metadata, &metadata))
+	assert.Equal(t, "60", metadata["retry_after"])
+	assert.EqualValues(t, 60, metadata["retry_after_seconds"])
+	assert.NotZero(t, metadata["reset_at"])
 }
