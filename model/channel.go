@@ -56,6 +56,12 @@ type Channel struct {
 
 	// cache info
 	Keys []string `json:"-" gorm:"-"`
+
+	// derived runtime state
+	RoutingCooldownActive   bool   `json:"routing_cooldown_active" gorm:"-"`
+	RoutingCooldownResetAt  int64  `json:"routing_cooldown_reset_at" gorm:"-"`
+	RoutingCooldownReason   string `json:"routing_cooldown_reason,omitempty" gorm:"-"`
+	RoutingCooldownKeyIndex *int   `json:"routing_cooldown_key_index,omitempty" gorm:"-"`
 }
 
 type ChannelInfo struct {
@@ -123,8 +129,12 @@ func (channel *Channel) GetKeys() []string {
 }
 
 func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
+	now := common.GetTimestamp()
 	// If not in multi-key mode, return the original key string directly.
 	if !channel.ChannelInfo.IsMultiKey {
+		if channel.IsKeyRoutingCooledDown(routingCooldownSingleKeyIdx, now) {
+			return "", 0, types.NewError(errors.New("no route key available because channel is cooling down"), types.ErrorCodeChannelNoAvailableKey)
+		}
 		return channel.Key, 0, nil
 	}
 
@@ -155,6 +165,9 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 	enabledIdx := make([]int, 0, len(keys))
 	for i := range keys {
 		if getStatus(i) == common.ChannelStatusEnabled {
+			if channel.IsKeyRoutingCooledDown(i, now) {
+				continue
+			}
 			enabledIdx = append(enabledIdx, i)
 		}
 	}
@@ -196,6 +209,9 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 		for i := 0; i < len(keys); i++ {
 			idx := (start + i) % len(keys)
 			if getStatus(idx) == common.ChannelStatusEnabled {
+				if channel.IsKeyRoutingCooledDown(idx, now) {
+					continue
+				}
 				// update polling index for next call (point to the next position)
 				channel.ChannelInfo.MultiKeyPollingIndex = (idx + 1) % len(keys)
 				return keys[idx], idx, nil

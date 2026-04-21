@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +30,14 @@ func buildCodexOAuthKeyForTest(t *testing.T, suffix string) string {
 func seedCodexChannel(t *testing.T, ch *model.Channel) {
 	t.Helper()
 	require.NoError(t, model.DB.Create(ch).Error)
+}
+
+func newCodexQuotaTestContext() *gin.Context {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	return ctx
 }
 
 func TestHandleCodexQuotaChannelErrorSingleKeyPersistsState(t *testing.T) {
@@ -53,13 +63,22 @@ func TestHandleCodexQuotaChannelErrorSingleKeyPersistsState(t *testing.T) {
 		Metadata: []byte(`{"reset_at": 2000000000, "limit_window_seconds": 18000}`),
 	}, http.StatusTooManyRequests)
 
-	handled := HandleCodexQuotaChannelError(context.Background(), *types.NewChannelError(channel.Id, channel.Type, channel.Name, false, channel.Key, -1, true), err)
+	ctx := newCodexQuotaTestContext()
+	handled := HandleCodexQuotaChannelError(ctx, *types.NewChannelError(channel.Id, channel.Type, channel.Name, false, channel.Key, -1, true), err)
 	require.True(t, handled)
 	assert.Equal(t, types.ErrorCodeChannelCodexQuotaExhausted, err.GetErrorCode())
 
 	loaded, loadErr := model.GetChannelById(channel.Id, true)
 	require.NoError(t, loadErr)
-	assert.Equal(t, common.ChannelStatusAutoDisabled, loaded.Status)
+	assert.Equal(t, common.ChannelStatusEnabled, loaded.Status)
+
+	routingStates := loaded.GetRoutingCooldownStates()
+	routingState, ok := routingStates["-1"]
+	require.True(t, ok)
+	assert.Equal(t, channelRoutingCooldownKindQuota, routingState.Kind)
+	assert.Equal(t, int64(2000000000), routingState.ResetAt)
+	assert.Equal(t, channelRoutingCooldownSourceMetadata, routingState.Source)
+	assert.Contains(t, routingState.Reason, "usage limit reached")
 
 	states := getCodexQuotaStates(loaded)
 	state, ok := states["-1"]
@@ -69,6 +88,17 @@ func TestHandleCodexQuotaChannelErrorSingleKeyPersistsState(t *testing.T) {
 	assert.Equal(t, int64(2000000000), state.ResetAt)
 	assert.Equal(t, codexQuotaSourceError, state.Source)
 	assert.False(t, state.ResetUnknown)
+
+	loaded.ApplyRoutingCooldownView(common.GetTimestamp())
+	assert.True(t, loaded.RoutingCooldownActive)
+	assert.Equal(t, int64(2000000000), loaded.RoutingCooldownResetAt)
+	assert.Nil(t, loaded.RoutingCooldownKeyIndex)
+
+	adminInfo, ok := getRoutingCooldownAdminInfo(ctx)
+	require.True(t, ok)
+	assert.True(t, adminInfo.Applied)
+	assert.Equal(t, channelRoutingCooldownKindQuota, adminInfo.Kind)
+	assert.Equal(t, int64(2000000000), adminInfo.ResetAt)
 }
 
 func TestHandleCodexQuotaChannelErrorUsesWhamUsageFallback(t *testing.T) {
@@ -107,11 +137,17 @@ func TestHandleCodexQuotaChannelErrorUsesWhamUsageFallback(t *testing.T) {
 		Code:    "rate_limit_exceeded",
 	}, http.StatusTooManyRequests)
 
-	handled := HandleCodexQuotaChannelError(context.Background(), *types.NewChannelError(channel.Id, channel.Type, channel.Name, false, channel.Key, -1, true), err)
+	handled := HandleCodexQuotaChannelError(newCodexQuotaTestContext(), *types.NewChannelError(channel.Id, channel.Type, channel.Name, false, channel.Key, -1, true), err)
 	require.True(t, handled)
 
 	loaded, loadErr := model.GetChannelById(channel.Id, true)
 	require.NoError(t, loadErr)
+	routingStates := loaded.GetRoutingCooldownStates()
+	routingState, ok := routingStates["-1"]
+	require.True(t, ok)
+	assert.Equal(t, channelRoutingCooldownSourceUsageProbe, routingState.Source)
+	assert.Equal(t, int64(2000000100), routingState.ResetAt)
+
 	states := getCodexQuotaStates(loaded)
 	state, ok := states["-1"]
 	require.True(t, ok)
@@ -120,7 +156,7 @@ func TestHandleCodexQuotaChannelErrorUsesWhamUsageFallback(t *testing.T) {
 	assert.Equal(t, codexQuotaScopeFiveHour, state.Scope)
 }
 
-func TestHandleCodexQuotaChannelErrorMultiKeyDisablesOnlyCurrentKey(t *testing.T) {
+func TestHandleCodexQuotaChannelErrorMultiKeyOnlyCoolsCurrentKey(t *testing.T) {
 	truncate(t)
 
 	autoBan := 1
@@ -149,22 +185,27 @@ func TestHandleCodexQuotaChannelErrorMultiKeyDisablesOnlyCurrentKey(t *testing.T
 		Metadata: []byte(`{"reset_at": 2000000300, "limit_window_seconds": 604800}`),
 	}, http.StatusTooManyRequests)
 
-	handled := HandleCodexQuotaChannelError(context.Background(), *types.NewChannelError(channel.Id, channel.Type, channel.Name, true, keyB, 1, true), err)
+	handled := HandleCodexQuotaChannelError(newCodexQuotaTestContext(), *types.NewChannelError(channel.Id, channel.Type, channel.Name, true, keyB, 1, true), err)
 	require.True(t, handled)
 
 	loaded, loadErr := model.GetChannelById(channel.Id, true)
 	require.NoError(t, loadErr)
 	assert.Equal(t, common.ChannelStatusEnabled, loaded.Status)
-	require.Contains(t, loaded.ChannelInfo.MultiKeyStatusList, 1)
-	assert.Equal(t, common.ChannelStatusAutoDisabled, loaded.ChannelInfo.MultiKeyStatusList[1])
-	_, firstKeyDisabled := loaded.ChannelInfo.MultiKeyStatusList[0]
-	assert.False(t, firstKeyDisabled)
+	assert.NotContains(t, loaded.ChannelInfo.MultiKeyStatusList, 1)
 
 	states := getCodexQuotaStates(loaded)
 	state, ok := states["1"]
 	require.True(t, ok)
 	assert.Equal(t, codexQuotaScopeWeekly, state.Scope)
 	assert.Equal(t, int64(2000000300), state.ResetAt)
+
+	routingStates := loaded.GetRoutingCooldownStates()
+	routingState, ok := routingStates["1"]
+	require.True(t, ok)
+	assert.Equal(t, 1, routingState.KeyIndex)
+	assert.True(t, loaded.IsKeyRoutingCooledDown(1, common.GetTimestamp()))
+	assert.False(t, loaded.IsKeyRoutingCooledDown(0, common.GetTimestamp()))
+	assert.True(t, loaded.HasAvailableRoute(common.GetTimestamp()))
 }
 
 func TestRunCodexQuotaAutoReenablePassRecoversDueStates(t *testing.T) {
@@ -191,6 +232,14 @@ func TestRunCodexQuotaAutoReenablePassRecoversDueStates(t *testing.T) {
 				DisabledAt:  common.GetTimestamp() - 30,
 			},
 		},
+		"routing_cooldown": map[string]model.RoutingCooldownState{
+			"-1": {
+				Kind:      channelRoutingCooldownKindQuota,
+				ResetAt:   common.GetTimestamp() - 10,
+				Source:    channelRoutingCooldownSourceFallback,
+				CreatedAt: common.GetTimestamp() - 30,
+			},
+		},
 	})
 	seedCodexChannel(t, channel)
 
@@ -200,6 +249,7 @@ func TestRunCodexQuotaAutoReenablePassRecoversDueStates(t *testing.T) {
 	require.NoError(t, loadErr)
 	assert.Equal(t, common.ChannelStatusEnabled, loaded.Status)
 	assert.Empty(t, getCodexQuotaStates(loaded))
+	assert.Empty(t, loaded.GetRoutingCooldownStates())
 }
 
 func TestRunCodexQuotaAutoReenablePassRecoversMultiKeyEntry(t *testing.T) {
@@ -233,6 +283,15 @@ func TestRunCodexQuotaAutoReenablePassRecoversMultiKeyEntry(t *testing.T) {
 				DisabledAt:  common.GetTimestamp() - 30,
 			},
 		},
+		"routing_cooldown": map[string]model.RoutingCooldownState{
+			"1": {
+				Kind:      channelRoutingCooldownKindQuota,
+				ResetAt:   common.GetTimestamp() - 10,
+				Source:    channelRoutingCooldownSourceFallback,
+				KeyIndex:  1,
+				CreatedAt: common.GetTimestamp() - 30,
+			},
+		},
 	})
 	seedCodexChannel(t, channel)
 
@@ -243,4 +302,5 @@ func TestRunCodexQuotaAutoReenablePassRecoversMultiKeyEntry(t *testing.T) {
 	assert.Equal(t, common.ChannelStatusEnabled, loaded.Status)
 	assert.NotContains(t, loaded.ChannelInfo.MultiKeyStatusList, 1)
 	assert.Empty(t, getCodexQuotaStates(loaded))
+	assert.Empty(t, loaded.GetRoutingCooldownStates())
 }

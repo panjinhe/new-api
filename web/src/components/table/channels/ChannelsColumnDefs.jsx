@@ -221,6 +221,82 @@ const renderMultiKeyStatus = (status, keySize, enabledKeySize, t) => {
   }
 };
 
+const parseChannelOtherInfo = (record) => {
+  if (!record?.other_info) {
+    return {};
+  }
+  try {
+    return JSON.parse(record.other_info);
+  } catch (error) {
+    return {};
+  }
+};
+
+const renderChannelStatus = (record, t) => {
+  const statusTag = renderStatus(record.status, record.channel_info, t);
+  const statusNotes = [];
+
+  if (record.status === 3) {
+    const otherInfo = parseChannelOtherInfo(record);
+    if (otherInfo.status_reason || otherInfo.status_time) {
+      let note = '';
+      if (otherInfo.status_reason) {
+        note += t('原因：') + otherInfo.status_reason;
+      }
+      if (otherInfo.status_time) {
+        note +=
+          (note ? '，' : '') +
+          t('时间：') +
+          timestamp2string(otherInfo.status_time);
+      }
+      if (note) {
+        statusNotes.push(note);
+      }
+    }
+  }
+
+  if (record.routing_cooldown_active) {
+    let cooldownNote = t('路由冷却');
+    if (record.routing_cooldown_reason) {
+      cooldownNote += `: ${record.routing_cooldown_reason}`;
+    }
+    if (typeof record.routing_cooldown_key_index === 'number') {
+      cooldownNote += `，${t('Key 序号：')}${record.routing_cooldown_key_index + 1}`;
+    }
+    if (record.routing_cooldown_reset_at) {
+      cooldownNote +=
+        `，${t('恢复时间：')}${timestamp2string(record.routing_cooldown_reset_at)}`;
+    }
+    statusNotes.push(cooldownNote);
+  }
+
+  const content =
+    statusNotes.length > 0 ? (
+      <div>
+        {statusNotes.map((note, index) => (
+          <div key={index}>{note}</div>
+        ))}
+      </div>
+    ) : null;
+
+  const body = record.routing_cooldown_active ? (
+    <Space spacing={4}>
+      {statusTag}
+      <Tag color='blue' shape='circle' type='light'>
+        {t('冷却中')}
+      </Tag>
+    </Space>
+  ) : (
+    statusTag
+  );
+
+  if (!content) {
+    return body;
+  }
+
+  return <Tooltip content={content}>{body}</Tooltip>;
+};
+
 const renderResponseTime = (responseTime, t) => {
   let time = responseTime / 1000;
   time = time.toFixed(2) + t(' 秒');
@@ -585,29 +661,7 @@ export const getChannelsColumns = ({
       key: COLUMN_KEYS.STATUS,
       title: t('状态'),
       dataIndex: 'status',
-      render: (text, record, index) => {
-        if (text === 3) {
-          if (record.other_info === '') {
-            record.other_info = '{}';
-          }
-          let otherInfo = JSON.parse(record.other_info);
-          let reason = otherInfo['status_reason'];
-          let time = otherInfo['status_time'];
-          return (
-            <div>
-              <Tooltip
-                content={
-                  t('原因：') + reason + t('，时间：') + timestamp2string(time)
-                }
-              >
-                {renderStatus(text, record.channel_info, t)}
-              </Tooltip>
-            </div>
-          );
-        } else {
-          return renderStatus(text, record.channel_info, t);
-        }
-      },
+      render: (text, record, index) => renderChannelStatus(record, t),
     },
     {
       key: COLUMN_KEYS.RESPONSE_TIME,

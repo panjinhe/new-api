@@ -21,13 +21,13 @@ func StartCodexQuotaAutoReenableTask() {
 
 	codexQuotaAutoReenableOnce.Do(func() {
 		go func() {
-			logger.LogInfo(context.Background(), fmt.Sprintf("codex quota auto-reenable task started: tick=%s", codexQuotaAutoReenableTickInterval))
+			logger.LogInfo(context.Background(), fmt.Sprintf("codex quota recovery and routing cooldown cleanup task started: tick=%s", codexQuotaAutoReenableTickInterval))
 			ticker := time.NewTicker(codexQuotaAutoReenableTickInterval)
 			defer ticker.Stop()
 
 			for {
 				if err := runCodexQuotaAutoReenablePass(context.Background(), common.GetTimestamp()); err != nil {
-					logger.LogWarn(context.Background(), fmt.Sprintf("codex quota auto-reenable task failed: %v", err))
+					logger.LogWarn(context.Background(), fmt.Sprintf("codex quota recovery and routing cooldown cleanup task failed: %v", err))
 				}
 				<-ticker.C
 			}

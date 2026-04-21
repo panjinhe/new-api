@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -64,8 +65,8 @@ type codexWhamUsageResponse struct {
 	} `json:"rate_limit"`
 }
 
-func HandleCodexQuotaChannelError(ctx context.Context, channelError types.ChannelError, err *types.NewAPIError) bool {
-	if err == nil || !channelError.AutoBan || channelError.ChannelType != constant.ChannelTypeCodex {
+func HandleCodexQuotaChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError) bool {
+	if err == nil || channelError.ChannelType != constant.ChannelTypeCodex {
 		return false
 	}
 
@@ -75,8 +76,12 @@ func HandleCodexQuotaChannelError(ctx context.Context, channelError types.Channe
 	}
 	types.ErrOptionWithErrorCode(types.ErrorCodeChannelCodexQuotaExhausted)(err)
 
+	reqCtx := context.Background()
+	if c != nil && c.Request != nil {
+		reqCtx = c.Request.Context()
+	}
 	if state.ResetAt <= 0 && !state.ResetUnknown {
-		resolvedState, resolveErr := resolveCodexQuotaStateFromUsage(ctx, channelError.ChannelId, state.Scope)
+		resolvedState, resolveErr := resolveCodexQuotaStateFromUsage(reqCtx, channelError.ChannelId, state.Scope)
 		if resolveErr == nil && resolvedState != nil && resolvedState.ResetAt > 0 {
 			state.ResetAt = resolvedState.ResetAt
 			state.Scope = resolvedState.Scope
@@ -93,15 +98,22 @@ func HandleCodexQuotaChannelError(ctx context.Context, channelError types.Channe
 		state.DisabledAt = common.GetTimestamp()
 	}
 
-	if err := disableCodexChannelForQuota(channelError, err.ErrorWithStatusCode(), state); err != nil {
-		common.SysLog(fmt.Sprintf("codex quota disable failed: channel_id=%d, error=%v", channelError.ChannelId, err))
+	if persistErr := applyCodexRoutingCooldown(channelError, err, state); persistErr != nil {
+		common.SysLog(fmt.Sprintf("codex quota cooldown failed: channel_id=%d, error=%v", channelError.ChannelId, persistErr))
 		return false
 	}
+	setCodexRoutingCooldownAdminInfo(c, err, state, channelError)
 	return true
 }
 
 func ShouldSkipAutoTestForCodexQuota(channel *model.Channel, now int64) bool {
-	if channel == nil || channel.Type != constant.ChannelTypeCodex || channel.Status != common.ChannelStatusAutoDisabled {
+	if channel == nil {
+		return false
+	}
+	if channel.HasRoutingCooldown(now) && !channel.HasAvailableRoute(now) {
+		return true
+	}
+	if channel.Type != constant.ChannelTypeCodex || channel.Status != common.ChannelStatusAutoDisabled {
 		return false
 	}
 
@@ -127,6 +139,9 @@ func runCodexQuotaAutoReenablePass(ctx context.Context, now int64) error {
 	for _, channel := range channels {
 		if channel == nil {
 			continue
+		}
+		if err := CleanupChannelRoutingCooldown(channel.Id, now); err != nil {
+			common.SysLog(fmt.Sprintf("routing cooldown cleanup failed: channel_id=%d, error=%v", channel.Id, err))
 		}
 		if err := recoverDueCodexQuotaStates(ctx, channel.Id, now); err != nil {
 			common.SysLog(fmt.Sprintf("codex quota auto-reenable failed: channel_id=%d, error=%v", channel.Id, err))
@@ -329,29 +344,83 @@ func fetchCodexWhamUsageForChannel(ctx context.Context, channelID int) (int, []b
 	return FetchCodexWhamUsage(ctx, client, refreshedChannel.GetBaseURL(), strings.TrimSpace(refreshedKey.AccessToken), strings.TrimSpace(refreshedKey.AccountID))
 }
 
-func disableCodexChannelForQuota(channelError types.ChannelError, reason string, state *CodexQuotaState) error {
+func applyCodexRoutingCooldown(channelError types.ChannelError, err *types.NewAPIError, state *CodexQuotaState) error {
 	if state == nil {
 		return errors.New("nil codex quota state")
 	}
 
-	_ = model.UpdateChannelStatus(channelError.ChannelId, channelError.UsingKey, common.ChannelStatusAutoDisabled, reason)
-	if err := persistCodexQuotaState(channelError.ChannelId, resolveCodexQuotaStateIndex(channelError), *state); err != nil {
-		return err
+	reason := err.ErrorWithStatusCode()
+	if persistErr := persistCodexQuotaState(channelError.ChannelId, resolveCodexQuotaStateIndex(channelError), *state); persistErr != nil {
+		return persistErr
 	}
 
-	channel, err := model.GetChannelById(channelError.ChannelId, true)
-	if err != nil {
-		return nil
+	resetAt := state.ResetAt
+	source := channelRoutingCooldownSourceMetadata
+	if state.Source == codexQuotaSourceUsage {
+		source = channelRoutingCooldownSourceUsageProbe
+	}
+	if resetAt <= 0 {
+		if derivedResetAt, derivedSource, ok := resolveChannelRoutingCooldownReset(err.Metadata); ok {
+			resetAt = derivedResetAt
+			source = derivedSource
+		} else {
+			resetAt = common.GetTimestamp() + int64(defaultChannelRoutingCooldown/time.Second)
+			source = channelRoutingCooldownSourceFallback
+		}
 	}
 
-	subject := fmt.Sprintf("通道「%s」（#%d）触发 Codex 限额", channelError.ChannelName, channelError.ChannelId)
-	content := fmt.Sprintf("通道「%s」（#%d）触发 Codex 限额，原因：%s", channelError.ChannelName, channelError.ChannelId, reason)
-	if channel.ChannelInfo.IsMultiKey && channelError.UsingKeyIdx >= 0 && channel.Status == common.ChannelStatusEnabled {
-		subject = fmt.Sprintf("通道「%s」（#%d）的 Codex Key 已被禁用", channelError.ChannelName, channelError.ChannelId)
-		content = fmt.Sprintf("通道「%s」（#%d）的第 %d 个 Key 已因 Codex 限额被禁用，原因：%s", channelError.ChannelName, channelError.ChannelId, channelError.UsingKeyIdx+1, reason)
+	if persistErr := persistChannelRoutingCooldown(channelError, model.RoutingCooldownState{
+		Kind:      channelRoutingCooldownKindQuota,
+		Reason:    reason,
+		ResetAt:   resetAt,
+		Source:    source,
+		CreatedAt: common.GetTimestamp(),
+	}); persistErr != nil {
+		return persistErr
+	}
+
+	channel, loadErr := model.GetChannelById(channelError.ChannelId, true)
+	if loadErr != nil {
+		return loadErr
+	}
+	channel.ApplyRoutingCooldownView(common.GetTimestamp())
+
+	subject := fmt.Sprintf("通道「%s」（#%d）触发 Codex 限额冷却", channelError.ChannelName, channelError.ChannelId)
+	content := fmt.Sprintf("通道「%s」（#%d）触发 Codex 限额冷却，原因：%s", channelError.ChannelName, channelError.ChannelId, reason)
+	if channel.ChannelInfo.IsMultiKey && channelError.UsingKeyIdx >= 0 {
+		subject = fmt.Sprintf("通道「%s」（#%d）的 Codex Key 进入冷却", channelError.ChannelName, channelError.ChannelId)
+		content = fmt.Sprintf("通道「%s」（#%d）的第 %d 个 Key 因 Codex 限额进入冷却，原因：%s", channelError.ChannelName, channelError.ChannelId, channelError.UsingKeyIdx+1, reason)
 	}
 	NotifyRootUser(formatNotifyType(channelError.ChannelId, channel.Status), subject, content)
 	return nil
+}
+
+func setCodexRoutingCooldownAdminInfo(c *gin.Context, err *types.NewAPIError, state *CodexQuotaState, channelError types.ChannelError) {
+	if c == nil || state == nil {
+		return
+	}
+	source := channelRoutingCooldownSourceMetadata
+	resetAt := state.ResetAt
+	if state.Source == codexQuotaSourceUsage {
+		source = channelRoutingCooldownSourceUsageProbe
+	} else if derivedResetAt, derivedSource, ok := resolveChannelRoutingCooldownReset(err.Metadata); ok {
+		resetAt = derivedResetAt
+		source = derivedSource
+	}
+	if resetAt <= 0 {
+		resetAt = common.GetTimestamp() + int64(defaultChannelRoutingCooldown/time.Second)
+		source = channelRoutingCooldownSourceFallback
+	}
+
+	routingState := model.RoutingCooldownState{
+		Kind:      channelRoutingCooldownKindQuota,
+		Reason:    err.ErrorWithStatusCode(),
+		ResetAt:   resetAt,
+		Source:    source,
+		CreatedAt: common.GetTimestamp(),
+		KeyIndex:  resolveCodexQuotaStateIndex(channelError),
+	}
+	setRoutingCooldownAdminInfo(c, routingState)
 }
 
 func persistCodexQuotaState(channelID int, keyIndex int, state CodexQuotaState) error {

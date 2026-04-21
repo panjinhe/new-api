@@ -232,6 +232,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			keyIndex = common.GetContextKeyInt(c, constant.ContextKeyChannelMultiKeyIndex)
 		}
 		forceRetrySamePriority := processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), keyIndex, channel.GetAutoBan()), newAPIError)
+		for _, excludedChannelID := range service.GetRetryExcludedChannels(c) {
+			retryParam.ExcludeChannel(excludedChannelID)
+		}
 		if forceRetrySamePriority {
 			retryParam.ResetRetryNextTry()
 		}
@@ -339,7 +342,7 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 		return false
 	}
 	if retryTimes <= 0 {
-		return false
+		return service.ConsumeChannelAffinityForcedRetry(c)
 	}
 	code := openaiErr.StatusCode
 	if code >= 200 && code < 300 {
@@ -355,7 +358,11 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 }
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError) bool {
-	handledSynchronously := service.HandleCodexQuotaChannelError(c.Request.Context(), channelError, err)
+	handledSynchronously := service.HandleChannelRoutingCooldown(c, channelError, err)
+	affinityReleased := service.ReleaseChannelAffinityOnRetryableFailure(c, err)
+	if service.ShouldExcludeChannelAfterFailure(channelError, c) {
+		service.AddRetryExcludedChannel(c, channelError.ChannelId)
+	}
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, err.Error()))
 	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
@@ -391,6 +398,7 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 			adminInfo["multi_key_index"] = common.GetContextKeyInt(c, constant.ContextKeyChannelMultiKeyIndex)
 		}
 		service.AppendChannelAffinityAdminInfo(c, adminInfo)
+		service.AppendChannelRoutingAdminInfo(c, adminInfo)
 		other["admin_info"] = adminInfo
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
 		if startTime.IsZero() {
@@ -400,7 +408,7 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		model.RecordErrorLog(c, userId, channelId, modelName, tokenName, err.MaskSensitiveErrorWithStatusCode(), tokenId, useTimeSeconds, common.GetContextKeyBool(c, constant.ContextKeyIsStream), userGroup, other)
 	}
 
-	return handledSynchronously
+	return handledSynchronously || affinityReleased
 }
 
 func RelayMidjourney(c *gin.Context) {
@@ -559,10 +567,17 @@ func RelayTask(c *gin.Context) {
 			if channel.ChannelInfo.IsMultiKey {
 				keyIndex = common.GetContextKeyInt(c, constant.ContextKeyChannelMultiKeyIndex)
 			}
-			processChannelError(c,
+			retryErr := types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode)
+			forceRetrySamePriority := processChannelError(c,
 				*types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey,
 					common.GetContextKeyString(c, constant.ContextKeyChannelKey), keyIndex, channel.GetAutoBan()),
-				types.NewOpenAIError(taskErr.Error, types.ErrorCodeBadResponseStatusCode, taskErr.StatusCode))
+				retryErr)
+			for _, excludedChannelID := range service.GetRetryExcludedChannels(c) {
+				retryParam.ExcludeChannel(excludedChannelID)
+			}
+			if forceRetrySamePriority {
+				retryParam.ResetRetryNextTry()
+			}
 		}
 
 		if !shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry()) {
@@ -625,7 +640,7 @@ func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *dto.TaskError,
 		return false
 	}
 	if retryTimes <= 0 {
-		return false
+		return service.ConsumeChannelAffinityForcedRetry(c)
 	}
 	if _, ok := c.Get("specific_channel_id"); ok {
 		return false

@@ -25,6 +25,7 @@ const (
 	ginKeyChannelAffinityMeta       = "channel_affinity_meta"
 	ginKeyChannelAffinityLogInfo    = "channel_affinity_log_info"
 	ginKeyChannelAffinitySkipRetry  = "channel_affinity_skip_retry_on_failure"
+	ginKeyChannelAffinityForceRetry = "channel_affinity_force_retry_on_failure"
 
 	channelAffinityCacheNamespace           = "new-api:channel_affinity:v1"
 	channelAffinityUsageCacheStatsNamespace = "new-api:channel_affinity_usage_cache_stats:v1"
@@ -634,6 +635,87 @@ func ShouldSkipRetryAfterChannelAffinityFailure(c *gin.Context) bool {
 		return false
 	}
 	return meta.SkipRetry
+}
+
+func shouldAllowChannelAffinityRetry(err *types.NewAPIError) bool {
+	if err == nil {
+		return false
+	}
+	if types.IsSkipRetryError(err) {
+		return false
+	}
+	if operation_setting.IsAlwaysSkipRetryCode(err.GetErrorCode()) {
+		return false
+	}
+	if types.IsChannelError(err) {
+		return true
+	}
+	code := err.StatusCode
+	if code < 100 || code > 599 {
+		return true
+	}
+	return operation_setting.ShouldRetryByStatusCode(code)
+}
+
+func ClearChannelAffinityBinding(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	cacheKey, _, hasCacheKey := getChannelAffinityContext(c)
+	if !hasCacheKey {
+		return false
+	}
+
+	cache := getChannelAffinityCache()
+	if _, delErr := cache.DeleteMany([]string{cacheKey}); delErr != nil {
+		common.SysError(fmt.Sprintf("channel affinity cache delete failed: key=%s, err=%v", cacheKey, delErr))
+	}
+
+	if anyInfo, ok := c.Get(ginKeyChannelAffinityLogInfo); ok {
+		if info, ok := anyInfo.(map[string]interface{}); ok {
+			info["affinity_released"] = true
+			c.Set(ginKeyChannelAffinityLogInfo, info)
+		}
+	}
+	return true
+}
+
+// ReleaseChannelAffinityOnRetryableFailure clears the current affinity binding and
+// allows one failover retry when a sticky channel hit a retryable upstream error.
+func ReleaseChannelAffinityOnRetryableFailure(c *gin.Context, err *types.NewAPIError) bool {
+	if c == nil || !shouldAllowChannelAffinityRetry(err) {
+		return false
+	}
+	meta, ok := getChannelAffinityMeta(c)
+	if !ok {
+		return false
+	}
+	released := ClearChannelAffinityBinding(c)
+	if !released {
+		return false
+	}
+
+	meta.SkipRetry = false
+	c.Set(ginKeyChannelAffinityMeta, meta)
+	c.Set(ginKeyChannelAffinitySkipRetry, false)
+	c.Set(ginKeyChannelAffinityForceRetry, true)
+	return true
+}
+
+func ConsumeChannelAffinityForcedRetry(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	anyValue, ok := c.Get(ginKeyChannelAffinityForceRetry)
+	if !ok {
+		return false
+	}
+	forced, ok := anyValue.(bool)
+	if !ok || !forced {
+		return false
+	}
+	c.Set(ginKeyChannelAffinityForceRetry, false)
+	return true
 }
 
 func MarkChannelAffinityUsed(c *gin.Context, selectedGroup string, channelID int) {

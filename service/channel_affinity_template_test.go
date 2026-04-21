@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -174,6 +176,54 @@ func TestShouldSkipRetryAfterChannelAffinityFailure(t *testing.T) {
 			require.Equal(t, tt.want, ShouldSkipRetryAfterChannelAffinityFailure(tt.ctx()))
 		})
 	}
+}
+
+func TestReleaseChannelAffinityOnRetryableFailureClearsStickyState(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	ctx := buildChannelAffinityTemplateContextForTest(channelAffinityMeta{
+		CacheKey:       channelAffinityCacheNamespace + ":rule-retry:gpt-5:default:sticky-key",
+		TTLSeconds:     60,
+		RuleName:       "rule-retry",
+		SkipRetry:      true,
+		UsingGroup:     "default",
+		ModelName:      "gpt-5",
+		KeyFingerprint: "stickyfp",
+	})
+
+	cache := getChannelAffinityCache()
+	cacheKeySuffix := "rule-retry:gpt-5:default:sticky-key"
+	require.NoError(t, cache.SetWithTTL(cacheKeySuffix, 9527, time.Minute))
+	t.Cleanup(func() {
+		_, _ = cache.DeleteMany([]string{cacheKeySuffix})
+	})
+
+	released := ReleaseChannelAffinityOnRetryableFailure(ctx, types.NewOpenAIError(errors.New("The usage limit has been reached"), types.ErrorCodeBadResponseStatusCode, http.StatusTooManyRequests))
+	require.True(t, released)
+	require.False(t, ShouldSkipRetryAfterChannelAffinityFailure(ctx))
+
+	_, found, err := cache.Get(cacheKeySuffix)
+	require.NoError(t, err)
+	require.False(t, found)
+
+	require.True(t, ConsumeChannelAffinityForcedRetry(ctx))
+	require.False(t, ConsumeChannelAffinityForcedRetry(ctx))
+}
+
+func TestReleaseChannelAffinityOnRetryableFailureSkipsLocalValidationErrors(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	ctx := buildChannelAffinityTemplateContextForTest(channelAffinityMeta{
+		RuleName:   "rule-no-release",
+		SkipRetry:  true,
+		UsingGroup: "default",
+		ModelName:  "gpt-5",
+	})
+
+	released := ReleaseChannelAffinityOnRetryableFailure(ctx, types.NewError(errors.New("bad request"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry()))
+	require.False(t, released)
+	require.True(t, ShouldSkipRetryAfterChannelAffinityFailure(ctx))
+	require.False(t, ConsumeChannelAffinityForcedRetry(ctx))
 }
 
 func TestChannelAffinityHitCodexTemplatePassHeadersEffective(t *testing.T) {

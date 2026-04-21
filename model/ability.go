@@ -3,10 +3,12 @@ package model
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/samber/lo"
 	"gorm.io/gorm"
@@ -103,44 +105,103 @@ func getChannelQuery(group string, model string, retry int) (*gorm.DB, error) {
 	return channelQuery, nil
 }
 
-func GetChannel(group string, model string, retry int) (*Channel, error) {
-	var abilities []Ability
-
-	var err error = nil
-	channelQuery, err := getChannelQuery(group, model, retry)
+func GetChannel(group string, model string, retry int, excludedChannelIDs map[int]struct{}) (*Channel, error) {
+	abilities, err := getEligibleAbilitiesForSelection(group, model)
 	if err != nil {
 		return nil, err
 	}
-	if common.UsingSQLite || common.UsingPostgreSQL {
-		err = channelQuery.Order("weight DESC").Find(&abilities).Error
-	} else {
-		err = channelQuery.Order("weight DESC").Find(&abilities).Error
-	}
-	if err != nil {
-		return nil, err
-	}
-	channel := Channel{}
-	if len(abilities) > 0 {
-		// Randomly choose one
-		weightSum := uint(0)
-		for _, ability_ := range abilities {
-			weightSum += ability_.Weight + 10
-		}
-		// Randomly choose one
-		weight := common.GetRandomInt(int(weightSum))
-		for _, ability_ := range abilities {
-			weight -= int(ability_.Weight) + 10
-			//log.Printf("weight: %d, ability weight: %d", weight, *ability_.Weight)
-			if weight <= 0 {
-				channel.Id = ability_.ChannelId
-				break
-			}
-		}
-	} else {
+	if len(abilities) == 0 {
 		return nil, nil
 	}
-	err = DB.First(&channel, "id = ?", channel.Id).Error
-	return &channel, err
+
+	channelIDs := make([]int, 0, len(abilities))
+	for _, ability := range abilities {
+		channelIDs = append(channelIDs, ability.ChannelId)
+	}
+
+	var channels []*Channel
+	if err := DB.Where("id IN ?", channelIDs).Find(&channels).Error; err != nil {
+		return nil, err
+	}
+
+	channelByID := make(map[int]*Channel, len(channels))
+	now := common.GetTimestamp()
+	for _, channel := range channels {
+		if _, excluded := excludedChannelIDs[channel.Id]; excluded {
+			continue
+		}
+		if !channel.HasAvailableRoute(now) {
+			continue
+		}
+		channelByID[channel.Id] = channel
+	}
+
+	eligibleAbilities := make([]Ability, 0, len(abilities))
+	prioritySet := make(map[int]struct{})
+	for _, ability := range abilities {
+		if _, ok := channelByID[ability.ChannelId]; !ok {
+			continue
+		}
+		eligibleAbilities = append(eligibleAbilities, ability)
+		prioritySet[int(lo.FromPtr(ability.Priority))] = struct{}{}
+	}
+	if len(eligibleAbilities) == 0 {
+		return nil, nil
+	}
+
+	priorities := make([]int, 0, len(prioritySet))
+	for priority := range prioritySet {
+		priorities = append(priorities, priority)
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(priorities)))
+	if retry >= len(priorities) {
+		return nil, nil
+	}
+	targetPriority := priorities[retry]
+
+	targetAbilities := make([]Ability, 0, len(eligibleAbilities))
+	weightSum := uint(0)
+	for _, ability := range eligibleAbilities {
+		if int(lo.FromPtr(ability.Priority)) != targetPriority {
+			continue
+		}
+		targetAbilities = append(targetAbilities, ability)
+		weightSum += ability.Weight + 10
+	}
+	if len(targetAbilities) == 0 {
+		return nil, nil
+	}
+
+	weight := common.GetRandomInt(int(weightSum))
+	for _, ability := range targetAbilities {
+		weight -= int(ability.Weight) + 10
+		if weight <= 0 {
+			return channelByID[ability.ChannelId], nil
+		}
+	}
+	return channelByID[targetAbilities[0].ChannelId], nil
+}
+
+func getEligibleAbilitiesForSelection(group string, modelName string) ([]Ability, error) {
+	modelsToTry := []string{modelName}
+	normalized := ratio_setting.FormatMatchingModelName(modelName)
+	if normalized != "" && normalized != modelName {
+		modelsToTry = append(modelsToTry, normalized)
+	}
+
+	for _, candidate := range modelsToTry {
+		var abilities []Ability
+		err := DB.Where(commonGroupCol+" = ? and model = ? and enabled = ?", group, candidate, true).
+			Order("priority DESC, weight DESC").
+			Find(&abilities).Error
+		if err != nil {
+			return nil, err
+		}
+		if len(abilities) > 0 {
+			return abilities, nil
+		}
+	}
+	return nil, nil
 }
 
 func (channel *Channel) AddAbilities(tx *gorm.DB) error {
