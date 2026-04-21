@@ -14,9 +14,13 @@ services:
       - .env.prod
     environment:
       SQLITE_PATH: /data/one-api.db
+      TARGET_DATA_DIR: /data
+      LEGACY_SEED_ROOT: /seed/workspace
+      ENABLE_LEGACY_SEED: "true"
     volumes:
       - ./data-prod:/data
       - ./logs-prod:/app/logs
+      - ./:/seed/workspace:ro
     healthcheck:
       test:
         [

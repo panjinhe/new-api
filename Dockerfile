@@ -33,6 +33,8 @@ RUN apt-get update \
     && update-ca-certificates
 
 COPY --from=builder2 /build/new-api /
+COPY docker/entrypoint-with-seed.sh /entrypoint-with-seed.sh
+RUN chmod +x /entrypoint-with-seed.sh
 EXPOSE 3000
 WORKDIR /data
-ENTRYPOINT ["/new-api"]
+ENTRYPOINT ["/entrypoint-with-seed.sh"]

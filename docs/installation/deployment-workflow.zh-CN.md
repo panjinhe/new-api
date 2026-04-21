@@ -50,6 +50,20 @@
 
 这样你第一次从“旧目录布局”切到“prod/dev 分离布局”时，不用手工搬每个文件。
 
+另外，现在生产容器本身也支持“首启自动导入旧数据”：
+
+- 如果 `data-prod/one-api.db` 还不存在
+- 但仓库根目录存在旧的 `one-api.db`
+
+那么即使你直接执行：
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+容器首次启动时也会自动把旧数据库导入到 `data-prod/one-api.db`。  
+旧的 `data/` 目录也会在首启时合并进 `data-prod/`，且不会覆盖已存在文件。
+
 ## 本地开发
 
 先准备开发环境变量：
@@ -69,6 +83,8 @@ docker compose -f docker-compose.dev.yml up -d --build
 - 监听端口是 `3001`
 - 数据只写到 `data-dev/one-api.db`
 - 不会碰线上 `data-prod/`
+- 如果 `data-dev/one-api.db` 还不存在，而仓库根目录存在旧的 `one-api.db`，容器首次启动时会自动导入
+- 如果仓库根目录存在旧的 `data/` 目录，容器首次启动时也会把里面的文件合并进 `data-dev/`，且不会覆盖已存在文件
 
 如果你只是改小功能，也可以继续用本地 `go run main.go`。  
 但在准备上线前，建议至少再用一次 `docker-compose.dev.yml` 做“接近生产”的验证。
