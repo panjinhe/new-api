@@ -5,10 +5,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_NAME="prod"
 PRINT_PATH=0
 DB_BACKEND=""
+RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-0}"
 
 usage() {
   cat <<'EOF'
-Usage: ./backup.sh [--env-name prod|dev] [--print-path]
+Usage: ./backup.sh [--env-name prod|dev] [--print-path] [--retention-days N]
 EOF
 }
 
@@ -25,6 +26,14 @@ while (($# > 0)); do
     --print-path)
       PRINT_PATH=1
       shift
+      ;;
+    --retention-days)
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for --retention-days" >&2
+        exit 1
+      }
+      RETENTION_DAYS="$2"
+      shift 2
       ;;
     --db)
       [[ $# -ge 2 ]] || {
@@ -45,6 +54,11 @@ while (($# > 0)); do
       ;;
   esac
 done
+
+if [[ ! "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
+  echo "Invalid retention days: $RETENTION_DAYS" >&2
+  exit 1
+fi
 
 case "$ENV_NAME" in
   prod)
@@ -145,6 +159,26 @@ copy_postgres_backup() {
   compose_with_files exec -T postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$POSTGRES_DUMP"
 }
 
+cleanup_old_backups() {
+  if [[ "$RETENTION_DAYS" -le 0 ]]; then
+    return
+  fi
+
+  if [[ ! -d "$BACKUP_ROOT" ]]; then
+    return
+  fi
+
+  local cutoff_days=$((RETENTION_DAYS - 1))
+  if [[ "$cutoff_days" -lt 0 ]]; then
+    cutoff_days=0
+  fi
+
+  while IFS= read -r -d '' old_dir; do
+    rm -rf -- "$old_dir"
+    echo "Pruned old backup: $old_dir"
+  done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime "+$cutoff_days" -print0)
+}
+
 if [[ "$DB_BACKEND" == "postgres" ]]; then
   copy_postgres_backup
 elif [[ -f "$SQLITE_SOURCE" ]]; then
@@ -168,6 +202,7 @@ fi
   echo "created_at=$(date -Iseconds)"
   echo "hostname=$(hostname)"
   echo "db_backend=$DB_BACKEND"
+  echo "retention_days=$RETENTION_DAYS"
   echo "data_dir=$DATA_DIR"
   echo "sqlite_source=$SQLITE_SOURCE"
   if command -v git >/dev/null 2>&1 && git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -188,3 +223,5 @@ elif [[ -f "$SNAPSHOT_DB" ]]; then
 else
   echo "Database snapshot skipped."
 fi
+
+cleanup_old_backups

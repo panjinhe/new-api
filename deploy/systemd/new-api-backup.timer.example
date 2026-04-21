@@ -1,0 +1,11 @@
+[Unit]
+Description=Run new-api backup on schedule
+
+[Timer]
+OnCalendar=__ON_CALENDAR__
+Persistent=true
+RandomizedDelaySec=10m
+Unit=__SERVICE_NAME__.service
+
+[Install]
+WantedBy=timers.target

@@ -166,6 +166,12 @@ cd /opt/new-api/app
 ./backup.sh --env-name prod
 ```
 
+如果你希望备份后自动清理旧快照，可以加保留天数：
+
+```bash
+./backup.sh --env-name prod --retention-days 14
+```
+
 备份内容包括：
 
 - SQLite 数据库快照
@@ -178,6 +184,30 @@ cd /opt/new-api/app
 
 ```text
 backups/prod/20260421-210000/
+```
+
+## 生产环境自动备份
+
+项目里已经带了 systemd 定时器模板和安装脚本，适合你现在这台长期运行的 Linux 服务器。
+
+推荐命令：
+
+```bash
+cd /opt/new-api/app
+sudo ./scripts/install-prod-backup-timer.sh --app-dir /opt/new-api/app --env-name prod --retention-days 14 --on-calendar "*-*-* 04:20:00"
+```
+
+这会做三件事：
+
+- 安装 `new-api-backup.service`
+- 安装 `new-api-backup.timer`
+- 立刻启用定时任务，并让它每天自动执行一次 `./backup.sh --env-name prod`
+
+安装完成后可以检查：
+
+```bash
+systemctl status new-api-backup.timer --no-pager
+systemctl list-timers --all --no-pager | grep new-api-backup
 ```
 
 ## 从线上拉快照到本地

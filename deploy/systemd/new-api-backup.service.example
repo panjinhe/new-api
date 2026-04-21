@@ -1,0 +1,10 @@
+[Unit]
+Description=new-api backup job
+Wants=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__APP_DIR__
+ExecStart=/usr/bin/env BACKUP_RETENTION_DAYS=__RETENTION_DAYS__ /bin/bash __APP_DIR__/backup.sh --env-name __ENV_NAME__
+
