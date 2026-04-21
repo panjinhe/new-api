@@ -23,7 +23,6 @@ import {
   Typography,
   Card,
   Button,
-  Banner,
   Skeleton,
   Form,
   Space,
@@ -33,6 +32,7 @@ import {
   Tooltip,
   Tabs,
   TabPane,
+  Tag,
 } from '@douyinfe/semi-ui';
 import { SiAlipay, SiWechat, SiStripe } from 'react-icons/si';
 import {
@@ -88,6 +88,8 @@ const RechargeCard = ({
   onOpenHistory,
   enableWaffoTopUp,
   enableWaffoPancakeTopUp,
+  onlineTopUpEntryEnabled = true,
+  subscriptionEntryEnabled = true,
   subscriptionLoading = false,
   subscriptionPlans = [],
   billingPreference,
@@ -101,8 +103,19 @@ const RechargeCard = ({
   const initialTabSetRef = useRef(false);
   const showAmountSkeleton = useMinimumLoadingTime(amountLoading);
   const [activeTab, setActiveTab] = useState('topup');
+  const hasOnlineTopUp =
+    enableOnlineTopUp ||
+    enableStripeTopUp ||
+    enableCreemTopUp ||
+    enableWaffoTopUp ||
+    enableWaffoPancakeTopUp;
+  const shouldShowOnlineTopUp = onlineTopUpEntryEnabled && hasOnlineTopUp;
   const shouldShowSubscription =
-    !subscriptionLoading && subscriptionPlans.length > 0;
+    subscriptionEntryEnabled &&
+    !subscriptionLoading &&
+    subscriptionPlans.length > 0;
+  const redemptionOnlyMode =
+    !shouldShowOnlineTopUp && !shouldShowSubscription;
   const regularPayMethods = payMethods || [];
 
   useEffect(() => {
@@ -122,6 +135,7 @@ const RechargeCard = ({
       {/* 统计数据 */}
       <Card
         className='!rounded-xl w-full'
+        bodyStyle={shouldShowOnlineTopUp ? undefined : { display: 'none' }}
         cover={
           <div
             className='relative h-30'
@@ -222,15 +236,12 @@ const RechargeCard = ({
         }
       >
         {/* 在线充值表单 */}
-        {statusLoading ? (
+        {shouldShowOnlineTopUp ? (
+          statusLoading ? (
           <div className='py-8 flex justify-center'>
             <Spin size='large' />
           </div>
-        ) : enableOnlineTopUp ||
-          enableStripeTopUp ||
-          enableCreemTopUp ||
-          enableWaffoTopUp ||
-          enableWaffoPancakeTopUp ? (
+          ) : (
           <Form
             getFormApi={(api) => (onlineFormApiRef.current = api)}
             initValues={{ topUpCount: topUpCount }}
@@ -552,16 +563,8 @@ const RechargeCard = ({
               )}
             </div>
           </Form>
-        ) : (
-          <Banner
-            type='info'
-            description={t(
-              '管理员未开启在线充值功能，请联系管理员开启或使用兑换码充值。',
-            )}
-            className='!rounded-xl'
-            closeIcon={null}
-          />
-        )}
+          )
+        ) : null}
       </Card>
 
       {/* 兑换码充值 */}
@@ -599,6 +602,7 @@ const RechargeCard = ({
             showClear
             style={{ width: '100%' }}
             extraText={
+              !redemptionOnlyMode &&
               topUpLink && (
                 <Text type='tertiary'>
                   {t('在找兑换码？')}
@@ -629,9 +633,13 @@ const RechargeCard = ({
           </Avatar>
           <div>
             <Typography.Text className='text-lg font-medium'>
-              {t('账户充值')}
+              {redemptionOnlyMode ? t('钱包管理') : t('账户充值')}
             </Typography.Text>
-            <div className='text-xs'>{t('多种充值方式，安全便捷')}</div>
+            <div className='text-xs'>
+              {redemptionOnlyMode
+                ? t('使用兑换码兑换额度')
+                : t('多种充值方式，安全便捷')}
+            </div>
           </div>
         </div>
         <Button
