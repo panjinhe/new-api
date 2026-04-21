@@ -38,6 +38,7 @@ data-prod/
 data-prod-snapshot/
 postgres-dev/
 postgres-prod/
+clash-prod/
 logs-dev/
 logs-prod/
 backups/
