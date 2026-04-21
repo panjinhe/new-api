@@ -1,0 +1,243 @@
+# new-api 本地开发 / 线上部署工作流
+
+这套方案的目标只有一个：
+
+- 线上服务器是唯一真实数据源
+- 本地只负责开发代码和做临时验证
+- 不做本地与线上数据库的双向同步
+
+## 目录约定
+
+仓库根目录下新增这几类目录：
+
+- `data-dev/`：本地 Docker 开发库
+- `logs-dev/`：本地 Docker 开发日志
+- `data-prod/`：服务器生产数据目录
+- `logs-prod/`：服务器生产日志目录
+- `backups/`：备份目录
+- `data-prod-snapshot/`：从线上拉回来的快照目录
+
+对应文件：
+
+- `docker-compose.dev.yml`
+- `docker-compose.prod.yml`
+- `.env.dev`
+- `.env.prod`
+- `deploy.sh`
+- `backup.sh`
+- `pull-prod-snapshot.sh`
+
+## 第一次迁移到服务器
+
+这份工作流默认你使用这套固定生产路径：
+
+- 服务器项目目录：`/opt/new-api/app`
+- 生产数据目录：`/opt/new-api/app/data-prod`
+- 生产日志目录：`/opt/new-api/app/logs-prod`
+- 生产备份目录：`/opt/new-api/app/backups`
+
+如果你现在的数据还在仓库根目录的 `one-api.db`，以及旧的 `data/` 目录里：
+
+1. 把代码推到你的 fork。
+2. 在服务器克隆仓库到固定目录，例如 `/opt/new-api/app`。
+3. 复制 `.env.prod.example` 为 `.env.prod`，填好 `SESSION_SECRET`、`CRYPTO_SECRET`、域名等。
+4. 运行 `./deploy.sh`。
+
+`deploy.sh` 在生产环境下会自动做两件迁移辅助工作：
+
+- 如果 `data-prod/one-api.db` 还不存在，但仓库根目录存在 `one-api.db`，会自动复制进去。
+- 如果旧的 `data/` 目录存在，会把里面的文件复制到 `data-prod/`，并保留已有文件。
+
+这样你第一次从“旧目录布局”切到“prod/dev 分离布局”时，不用手工搬每个文件。
+
+## 本地开发
+
+先准备开发环境变量：
+
+```bash
+cp .env.dev.example .env.dev
+```
+
+启动本地 Docker 开发环境：
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+开发环境的特点：
+
+- 监听端口是 `3001`
+- 数据只写到 `data-dev/one-api.db`
+- 不会碰线上 `data-prod/`
+
+如果你只是改小功能，也可以继续用本地 `go run main.go`。  
+但在准备上线前，建议至少再用一次 `docker-compose.dev.yml` 做“接近生产”的验证。
+
+## 线上部署
+
+先准备生产环境变量：
+
+```bash
+cd /opt/new-api/app
+cp .env.prod.example .env.prod
+nano .env.prod
+```
+
+建议至少把这几项填掉：
+
+```env
+SESSION_SECRET=换成足够长的随机字符串
+CRYPTO_SECRET=换成另一串随机字符串
+FRONTEND_BASE_URL=https://your-domain.example.com
+NODE_NAME=new-api-prod
+TZ=Asia/Shanghai
+ERROR_LOG_ENABLED=true
+BATCH_UPDATE_ENABLED=true
+MEMORY_CACHE_ENABLED=true
+TRUSTED_REDIRECT_DOMAINS=your-domain.example.com
+```
+
+生产部署命令：
+
+```bash
+cd /opt/new-api/app
+./deploy.sh
+```
+
+如果你已经在服务器上，并且想在部署前顺便拉最新代码：
+
+```bash
+cd /opt/new-api/app
+./deploy.sh --git-pull
+```
+
+生产脚本会按这个顺序执行：
+
+1. 检查 `.env.prod`
+2. 创建 `data-prod/` 和 `logs-prod/`
+3. 首次部署时迁移旧的 `one-api.db` 和 `data/`
+4. 调用 `backup.sh` 先做备份
+5. `docker compose -f docker-compose.prod.yml up -d --build --remove-orphans`
+6. 检查 `http://127.0.0.1:3000/api/status`
+
+生产 compose 默认只绑定：
+
+```text
+127.0.0.1:3000:3000
+```
+
+这表示：
+
+- 应用容器只监听服务器本机
+- 外网访问应该通过 Nginx 反向代理进来
+
+长期使用时，建议你继续配：
+
+- Nginx 反向代理
+- HTTPS 证书
+
+对应说明见：
+
+- [nginx-https.zh-CN.md](/E:/new-api/docs/installation/nginx-https.zh-CN.md)
+
+## 线上数据备份
+
+手工备份：
+
+```bash
+./backup.sh --env-name prod
+```
+
+备份内容包括：
+
+- SQLite 数据库快照
+- `data-prod/` 里的其他文件打包
+- 当前 `.env.prod`
+- 当前 `docker-compose.prod.yml`
+- 一份元数据说明
+
+备份目录示例：
+
+```text
+backups/prod/20260421-210000/
+```
+
+## 从线上拉快照到本地
+
+当你需要“在本地看线上当前配置”时，不要直接双向同步线上库。  
+正确做法是：只把线上备份单向拉回本地。
+
+示例：
+
+```bash
+REMOTE=ubuntu@your-server REMOTE_APP_DIR=/opt/new-api/app ./pull-prod-snapshot.sh
+```
+
+它会在远程服务器先执行：
+
+```bash
+./backup.sh --env-name prod --print-path
+```
+
+然后把最新备份目录拉到本地：
+
+```text
+data-prod-snapshot/<timestamp>/
+```
+
+如果你想把这份线上快照作为本地临时调试库，可以手工复制：
+
+```bash
+cp data-prod-snapshot/<timestamp>/one-api.db data-dev/one-api.db
+```
+
+这样做的好处是：
+
+- 本地可以基于线上真实配置排查问题
+- 不会把本地测试数据反写回生产
+
+## 固定工作流
+
+推荐你以后一直按这个节奏走：
+
+1. 本地改代码。
+2. 本地用 `docker-compose.dev.yml` 验证。
+3. 提交到 git 并 push 到自己的 fork。
+4. 服务器 `git pull --ff-only`。
+5. 服务器执行 `./deploy.sh`。
+6. 如果要排查线上问题，再用 `pull-prod-snapshot.sh` 拉一次快照到本地。
+
+## 不推荐的做法
+
+下面这些做法建议避免：
+
+- 本地和线上同时写同一份 SQLite 数据库
+- 用 git 同步数据库文件
+- 让生产数据只存在 Docker 容器内部
+- 在服务器直接改代码，再手工回填到本地
+
+## 恢复思路
+
+如果你要回滚某次部署，可以这样做：
+
+1. 停掉生产容器
+2. 把某个备份目录里的 `one-api.db` 复制回 `data-prod/one-api.db`
+3. 如果需要，也把 `data-extra.tar.gz` 里的文件解回 `data-prod/`
+4. 重新执行 `./deploy.sh --skip-backup`
+
+## 说明
+
+这套工作流是按你当前场景定的：
+
+- 个人维护
+- 一套主线上环境
+- 先继续使用 SQLite
+- 需要从线上单向拉快照到本地
+
+如果后面你要升级成：
+
+- 测试环境 + 正式环境双环境
+- PostgreSQL
+- 自动化 CI/CD
+
+可以在这套骨架上继续扩展，不用推倒重来。

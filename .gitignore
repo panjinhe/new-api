@@ -11,6 +11,8 @@ logs
 runtime
 web/dist
 .env
+.env.dev
+.env.prod
 one-api
 new-api
 /__debug_bin*
@@ -30,6 +32,12 @@ plans
 electron/node_modules
 electron/dist
 data/
+data-dev/
+data-prod/
+data-prod-snapshot/
+logs-dev/
+logs-prod/
+backups/
 .gomodcache/
 .gocache-temp
 .gopath

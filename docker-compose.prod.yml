@@ -1,0 +1,29 @@
+services:
+  new-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: new-api-local:prod
+    container_name: new-api-prod
+    restart: unless-stopped
+    init: true
+    command: ["--port", "3000", "--log-dir", "/app/logs"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env.prod
+    environment:
+      SQLITE_PATH: /data/one-api.db
+    volumes:
+      - ./data-prod:/data
+      - ./logs-prod:/app/logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:3000/api/status | grep -Eq '\"success\":[[:space:]]*true'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
