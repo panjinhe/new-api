@@ -1,6 +1,8 @@
 package setting
 
 import (
+	"strings"
+
 	"github.com/QuantumNous/new-api/common"
 )
 
@@ -21,7 +23,11 @@ func ContainsAutoGroup(group string) bool {
 
 func UpdateAutoGroupsByJsonString(jsonString string) error {
 	autoGroups = make([]string, 0)
-	return common.Unmarshal([]byte(jsonString), &autoGroups)
+	trimmed := strings.TrimSpace(jsonString)
+	if trimmed == "" || trimmed == "null" {
+		return nil
+	}
+	return common.Unmarshal([]byte(trimmed), &autoGroups)
 }
 
 func AutoGroups2JsonString() string {

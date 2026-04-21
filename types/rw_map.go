@@ -1,6 +1,7 @@
 package types
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/QuantumNous/new-api/common"
@@ -78,7 +79,11 @@ func LoadFromJsonString[K comparable, V any](m *RWMap[K, V], jsonStr string) err
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.data = make(map[K]V)
-	return common.Unmarshal([]byte(jsonStr), &m.data)
+	trimmed := strings.TrimSpace(jsonStr)
+	if trimmed == "" || trimmed == "null" {
+		return nil
+	}
+	return common.Unmarshal([]byte(trimmed), &m.data)
 }
 
 // LoadFromJsonStringWithCallback loads a JSON string into the RWMap and calls the callback on success.
@@ -86,7 +91,11 @@ func LoadFromJsonStringWithCallback[K comparable, V any](m *RWMap[K, V], jsonStr
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.data = make(map[K]V)
-	err := common.Unmarshal([]byte(jsonStr), &m.data)
+	trimmed := strings.TrimSpace(jsonStr)
+	var err error
+	if trimmed != "" && trimmed != "null" {
+		err = common.Unmarshal([]byte(trimmed), &m.data)
+	}
 	if err == nil && onSuccess != nil {
 		onSuccess()
 	}
