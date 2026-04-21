@@ -13,6 +13,7 @@ web/dist
 .env
 .env.dev
 .env.prod
+aheapi.pem
 one-api
 new-api
 /__debug_bin*
