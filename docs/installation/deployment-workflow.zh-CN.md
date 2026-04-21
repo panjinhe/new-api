@@ -138,6 +138,123 @@ cd /opt/new-api/app
 5. `docker compose -f docker-compose.prod.yml up -d --build --remove-orphans`
 6. 检查 `http://127.0.0.1:3000/api/status`
 
+## Docker Hub 拉取失败时的应急发布
+
+正常情况下，生产环境还是优先使用：
+
+```bash
+cd /opt/new-api/app
+./deploy.sh
+```
+
+但如果服务器当前无法稳定访问 Docker Hub，导致 `docker compose up -d --build` 卡在拉取基础镜像这一步，可以使用一套已经验证过的应急方案：
+
+- 本地编译前端
+- 本地编译 Linux 二进制
+- 直接替换线上容器里的 `/new-api`
+
+这套方式适合当前项目，是因为前端产物会被嵌入 Go 二进制：
+
+- `main.go` 里通过 `go:embed web/dist` 打包前端
+- 所以只要本地先完成前端构建，再重新编译后端二进制，线上替换一个可执行文件就能同时更新前后端
+
+### 适用场景
+
+建议只在下面这些场景使用：
+
+- 线上容器本身在正常运行
+- 只是这次代码改动需要发布
+- 服务器无法顺利从 Docker Hub 拉基础镜像
+- 你不想因为镜像拉取问题阻塞上线
+
+不建议把它作为长期默认发布方式。  
+等网络恢复后，还是应该回到 `./deploy.sh` 这条标准路径。
+
+### 本地构建
+
+先在本地仓库根目录执行：
+
+```bash
+cd /path/to/new-api/web
+bun run build
+```
+
+然后回到仓库根目录，编译 Linux 版本二进制：
+
+```bash
+cd /path/to/new-api
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOEXPERIMENT=greenteagc \
+go build -ldflags "-s -w -X github.com/QuantumNous/new-api/common.Version=$(git rev-parse --short HEAD)" \
+  -o new-api-linux-amd64
+```
+
+### 服务器替换步骤
+
+以下示例假设：
+
+- 服务器项目目录：`/opt/new-api/app`
+- 运行中的生产容器名：`new-api-prod`
+- 服务器临时目录：`/opt/new-api/tmp`
+- 二进制备份目录：`/opt/new-api/backups/bin`
+
+先把本地编好的二进制传到服务器：
+
+```bash
+scp ./new-api-linux-amd64 root@your-server:/opt/new-api/tmp/new-api-linux-amd64
+```
+
+然后在服务器执行：
+
+```bash
+mkdir -p /opt/new-api/backups/bin /opt/new-api/tmp
+TS=$(date +%Y%m%d-%H%M%S)
+
+docker cp new-api-prod:/new-api /opt/new-api/backups/bin/new-api-$TS
+chmod 755 /opt/new-api/tmp/new-api-linux-amd64
+cp /opt/new-api/tmp/new-api-linux-amd64 /opt/new-api/app/new-api-linux-amd64
+docker cp /opt/new-api/tmp/new-api-linux-amd64 new-api-prod:/new-api
+docker commit new-api-prod new-api-local:prod >/dev/null
+docker restart new-api-prod
+```
+
+最后检查：
+
+```bash
+docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' new-api-prod
+wget -q -O - http://127.0.0.1:3000/api/status
+```
+
+### 这套方式的特点
+
+- 不依赖服务器重新拉 Docker 基础镜像
+- 不会动 `data-prod/`、`logs-prod/` 和数据库内容
+- 可以很快把代码变更发布到当前运行中的容器
+- 二进制会额外备份一份，方便你手工回滚
+
+### 需要注意的地方
+
+- 这是“应急热更新”，不是完整的镜像重建
+- 容器里的程序更新了，但 Dockerfile 构建链路并没有被重新验证
+- 如果你只替换容器内二进制，没有同步服务器源码目录，后续再执行 `./deploy.sh` 时可能把改动覆盖掉
+- 所以更稳妥的做法是：至少把对应源码也同步到 `/opt/new-api/app`，保证下次标准部署时源码和线上程序一致
+
+### 应急发布后的收口建议
+
+等服务器网络恢复、可以正常访问 Docker Hub 后，建议补做一次标准部署：
+
+```bash
+cd /opt/new-api/app
+./deploy.sh
+```
+
+这样可以把：
+
+- Docker 镜像
+- 容器内程序
+- 服务器源码目录
+
+重新收敛到同一状态，避免以后排查问题时出现“源码是一版、容器里跑的是另一版”的情况。
+
 生产 compose 默认只绑定：
 
 ```text
