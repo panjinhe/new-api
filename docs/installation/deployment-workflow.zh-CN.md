@@ -20,7 +20,9 @@
 对应文件：
 
 - `docker-compose.dev.yml`
+- `docker-compose.dev.postgres.yml`
 - `docker-compose.prod.yml`
+- `docker-compose.prod.postgres.yml`
 - `.env.dev`
 - `.env.prod`
 - `deploy.sh`
@@ -257,3 +259,7 @@ cp data-prod-snapshot/<timestamp>/one-api.db data-dev/one-api.db
 - 自动化 CI/CD
 
 可以在这套骨架上继续扩展，不用推倒重来。
+
+如果你现在就准备把生产库从 SQLite 切到 PostgreSQL，可以直接看：
+
+- [postgres-migration.zh-CN.md](/E:/new-api/docs/installation/postgres-migration.zh-CN.md)

@@ -35,6 +35,8 @@ data/
 data-dev/
 data-prod/
 data-prod-snapshot/
+postgres-dev/
+postgres-prod/
 logs-dev/
 logs-prod/
 backups/

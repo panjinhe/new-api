@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_NAME="prod"
 RUN_BACKUP=1
 RUN_GIT_PULL=0
+DB_BACKEND=""
 
 usage() {
   cat <<'EOF'
@@ -30,6 +31,14 @@ while (($# > 0)); do
       RUN_GIT_PULL=1
       shift
       ;;
+    --db)
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for --db" >&2
+        exit 1
+      }
+      DB_BACKEND="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -49,6 +58,7 @@ case "$ENV_NAME" in
     ENV_FILE="$ROOT_DIR/.env.prod"
     COMPOSE_FILE="$ROOT_DIR/docker-compose.prod.yml"
     HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/status}"
+    POSTGRES_COMPOSE_FILE="$ROOT_DIR/docker-compose.prod.postgres.yml"
     ;;
   dev)
     DATA_DIR="$ROOT_DIR/data-dev"
@@ -56,12 +66,20 @@ case "$ENV_NAME" in
     ENV_FILE="$ROOT_DIR/.env.dev"
     COMPOSE_FILE="$ROOT_DIR/docker-compose.dev.yml"
     HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3001/api/status}"
+    POSTGRES_COMPOSE_FILE="$ROOT_DIR/docker-compose.dev.postgres.yml"
     ;;
   *)
     echo "Unsupported env name: $ENV_NAME" >&2
     exit 1
     ;;
 esac
+
+load_env_file() {
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+}
 
 compose() {
   if docker compose version >/dev/null 2>&1; then
@@ -72,6 +90,10 @@ compose() {
     echo "Docker Compose is not installed." >&2
     exit 1
   fi
+}
+
+compose_with_files() {
+  compose "${COMPOSE_ARGS[@]}" "$@"
 }
 
 probe_health() {
@@ -117,6 +139,25 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
+load_env_file
+
+if [[ -z "$DB_BACKEND" ]]; then
+  DB_BACKEND="${DATABASE_BACKEND:-sqlite}"
+fi
+
+case "$DB_BACKEND" in
+  sqlite)
+    COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+    ;;
+  postgres)
+    COMPOSE_ARGS=(-f "$COMPOSE_FILE" -f "$POSTGRES_COMPOSE_FILE")
+    ;;
+  *)
+    echo "Unsupported database backend: $DB_BACKEND" >&2
+    exit 1
+    ;;
+esac
+
 if [[ "$RUN_GIT_PULL" -eq 1 ]]; then
   if git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     git -C "$ROOT_DIR" pull --ff-only
@@ -132,19 +173,19 @@ if [[ "$RUN_BACKUP" -eq 1 ]]; then
   "$ROOT_DIR/backup.sh" --env-name "$ENV_NAME"
 fi
 
-compose -f "$COMPOSE_FILE" up -d --build --remove-orphans
+compose_with_files up -d --build --remove-orphans
 
 echo "Waiting for health check: $HEALTH_URL"
 for _ in $(seq 1 30); do
   if probe_health "$HEALTH_URL"; then
     echo "Deployment succeeded."
-    compose -f "$COMPOSE_FILE" ps
+    compose_with_files ps
     exit 0
   fi
   sleep 2
 done
 
 echo "Health check failed. Recent container status:" >&2
-compose -f "$COMPOSE_FILE" ps >&2 || true
-compose -f "$COMPOSE_FILE" logs --tail 100 >&2 || true
+compose_with_files ps >&2 || true
+compose_with_files logs --tail 100 >&2 || true
 exit 1

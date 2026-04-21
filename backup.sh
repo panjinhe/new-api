@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_NAME="prod"
 PRINT_PATH=0
+DB_BACKEND=""
 
 usage() {
   cat <<'EOF'
@@ -25,6 +26,14 @@ while (($# > 0)); do
       PRINT_PATH=1
       shift
       ;;
+    --db)
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for --db" >&2
+        exit 1
+      }
+      DB_BACKEND="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -43,12 +52,14 @@ case "$ENV_NAME" in
     LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs-prod}"
     ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env.prod}"
     COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/docker-compose.prod.yml}"
+    POSTGRES_COMPOSE_FILE="${POSTGRES_COMPOSE_FILE:-$ROOT_DIR/docker-compose.prod.postgres.yml}"
     ;;
   dev)
     DATA_DIR="${DATA_DIR:-$ROOT_DIR/data-dev}"
     LOG_DIR="${LOG_DIR:-$ROOT_DIR/logs-dev}"
     ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env.dev}"
     COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/docker-compose.dev.yml}"
+    POSTGRES_COMPOSE_FILE="${POSTGRES_COMPOSE_FILE:-$ROOT_DIR/docker-compose.dev.postgres.yml}"
     ;;
   *)
     echo "Unsupported env name: $ENV_NAME" >&2
@@ -56,14 +67,58 @@ case "$ENV_NAME" in
     ;;
 esac
 
+load_env_file() {
+  if [[ -f "$ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$ENV_FILE"
+    set +a
+  fi
+}
+
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    echo "Docker Compose is not installed." >&2
+    exit 1
+  fi
+}
+
+compose_with_files() {
+  compose "${COMPOSE_ARGS[@]}" "$@"
+}
+
 BACKUP_ROOT="${BACKUP_ROOT:-$ROOT_DIR/backups/$ENV_NAME}"
 SQLITE_SOURCE="${SQLITE_SOURCE:-$DATA_DIR/one-api.db}"
 SQLITE_SOURCE="${SQLITE_SOURCE%%\?*}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 SNAPSHOT_DIR="$BACKUP_ROOT/$TIMESTAMP"
 SNAPSHOT_DB="$SNAPSHOT_DIR/one-api.db"
+POSTGRES_DUMP="$SNAPSHOT_DIR/postgres.dump"
 
 mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_ROOT" "$SNAPSHOT_DIR"
+
+load_env_file
+
+if [[ -z "$DB_BACKEND" ]]; then
+  DB_BACKEND="${DATABASE_BACKEND:-sqlite}"
+fi
+
+case "$DB_BACKEND" in
+  sqlite)
+    COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+    ;;
+  postgres)
+    COMPOSE_ARGS=(-f "$COMPOSE_FILE" -f "$POSTGRES_COMPOSE_FILE")
+    ;;
+  *)
+    echo "Unsupported database backend: $DB_BACKEND" >&2
+    exit 1
+    ;;
+esac
 
 copy_sqlite_backup() {
   if command -v python3 >/dev/null 2>&1; then
@@ -86,7 +141,13 @@ PY
   fi
 }
 
-if [[ -f "$SQLITE_SOURCE" ]]; then
+copy_postgres_backup() {
+  compose_with_files exec -T postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$POSTGRES_DUMP"
+}
+
+if [[ "$DB_BACKEND" == "postgres" ]]; then
+  copy_postgres_backup
+elif [[ -f "$SQLITE_SOURCE" ]]; then
   copy_sqlite_backup
 fi
 
@@ -106,6 +167,7 @@ fi
   echo "env_name=$ENV_NAME"
   echo "created_at=$(date -Iseconds)"
   echo "hostname=$(hostname)"
+  echo "db_backend=$DB_BACKEND"
   echo "data_dir=$DATA_DIR"
   echo "sqlite_source=$SQLITE_SOURCE"
   if command -v git >/dev/null 2>&1 && git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -119,8 +181,10 @@ if (( PRINT_PATH )); then
 fi
 
 echo "Backup created: $SNAPSHOT_DIR"
-if [[ -f "$SNAPSHOT_DB" ]]; then
+if [[ -f "$POSTGRES_DUMP" ]]; then
+  echo "PostgreSQL snapshot: $POSTGRES_DUMP"
+elif [[ -f "$SNAPSHOT_DB" ]]; then
   echo "SQLite snapshot: $SNAPSHOT_DB"
 else
-  echo "SQLite snapshot skipped: $SQLITE_SOURCE not found"
+  echo "Database snapshot skipped."
 fi

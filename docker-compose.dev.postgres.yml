@@ -1,0 +1,28 @@
+services:
+  new-api:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SQL_DSN: postgresql://${POSTGRES_USER:-newapi}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-newapi_dev}?sslmode=disable
+      ENABLE_LEGACY_SEED: "true"
+
+  postgres:
+    image: postgres:16
+    container_name: new-api-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-newapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-newapi_dev}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - ./postgres-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-newapi} -d ${POSTGRES_DB:-newapi_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
