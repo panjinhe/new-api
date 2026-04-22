@@ -905,6 +905,33 @@ func increaseUserQuota(id int, quota int) (err error) {
 	return err
 }
 
+func GrantQuotaToAllUsers(quota int) (affected int64, err error) {
+	if quota <= 0 {
+		return 0, errors.New("quota 必须大于 0")
+	}
+
+	result := DB.Model(&User{}).Where("id > 0").Update("quota", gorm.Expr("quota + ?", quota))
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	if common.RedisEnabled {
+		var userIDs []int
+		if err = DB.Model(&User{}).Pluck("id", &userIDs).Error; err != nil {
+			return result.RowsAffected, err
+		}
+		gopool.Go(func() {
+			for _, userID := range userIDs {
+				if invalidateErr := invalidateUserCache(userID); invalidateErr != nil {
+					common.SysLog(fmt.Sprintf("failed to invalidate user cache for user %d after bulk quota grant: %s", userID, invalidateErr.Error()))
+				}
+			}
+		})
+	}
+
+	return result.RowsAffected, nil
+}
+
 func DecreaseUserQuota(id int, quota int, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/console_setting"
@@ -110,6 +111,10 @@ func GetOptions(c *gin.Context) {
 type OptionUpdateRequest struct {
 	Key   string `json:"key"`
 	Value any    `json:"value"`
+}
+
+type GrantQuotaToAllUsersRequest struct {
+	Quota int `json:"quota"`
 }
 
 func UpdateOption(c *gin.Context) {
@@ -317,4 +322,45 @@ func UpdateOption(c *gin.Context) {
 		"message": "",
 	})
 	return
+}
+
+func GrantQuotaToAllUsers(c *gin.Context) {
+	var req GrantQuotaToAllUsersRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "无效的参数",
+		})
+		return
+	}
+	if req.Quota <= 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "额度必须大于 0",
+		})
+		return
+	}
+
+	affected, err := model.GrantQuotaToAllUsers(req.Quota)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	adminID := c.GetInt("id")
+	adminName := c.GetString("username")
+	adminInfo := map[string]interface{}{
+		"admin_id":       adminID,
+		"admin_username": adminName,
+	}
+	model.RecordLogWithAdminInfo(adminID, model.LogTypeManage,
+		fmt.Sprintf("管理员为所有用户批量增加额度 %s，影响 %d 个用户", logger.LogQuota(req.Quota), affected), adminInfo)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"affected_users": affected,
+		},
+	})
 }

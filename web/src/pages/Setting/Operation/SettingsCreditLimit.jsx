@@ -18,12 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Button, Col, Form, Row, Spin } from '@douyinfe/semi-ui';
+import { Button, Col, Form, Modal, Row, Spin, Space } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import {
   compareObjects,
   API,
   showError,
+  showInfo,
   showSuccess,
   showWarning,
 } from '../../../helpers';
@@ -41,10 +42,15 @@ export default function SettingsCreditLimit(props) {
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
 
-  function onSubmit() {
+  const quotaPerUnit = Number(props.options?.QuotaPerUnit || 0);
+  const presetFiveDollarQuota =
+    Number.isFinite(quotaPerUnit) && quotaPerUnit > 0
+      ? Math.round(quotaPerUnit * 5)
+      : 0;
+
+  function buildRequestQueue() {
     const updateArray = compareObjects(inputs, inputsRow);
-    if (!updateArray.length) return showWarning(t('你似乎并没有修改什么'));
-    const requestQueue = updateArray.map((item) => {
+    return updateArray.map((item) => {
       let value = '';
       if (typeof inputs[item.key] === 'boolean') {
         value = String(inputs[item.key]);
@@ -56,24 +62,92 @@ export default function SettingsCreditLimit(props) {
         value,
       });
     });
+  }
+
+  async function persistSettings({ quietIfUnchanged = false } = {}) {
+    const requestQueue = buildRequestQueue();
+    if (!requestQueue.length) {
+      if (!quietIfUnchanged) showWarning(t('你似乎并没有修改什么'));
+      return true;
+    }
     setLoading(true);
-    Promise.all(requestQueue)
-      .then((res) => {
-        if (requestQueue.length === 1) {
-          if (res.includes(undefined)) return;
-        } else if (requestQueue.length > 1) {
-          if (res.includes(undefined))
-            return showError(t('部分保存失败，请重试'));
+    try {
+      const res = await Promise.all(requestQueue);
+      if (requestQueue.length === 1) {
+        if (res.includes(undefined)) return false;
+      } else if (requestQueue.length > 1) {
+        if (res.includes(undefined)) {
+          showError(t('部分保存失败，请重试'));
+          return false;
         }
-        showSuccess(t('保存成功'));
-        props.refresh();
-      })
-      .catch(() => {
-        showError(t('保存失败，请重试'));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      }
+      showSuccess(t('保存成功'));
+      await props.refresh();
+      return true;
+    } catch {
+      showError(t('保存失败，请重试'));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function onSubmit() {
+    void persistSettings();
+  }
+
+  function applyFiveDollarPreset() {
+    if (presetFiveDollarQuota <= 0) {
+      showInfo(t('请先在通用设置中确认额度单位'));
+      return;
+    }
+    const nextInputs = {
+      ...inputs,
+      QuotaForNewUser: String(presetFiveDollarQuota),
+    };
+    setInputs(nextInputs);
+    refForm.current?.setValue('QuotaForNewUser', presetFiveDollarQuota);
+  }
+
+  function saveAndGrantTrialQuota() {
+    const quota = parseInt(inputs.QuotaForNewUser, 10);
+    if (!Number.isFinite(quota) || quota <= 0) {
+      showError(t('新用户初始额度必须大于 0'));
+      return;
+    }
+
+    Modal.confirm({
+      title: t('确认补发现有用户体验额度？'),
+      content: t(
+        '将先保存当前额度设置，再给所有现有用户发放与“新用户初始额度”相同的体验额度，此操作会立即生效。',
+      ),
+      onOk: async () => {
+        const saved = await persistSettings({ quietIfUnchanged: true });
+        if (!saved) return;
+
+        setLoading(true);
+        try {
+          const res = await API.post('/api/option/grant_quota_to_all_users', {
+            quota,
+          });
+          const { success, message, data } = res.data;
+          if (!success) {
+            showError(message);
+            return;
+          }
+          showSuccess(
+            t('已为 {{count}} 个用户发放体验额度', {
+              count: data?.affected_users || 0,
+            }),
+          );
+          await props.refresh();
+        } catch (error) {
+          showError(error?.message || t('批量发放失败，请重试'));
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   useEffect(() => {
@@ -186,9 +260,21 @@ export default function SettingsCreditLimit(props) {
             </Row>
 
             <Row>
-              <Button size='default' onClick={onSubmit}>
-                {t('保存额度设置')}
-              </Button>
+              <Space wrap>
+                <Button size='default' onClick={applyFiveDollarPreset}>
+                  {t('一键填入 5 美元额度')}
+                </Button>
+                <Button size='default' onClick={onSubmit}>
+                  {t('保存额度设置')}
+                </Button>
+                <Button
+                  theme='solid'
+                  type='primary'
+                  onClick={saveAndGrantTrialQuota}
+                >
+                  {t('保存并给所有现有用户补发')}
+                </Button>
+              </Space>
             </Row>
           </Form.Section>
         </Form>
