@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"os"
 	"strings"
 	"sync"
 
@@ -394,6 +395,9 @@ func GetChannelById(id int, selectAll bool) (*Channel, error) {
 func BatchInsertChannels(channels []Channel) error {
 	if len(channels) == 0 {
 		return nil
+	}
+	for i := range channels {
+		ApplyDefaultProxyForNewChannel(&channels[i])
 	}
 	tx := DB.Begin()
 	if tx.Error != nil {
@@ -924,6 +928,115 @@ func (channel *Channel) SetSetting(setting dto.ChannelSettings) {
 		return
 	}
 	channel.Setting = common.GetPointer[string](string(settingBytes))
+}
+
+func getDefaultChannelProxyFromEnv() string {
+	for _, key := range []string{
+		"HTTPS_PROXY",
+		"https_proxy",
+		"ALL_PROXY",
+		"all_proxy",
+		"HTTP_PROXY",
+		"http_proxy",
+	} {
+		if proxy := strings.TrimSpace(os.Getenv(key)); proxy != "" {
+			return proxy
+		}
+	}
+	return ""
+}
+
+func hasSharedChannelGroup(groups []string, other []string) bool {
+	if len(groups) == 0 || len(other) == 0 {
+		return false
+	}
+	groupSet := make(map[string]struct{}, len(groups))
+	for _, group := range groups {
+		group = strings.TrimSpace(group)
+		if group == "" {
+			continue
+		}
+		groupSet[group] = struct{}{}
+	}
+	for _, group := range other {
+		group = strings.TrimSpace(group)
+		if group == "" {
+			continue
+		}
+		if _, ok := groupSet[group]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func findInheritedChannelProxy(channel *Channel) string {
+	if channel == nil || DB == nil {
+		return ""
+	}
+
+	var candidates []Channel
+	sameTypeQuery := DB.Select("id", "type", "group", "setting").Where("type = ? AND setting IS NOT NULL AND setting != ''", channel.Type)
+	if channel.Id > 0 {
+		sameTypeQuery = sameTypeQuery.Where("id <> ?", channel.Id)
+	}
+	if err := sameTypeQuery.Order("id desc").Find(&candidates).Error; err == nil {
+		for i := range candidates {
+			if proxy := strings.TrimSpace(candidates[i].GetSetting().Proxy); proxy != "" {
+				return proxy
+			}
+		}
+	}
+
+	targetGroups := channel.GetGroups()
+	if len(targetGroups) == 0 {
+		return ""
+	}
+
+	candidates = nil
+	groupQuery := DB.Select("id", "type", "group", "setting").Where("setting IS NOT NULL AND setting != ''")
+	if channel.Id > 0 {
+		groupQuery = groupQuery.Where("id <> ?", channel.Id)
+	}
+	if err := groupQuery.Order("id desc").Find(&candidates).Error; err == nil {
+		for i := range candidates {
+			if !hasSharedChannelGroup(targetGroups, candidates[i].GetGroups()) {
+				continue
+			}
+			if proxy := strings.TrimSpace(candidates[i].GetSetting().Proxy); proxy != "" {
+				return proxy
+			}
+		}
+	}
+
+	return ""
+}
+
+// ApplyDefaultProxyForNewChannel fills an empty channel proxy from global env first,
+// then falls back to existing peer channels so newly created upstream channels inherit proxy settings.
+func ApplyDefaultProxyForNewChannel(channel *Channel) bool {
+	if channel == nil {
+		return false
+	}
+
+	setting := channel.GetSetting()
+	if strings.TrimSpace(setting.Proxy) != "" {
+		return false
+	}
+
+	if proxy := getDefaultChannelProxyFromEnv(); proxy != "" {
+		setting.Proxy = proxy
+		channel.SetSetting(setting)
+		return true
+	}
+
+	if proxy := findInheritedChannelProxy(channel); proxy != "" {
+		setting.Proxy = proxy
+		channel.SetSetting(setting)
+		return true
+	}
+
+	return false
 }
 
 func (channel *Channel) GetOtherSettings() dto.ChannelOtherSettings {

@@ -577,6 +577,8 @@ func AddChannel(c *gin.Context) {
 		return
 	}
 
+	model.ApplyDefaultProxyForNewChannel(addChannelRequest.Channel)
+
 	// 使用统一的校验函数
 	if err := validateChannel(c.Request.Context(), addChannelRequest.Channel, true); err != nil {
 		c.JSON(http.StatusOK, gin.H{
