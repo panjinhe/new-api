@@ -18,52 +18,16 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect, useState } from 'react';
-import {
-  Button,
-  Typography,
-  Input,
-  ScrollList,
-  ScrollItem,
-} from '@douyinfe/semi-ui';
+import { Button, Input } from '@douyinfe/semi-ui';
 import { API, showError, copy, showSuccess } from '../../helpers';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
-import { API_ENDPOINTS } from '../../constants/common.constant';
 import { StatusContext } from '../../context/Status';
 import { useActualTheme } from '../../context/Theme';
 import { marked } from 'marked';
 import { useTranslation } from 'react-i18next';
-import {
-  IconGithubLogo,
-  IconPlay,
-  IconFile,
-  IconCopy,
-} from '@douyinfe/semi-icons';
+import { IconPlay, IconFile, IconCopy } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import NoticeModal from '../../components/layout/NoticeModal';
-import {
-  Moonshot,
-  OpenAI,
-  XAI,
-  Zhipu,
-  Volcengine,
-  Cohere,
-  Claude,
-  Gemini,
-  Suno,
-  Minimax,
-  Wenxin,
-  Spark,
-  Qingyan,
-  DeepSeek,
-  Qwen,
-  Midjourney,
-  Grok,
-  AzureAI,
-  Hunyuan,
-  Xinference,
-} from '@lobehub/icons';
-
-const { Text } = Typography;
 
 const Home = () => {
   const { t, i18n } = useTranslation();
@@ -77,9 +41,30 @@ const Home = () => {
   const docsLink = statusState?.status?.docs_link || '';
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
-  const endpointItems = API_ENDPOINTS.map((e) => ({ value: e }));
-  const [endpointIndex, setEndpointIndex] = useState(0);
-  const isChinese = i18n.language.startsWith('zh');
+
+  const quickStartSteps = [
+    {
+      number: '01',
+      title: t('注册账号'),
+      description: t(
+        '完成注册或登录后即可进入控制台，开始配置你的专属 Codex 接入环境。',
+      ),
+    },
+    {
+      number: '02',
+      title: t('获取 API 密钥'),
+      description: t(
+        '在控制台一键创建令牌，支持多密钥管理，创建后即可作为 api-key 使用。',
+      ),
+    },
+    {
+      number: '03',
+      title: t('替换 Base URL'),
+      description: t(
+        '将原有配置中的 Base URL 替换为本站地址，按教程填入模型与密钥即可开始使用。',
+      ),
+    },
+  ];
 
   const displayHomePageContent = async () => {
     setHomePageContent(localStorage.getItem('home_page_content') || '');
@@ -141,13 +126,6 @@ const Home = () => {
     displayHomePageContent().then();
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setEndpointIndex((prev) => (prev + 1) % endpointItems.length);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [endpointItems.length]);
-
   return (
     <div className='w-full overflow-x-hidden'>
       <NoticeModal
@@ -157,177 +135,103 @@ const Home = () => {
       />
       {homePageContentLoaded && homePageContent === '' ? (
         <div className='w-full overflow-x-hidden'>
-          {/* Banner 部分 */}
-          <div className='w-full border-b border-semi-color-border min-h-[500px] md:min-h-[600px] lg:min-h-[700px] relative overflow-x-hidden'>
-            {/* 背景模糊晕染球 */}
+          <div className='relative w-full overflow-x-hidden border-b border-semi-color-border min-h-[calc(100svh-64px)]'>
             <div className='blur-ball blur-ball-indigo' />
             <div className='blur-ball blur-ball-teal' />
-            <div className='flex items-center justify-center h-full px-4 py-20 md:py-24 lg:py-32 mt-10'>
-              {/* 居中内容区 */}
-              <div className='flex flex-col items-center justify-center text-center max-w-4xl mx-auto'>
-                <div className='flex flex-col items-center justify-center mb-6 md:mb-8'>
-                  <h1
-                    className={`text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-semi-color-text-0 leading-tight ${isChinese ? 'tracking-wide md:tracking-wider' : ''}`}
-                  >
-                    <>
-                      {t('统一的')}
-                      <br />
-                      <span className='shine-text'>{t('大模型接口网关')}</span>
-                    </>
+            <div className='mx-auto flex min-h-[calc(100svh-64px)] max-w-6xl items-center justify-center px-4 py-16 md:px-8 md:py-20'>
+              <div className='w-full text-center'>
+                <div className='mx-auto max-w-3xl'>
+                  <div className='inline-flex items-center rounded-full border border-semi-color-border bg-white/75 px-4 py-1 text-sm text-semi-color-text-1 shadow-sm backdrop-blur dark:bg-black/20'>
+                    {t('快速接入教程')}
+                  </div>
+                  <h1 className='mt-6 text-4xl font-bold leading-tight text-semi-color-text-0 md:text-5xl lg:text-6xl'>
+                    {t('三步即可开始')}
                   </h1>
-                  <p className='text-base md:text-lg lg:text-xl text-semi-color-text-1 mt-4 md:mt-6 max-w-xl'>
-                    {t('更好的价格，更好的稳定性，只需要将模型基址替换为：')}
+                  <p className='mx-auto mt-4 max-w-2xl text-base leading-7 text-semi-color-text-1 md:text-lg'>
+                    {t(
+                      '接入你的 Codex API 极其简单，打开网站后按教程配置，最快 3 分钟即可开始编码。',
+                    )}
                   </p>
-                  {/* BASE URL 与端点选择 */}
-                  <div className='flex flex-col md:flex-row items-center justify-center gap-4 w-full mt-4 md:mt-6 max-w-md'>
-                    <Input
-                      readonly
-                      value={serverAddress}
-                      className='flex-1 !rounded-full'
-                      size={isMobile ? 'default' : 'large'}
-                      suffix={
-                        <div className='flex items-center gap-2'>
-                          <ScrollList
-                            bodyHeight={32}
-                            style={{ border: 'unset', boxShadow: 'unset' }}
-                          >
-                            <ScrollItem
-                              mode='wheel'
-                              cycled={true}
-                              list={endpointItems}
-                              selectedIndex={endpointIndex}
-                              onSelect={({ index }) => setEndpointIndex(index)}
-                            />
-                          </ScrollList>
+                </div>
+
+                <div className='mt-10 grid gap-5 text-left md:mt-12 md:grid-cols-3'>
+                  {quickStartSteps.map((step) => (
+                    <div
+                      key={step.number}
+                      className='rounded-[28px] border border-semi-color-border bg-white/80 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur dark:bg-black/20'
+                    >
+                      <div className='text-sm font-semibold tracking-[0.22em] text-cyan-500'>
+                        {step.number}
+                      </div>
+                      <div className='mt-5 text-2xl font-bold text-semi-color-text-0'>
+                        {step.title}
+                      </div>
+                      <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
+                        {step.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className='mx-auto mt-8 max-w-4xl rounded-[32px] border border-semi-color-border bg-white/85 p-5 text-left shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:mt-10 md:p-6'>
+                  <div className='flex flex-col gap-4 md:flex-row md:items-center'>
+                    <div className='flex-1'>
+                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+                        Base URL
+                      </div>
+                      <Input
+                        readonly
+                        value={serverAddress}
+                        size={isMobile ? 'default' : 'large'}
+                        className='mt-2'
+                        suffix={
                           <Button
-                            type='primary'
+                            type='tertiary'
                             onClick={handleCopyBaseURL}
                             icon={<IconCopy />}
-                            className='!rounded-full'
                           />
-                        </div>
-                      }
-                    />
+                        }
+                      />
+                    </div>
+                    <div className='grid gap-3 md:w-auto md:grid-cols-2'>
+                      <Link to='/console'>
+                        <Button
+                          theme='solid'
+                          type='primary'
+                          size={isMobile ? 'default' : 'large'}
+                          className='!h-11 !w-full !rounded-full px-6'
+                          icon={<IconPlay />}
+                        >
+                          {t('获取 API 密钥')}
+                        </Button>
+                      </Link>
+                      {docsLink ? (
+                        <Button
+                          size={isMobile ? 'default' : 'large'}
+                          className='!h-11 !w-full !rounded-full px-6'
+                          icon={<IconFile />}
+                          onClick={() => window.open(docsLink, '_blank')}
+                        >
+                          {t('查看教程文档')}
+                        </Button>
+                      ) : (
+                        <Button
+                          size={isMobile ? 'default' : 'large'}
+                          className='!h-11 !w-full !rounded-full px-6'
+                          icon={<IconCopy />}
+                          onClick={handleCopyBaseURL}
+                        >
+                          {t('复制 Base URL')}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {/* 操作按钮 */}
-                <div className='flex flex-row gap-4 justify-center items-center'>
-                  <Link to='/console'>
-                    <Button
-                      theme='solid'
-                      type='primary'
-                      size={isMobile ? 'default' : 'large'}
-                      className='!rounded-3xl px-8 py-2'
-                      icon={<IconPlay />}
-                    >
-                      {t('获取密钥')}
-                    </Button>
-                  </Link>
-                  {isDemoSiteMode && statusState?.status?.version ? (
-                    <Button
-                      size={isMobile ? 'default' : 'large'}
-                      className='flex items-center !rounded-3xl px-6 py-2'
-                      icon={<IconGithubLogo />}
-                      onClick={() =>
-                        window.open(
-                          'https://github.com/QuantumNous/new-api',
-                          '_blank',
-                        )
-                      }
-                    >
-                      {statusState.status.version}
-                    </Button>
-                  ) : (
-                    docsLink && (
-                      <Button
-                        size={isMobile ? 'default' : 'large'}
-                        className='flex items-center !rounded-3xl px-6 py-2'
-                        icon={<IconFile />}
-                        onClick={() => window.open(docsLink, '_blank')}
-                      >
-                        {t('文档')}
-                      </Button>
-                    )
-                  )}
-                </div>
-
-                {/* 框架兼容性图标 */}
-                <div className='mt-12 md:mt-16 lg:mt-20 w-full'>
-                  <div className='flex items-center mb-6 md:mb-8 justify-center'>
-                    <Text
-                      type='tertiary'
-                      className='text-lg md:text-xl lg:text-2xl font-light'
-                    >
-                      {t('支持众多的大模型供应商')}
-                    </Text>
-                  </div>
-                  <div className='flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6 lg:gap-8 max-w-5xl mx-auto px-4'>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Moonshot size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <OpenAI size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <XAI size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Zhipu.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Volcengine.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Cohere.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Claude.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Gemini.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Suno size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Minimax.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Wenxin.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Spark.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Qingyan.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <DeepSeek.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Qwen.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Midjourney size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Grok size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <AzureAI.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Hunyuan.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Xinference.Color size={40} />
-                    </div>
-                    <div className='w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center'>
-                      <Typography.Text className='!text-lg sm:!text-xl md:!text-2xl lg:!text-3xl font-bold'>
-                        30+
-                      </Typography.Text>
-                    </div>
+                  <div className='mt-4 text-sm leading-6 text-semi-color-text-2'>
+                    {isDemoSiteMode && statusState?.status?.version
+                      ? `${t('当前站点版本')} ${statusState.status.version}`
+                      : t(
+                          '进入网站后创建令牌即可获取 api-key，替换配置后即可开始使用。',
+                        )}
                   </div>
                 </div>
               </div>
