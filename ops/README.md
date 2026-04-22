@@ -33,3 +33,46 @@ ssh -F ops/ssh/config.local aheapi-prod "cd /opt/new-api/app && docker compose -
 docker images new-api-local:prod
 docker save new-api-local:prod | gzip -1 | wc -c
 ```
+
+## 生产部署避坑
+
+- 在服务器手动执行 `docker compose` 之前，必须先加载 `.env.prod`，否则 Compose 不会自动使用其中的变量值去展开 `docker-compose.prod*.yml` 里的 `${...}` 表达式。
+- 本项目的 PostgreSQL 组合配置依赖这些变量：
+
+```bash
+SQL_DSN=postgresql://${POSTGRES_USER:-newapi}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-newapi}?sslmode=disable
+```
+
+- 如果没有先加载 `.env.prod`，`POSTGRES_PASSWORD` 很容易被错误展开成默认值 `change-me`，从而让 `new-api` 容器出现数据库认证失败并反复重启。
+- 这类错误的典型现象：
+  - `new-api-prod` 容器持续 `Restarting`
+  - 日志里出现 `password authentication failed for user "newapi"`
+  - `docker inspect new-api-prod` 里能看到错误的 `SQL_DSN=...:change-me@postgres...`
+- 服务器手动部署时，正确顺序必须是：
+
+```bash
+cd /opt/new-api/app
+set -a
+. ./.env.prod
+set +a
+docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build
+```
+
+- 如果只想重建应用容器、不要动数据库容器，使用：
+
+```bash
+cd /opt/new-api/app
+set -a
+. ./.env.prod
+set +a
+docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build --no-deps --force-recreate new-api
+```
+
+- 部署后务必检查：
+
+```bash
+docker ps
+curl http://127.0.0.1:3000/api/status
+docker logs --tail 100 new-api-prod
+docker inspect new-api-prod --format '{{json .Config.Env}}'
+```
