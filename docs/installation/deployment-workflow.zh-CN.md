@@ -185,6 +185,25 @@ go build -ldflags "-s -w -X github.com/QuantumNous/new-api/common.Version=$(git 
   -o new-api-linux-amd64
 ```
 
+如果你本机主要用 PowerShell，推荐直接使用仓库里的脚本，它会自动：
+
+- 重建前端
+- 交叉编译 Linux `amd64` 二进制
+- 校验产物文件头必须为 `ELF`
+- 在发现错误平台产物时直接失败，避免把 Windows `MZ` 可执行文件误发到 Linux 容器里
+
+示例：
+
+```powershell
+pwsh ./scripts/build-linux-release.ps1
+```
+
+如果你已经提前完成前端构建，也可以跳过前端阶段：
+
+```powershell
+pwsh ./scripts/build-linux-release.ps1 -SkipFrontendBuild
+```
+
 ### 同步源码到服务器
 
 以下示例假设：
