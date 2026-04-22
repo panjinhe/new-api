@@ -18,14 +18,19 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect, useState } from 'react';
-import { Button, Input } from '@douyinfe/semi-ui';
+import { Button, Input, Modal } from '@douyinfe/semi-ui';
 import { API, showError, copy, showSuccess } from '../../helpers';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import { StatusContext } from '../../context/Status';
 import { useActualTheme } from '../../context/Theme';
 import { marked } from 'marked';
 import { useTranslation } from 'react-i18next';
-import { IconPlay, IconCopy } from '@douyinfe/semi-icons';
+import {
+  IconPlay,
+  IconCopy,
+  IconExternalOpen,
+  IconGithubLogo,
+} from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import NoticeModal from '../../components/layout/NoticeModal';
 
@@ -33,9 +38,14 @@ const Home = () => {
   const { t, i18n } = useTranslation();
   const [statusState] = useContext(StatusContext);
   const actualTheme = useActualTheme();
+  const qqGroupNumber = '217637139';
+  const ccSwitchInstallUrl =
+    'https://github.com/farion1231/cc-switch/releases/latest';
+  const ccSwitchRepoUrl = 'https://github.com/farion1231/cc-switch';
   const [homePageContentLoaded, setHomePageContentLoaded] = useState(false);
   const [homePageContent, setHomePageContent] = useState('');
   const [noticeVisible, setNoticeVisible] = useState(false);
+  const [contactModalVisible, setContactModalVisible] = useState(false);
   const isMobile = useIsMobile();
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
   const serverAddress =
@@ -101,6 +111,17 @@ const Home = () => {
     }
   };
 
+  const handleCopyQQGroup = async () => {
+    const ok = await copy(qqGroupNumber);
+    if (ok) {
+      showSuccess(t('QQ群号已复制到剪切板'));
+    }
+  };
+
+  const openExternalLink = (url) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   useEffect(() => {
     const checkNoticeAndShow = async () => {
       const lastCloseDate = localStorage.getItem('notice_close_date');
@@ -132,6 +153,30 @@ const Home = () => {
         onClose={() => setNoticeVisible(false)}
         isMobile={isMobile}
       />
+      <Modal
+        title={t('咨询更多')}
+        visible={contactModalVisible}
+        onCancel={() => setContactModalVisible(false)}
+        footer={null}
+        centered
+      >
+        <div className='space-y-4'>
+          <div className='text-sm leading-7 text-semi-color-text-1'>
+            {t('如需接入协助、兑换码或配置支持，可加入 QQ 群咨询。')}
+          </div>
+          <div className='rounded-2xl border border-semi-color-border bg-semi-color-fill-0 p-4'>
+            <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+              {t('QQ群号')}
+            </div>
+            <div className='mt-2 text-2xl font-bold tracking-[0.08em] text-semi-color-text-0'>
+              {qqGroupNumber}
+            </div>
+          </div>
+          <Button theme='solid' type='primary' block onClick={handleCopyQQGroup}>
+            {t('复制群号')}
+          </Button>
+        </div>
+      </Modal>
       {homePageContentLoaded && homePageContent === '' ? (
         <div className='w-full overflow-x-hidden'>
           <div className='relative w-full overflow-x-hidden border-b border-semi-color-border min-h-[calc(100svh-64px)]'>
@@ -250,7 +295,33 @@ const Home = () => {
                           {t('前往令牌页')}
                         </Button>
                       </Link>
+                      <Button
+                        size={isMobile ? 'default' : 'large'}
+                        className='!h-11 !w-full !rounded-full px-6'
+                        onClick={() => setContactModalVisible(true)}
+                      >
+                        {t('咨询更多')}
+                      </Button>
                     </div>
+                  </div>
+                  <div className='mt-4 flex flex-wrap items-center gap-2 border-t border-cyan-200/70 pt-4 text-sm text-semi-color-text-1 dark:border-cyan-500/20'>
+                    <span>{t('还没安装 CC Switch？')}</span>
+                    <Button
+                      theme='borderless'
+                      type='tertiary'
+                      icon={<IconExternalOpen />}
+                      onClick={() => openExternalLink(ccSwitchInstallUrl)}
+                    >
+                      {t('安装 CC Switch')}
+                    </Button>
+                    <Button
+                      theme='borderless'
+                      type='tertiary'
+                      icon={<IconGithubLogo />}
+                      onClick={() => openExternalLink(ccSwitchRepoUrl)}
+                    >
+                      {t('查看 GitHub 仓库')}
+                    </Button>
                   </div>
                 </div>
               </div>
