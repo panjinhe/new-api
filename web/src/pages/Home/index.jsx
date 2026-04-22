@@ -25,7 +25,7 @@ import { StatusContext } from '../../context/Status';
 import { useActualTheme } from '../../context/Theme';
 import { marked } from 'marked';
 import { useTranslation } from 'react-i18next';
-import { IconPlay, IconFile, IconCopy } from '@douyinfe/semi-icons';
+import { IconPlay, IconCopy } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import NoticeModal from '../../components/layout/NoticeModal';
 
@@ -38,7 +38,6 @@ const Home = () => {
   const [noticeVisible, setNoticeVisible] = useState(false);
   const isMobile = useIsMobile();
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
-  const docsLink = statusState?.status?.docs_link || '';
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
 
@@ -193,7 +192,7 @@ const Home = () => {
                         }
                       />
                     </div>
-                    <div className='grid gap-3 md:w-auto md:grid-cols-2'>
+                    <div className='grid gap-3 md:w-auto'>
                       <Link to='/console'>
                         <Button
                           theme='solid'
@@ -205,25 +204,14 @@ const Home = () => {
                           {t('获取 API 密钥')}
                         </Button>
                       </Link>
-                      {docsLink ? (
-                        <Button
-                          size={isMobile ? 'default' : 'large'}
-                          className='!h-11 !w-full !rounded-full px-6'
-                          icon={<IconFile />}
-                          onClick={() => window.open(docsLink, '_blank')}
-                        >
-                          {t('查看教程文档')}
-                        </Button>
-                      ) : (
-                        <Button
-                          size={isMobile ? 'default' : 'large'}
-                          className='!h-11 !w-full !rounded-full px-6'
-                          icon={<IconCopy />}
-                          onClick={handleCopyBaseURL}
-                        >
-                          {t('复制 Base URL')}
-                        </Button>
-                      )}
+                      <Button
+                        size={isMobile ? 'default' : 'large'}
+                        className='!h-11 !w-full !rounded-full px-6'
+                        icon={<IconCopy />}
+                        onClick={handleCopyBaseURL}
+                      >
+                        {t('复制 Base URL')}
+                      </Button>
                     </div>
                   </div>
                   <div className='mt-4 text-sm leading-6 text-semi-color-text-2'>
