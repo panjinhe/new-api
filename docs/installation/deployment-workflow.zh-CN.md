@@ -270,10 +270,17 @@ cd /opt/new-api/app
 
 - Nginx 反向代理
 - HTTPS 证书
+- 合适的 `client_max_body_size`
 
 对应说明见：
 
 - [nginx-https.zh-CN.md](/E:/new-api/docs/installation/nginx-https.zh-CN.md)
+
+这里额外提醒一条容易忽略的上线项：
+
+- 如果你的客户端会走 `/v1/responses`，尤其是 Codex Desktop 或 CCSwitch，Nginx 不能保留默认约 `1m` 的请求体限制
+- 否则请求会在反向代理层直接失败，表现为 `413 Payload Too Large`
+- 项目提供的 Nginx 模板已经带了 `client_max_body_size 100m;`，正式上线时建议保留
 
 ## 线上数据备份
 

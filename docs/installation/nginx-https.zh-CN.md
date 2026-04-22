@@ -86,6 +86,17 @@ sudo cp /opt/new-api/app/deploy/nginx/new-api.conf.example /etc/nginx/sites-avai
 - `ssl_certificate`
 - `ssl_certificate_key`
 
+这个模板里已经包含一条很重要的配置：
+
+- `client_max_body_size 100m;`
+
+这条建议保留。  
+原因是 Codex Desktop、CCSwitch 以及走 `/v1/responses` 的调用，请求体通常会比普通接口大得多；如果 Nginx 还停留在默认的约 `1m` 限制，请求会先被 Nginx 拒绝，表现为：
+
+- `413 Payload Too Large`
+- 日志里出现 `client intended to send too large body`
+- 出错地址通常是 `POST /v1/responses`
+
 然后启用站点：
 
 ```bash
@@ -166,6 +177,10 @@ curl -I https://your-domain.example.com
 - 本机 `127.0.0.1:3000` 返回成功
 - 域名是 HTTPS
 
+如果你要额外验证“大请求不会被 Nginx 拦住”，可以再补一条检查思路：
+
+- 正常情况下，大请求应该进入应用层，哪怕最后返回 `401`、`400` 或业务错误，也不应该再是 Nginx 的 `413`
+
 ## 推荐的正式上线命令
 
 以后服务器上固定就用这几条：
@@ -212,3 +227,42 @@ docker compose -f docker-compose.prod.yml logs -f
 
 这是为了让你一眼能看懂 Nginx 怎么接进来。  
 真正上线时，最常见的做法就是让 Certbot 自动生成并接管这些路径。
+
+### 4. 如果 Codex / Responses 接口报 `413 Payload Too Large`
+
+优先检查 Nginx，而不是先怀疑渠道或容器。
+
+常见特征：
+
+- 浏览器或客户端提示 `413 Payload Too Large`
+- Nginx `error.log` 出现 `client intended to send too large body`
+- `access.log` 里是 `POST /v1/responses` 返回 `413`
+
+排查顺序建议：
+
+1. 先确认 `new-api` 容器本身是正常的：
+
+```bash
+curl http://127.0.0.1:3000/api/status
+```
+
+2. 再检查 Nginx 生效配置里有没有 `client_max_body_size`：
+
+```bash
+sudo nginx -T | grep -n "client_max_body_size"
+```
+
+3. 如果你不是用 `/etc/nginx/sites-available/new-api.conf`，而是直接把站点写在 `/etc/nginx/nginx.conf`，那也要确保真正处理 `443 ssl` 的那个 `server` 块，或者 `http {}` 全局层级里，已经设置了例如：
+
+```nginx
+client_max_body_size 20m;
+```
+
+4. 修改后执行：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+经验上，`20m` 已经能覆盖当前 Codex Desktop 的常见请求；如果你希望少折腾，直接沿用项目模板里的 `100m` 也可以。

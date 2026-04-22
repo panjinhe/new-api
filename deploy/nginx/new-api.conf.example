@@ -28,6 +28,8 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
 
+    # Codex Desktop / CCSwitch / /v1/responses 的请求体可能明显大于 1MB。
+    # 这里不要删小，否则会先被 Nginx 拦成 413，而不是进入 new-api。
     client_max_body_size 100m;
 
     location / {
