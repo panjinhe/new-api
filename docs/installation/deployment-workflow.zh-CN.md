@@ -121,14 +121,14 @@ MEMORY_CACHE_ENABLED=true
 TRUSTED_REDIRECT_DOMAINS=your-domain.example.com
 ```
 
-生产部署命令：
+对你当前这套环境，更推荐把下面这条命令当成“完整镜像重建 / 收口方案”，而不是日常默认发版方式：
 
 ```bash
 cd /opt/new-api/app
 ./deploy.sh
 ```
 
-如果你已经在服务器上，并且想在部署前顺便拉最新代码：
+如果服务器上的 `/opt/new-api/app` 本身就是一个 git 工作树，并且你想在重建前顺便拉最新代码：
 
 ```bash
 cd /opt/new-api/app
@@ -144,20 +144,14 @@ cd /opt/new-api/app
 5. `docker compose -f docker-compose.prod.yml up -d --build --remove-orphans`
 6. 检查 `http://127.0.0.1:3000/api/status`
 
-## Docker Hub 拉取失败时的应急发布
+## 默认发布流程：本地构建并推送到服务器
 
-正常情况下，生产环境还是优先使用：
+这部分改成默认流程，原因也很直接：
 
-```bash
-cd /opt/new-api/app
-./deploy.sh
-```
-
-但如果服务器当前无法稳定访问 Docker Hub，导致 `docker compose up -d --build` 卡在拉取基础镜像这一步，可以使用一套已经验证过的应急方案：
-
-- 本地编译前端
-- 本地编译 Linux 二进制
-- 直接替换线上容器里的 `/new-api`
+- 你现在的服务器到 Docker Hub 不稳定
+- 线上容器平时本身就在正常运行
+- 这个项目的前端会被嵌入 Go 二进制
+- 所以“本地构建后直接发到服务器”更符合你现在的长期实际用法
 
 这套方式适合当前项目，是因为前端产物会被嵌入 Go 二进制：
 
@@ -166,15 +160,12 @@ cd /opt/new-api/app
 
 ### 适用场景
 
-建议只在下面这些场景使用：
+推荐你当前长期按下面这些场景理解它：
 
 - 线上容器本身在正常运行
 - 只是这次代码改动需要发布
-- 服务器无法顺利从 Docker Hub 拉基础镜像
-- 你不想因为镜像拉取问题阻塞上线
-
-不建议把它作为长期默认发布方式。  
-等网络恢复后，还是应该回到 `./deploy.sh` 这条标准路径。
+- 服务器无法稳定从 Docker Hub 拉基础镜像
+- 你希望把发布动作稳定收敛到“本地构建 -> 服务器热更新”
 
 ### 本地构建
 
@@ -194,7 +185,7 @@ go build -ldflags "-s -w -X github.com/QuantumNous/new-api/common.Version=$(git 
   -o new-api-linux-amd64
 ```
 
-### 服务器替换步骤
+### 同步源码到服务器
 
 以下示例假设：
 
@@ -203,11 +194,29 @@ go build -ldflags "-s -w -X github.com/QuantumNous/new-api/common.Version=$(git 
 - 服务器临时目录：`/opt/new-api/tmp`
 - 二进制备份目录：`/opt/new-api/backups/bin`
 
-先把本地编好的二进制传到服务器：
+先把当前源码打成一个归档包：
 
 ```bash
+cd /path/to/new-api
+SHA=$(git rev-parse --short HEAD)
+git archive --format=tar.gz -o /tmp/new-api-deploy-$SHA.tar.gz HEAD
+```
+
+再把源码包和本地编好的二进制一起传到服务器：
+
+```bash
+scp /tmp/new-api-deploy-$SHA.tar.gz root@your-server:/opt/new-api/tmp/new-api-deploy-$SHA.tar.gz
 scp ./new-api-linux-amd64 root@your-server:/opt/new-api/tmp/new-api-linux-amd64
 ```
+
+先在服务器解开源码包，覆盖更新 `/opt/new-api/app`：
+
+```bash
+mkdir -p /opt/new-api/app /opt/new-api/tmp
+tar -xzf /opt/new-api/tmp/new-api-deploy-$SHA.tar.gz -C /opt/new-api/app
+```
+
+### 替换运行中的程序
 
 然后在服务器执行：
 
@@ -235,16 +244,17 @@ wget -q -O - http://127.0.0.1:3000/api/status
 - 不依赖服务器重新拉 Docker 基础镜像
 - 不会动 `data-prod/`、`logs-prod/` 和数据库内容
 - 可以很快把代码变更发布到当前运行中的容器
+- 服务器源码目录也会一起更新，和当前运行版本更一致
 - 二进制会额外备份一份，方便你手工回滚
 
 ### 需要注意的地方
 
-- 这是“应急热更新”，不是完整的镜像重建
+- 这是“默认热更新发布”，不是完整的镜像重建
 - 容器里的程序更新了，但 Dockerfile 构建链路并没有被重新验证
-- 如果你只替换容器内二进制，没有同步服务器源码目录，后续再执行 `./deploy.sh` 时可能把改动覆盖掉
-- 所以更稳妥的做法是：至少把对应源码也同步到 `/opt/new-api/app`，保证下次标准部署时源码和线上程序一致
+- 如果你只替换容器内二进制，不同步服务器源码目录，后续再执行 `./deploy.sh` 时可能把改动覆盖掉
+- 所以默认流程里也把源码归档同步到了 `/opt/new-api/app`
 
-### 应急发布后的收口建议
+### 完整镜像重建收口
 
 等服务器网络恢复、可以正常访问 Docker Hub 后，建议补做一次标准部署：
 
@@ -381,9 +391,12 @@ cp data-prod-snapshot/<timestamp>/one-api.db data-dev/one-api.db
 1. 本地改代码。
 2. 本地用 `docker-compose.dev.yml` 验证。
 3. 提交到 git 并 push 到自己的 fork。
-4. 服务器 `git pull --ff-only`。
-5. 服务器执行 `./deploy.sh`。
-6. 如果要排查线上问题，再用 `pull-prod-snapshot.sh` 拉一次快照到本地。
+4. 本地执行 `bun run build` 和 Linux 二进制编译。
+5. 本地打源码归档并上传到服务器。
+6. 把新二进制传到服务器，替换运行中的 `/new-api` 并重启容器。
+7. 检查 `https://your-domain/api/status` 和首页是否正常。
+8. 等服务器网络恢复后，再择机跑一次 `./deploy.sh` 做完整镜像重建收口。
+9. 如果要排查线上问题，再用 `pull-prod-snapshot.sh` 拉一次快照到本地。
 
 ## 不推荐的做法
 
