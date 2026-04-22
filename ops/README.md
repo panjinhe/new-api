@@ -14,3 +14,22 @@
 - 真实密钥只保留在本机，不写入仓库
 - 真实环境变量继续只保留在服务器 `.env.prod`
 - 如果以后新增服务器，也继续按这套命名扩展
+
+## 生产镜像传输约定
+
+- 生产部署时，如果服务器拉取 Docker Hub 镜像慢或超时，统一改为在本地构建镜像后传到服务器。
+- 镜像传输必须使用压缩流，不再直接使用未压缩的 `docker save | ssh ... docker load`。
+- 推荐命令：
+
+```bash
+docker build -t new-api-local:prod .
+docker save new-api-local:prod | gzip -1 | ssh -F ops/ssh/config.local aheapi-prod "gunzip | docker load"
+ssh -F ops/ssh/config.local aheapi-prod "cd /opt/new-api/app && docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build"
+```
+
+- 如果需要验证镜像体积，可先查看：
+
+```bash
+docker images new-api-local:prod
+docker save new-api-local:prod | gzip -1 | wc -c
+```
