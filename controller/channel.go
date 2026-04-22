@@ -855,17 +855,26 @@ func UpdateChannel(c *gin.Context) {
 		return
 	}
 
-	// 使用统一的校验函数
-	if err := validateChannel(c.Request.Context(), &channel.Channel, false); err != nil {
+	// Preserve existing ChannelInfo to ensure multi-key channels keep correct state even if the client does not send ChannelInfo in the request.
+	originChannel, err := model.GetChannelById(channel.Id, true)
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": err.Error(),
 		})
 		return
 	}
-	// Preserve existing ChannelInfo to ensure multi-key channels keep correct state even if the client does not send ChannelInfo in the request.
-	originChannel, err := model.GetChannelById(channel.Id, true)
-	if err != nil {
+
+	// When editing an existing channel, keep the stored setting payload if the client
+	// does not send it, so we can safely inherit a proxy only for channels that are
+	// truly empty instead of overwriting an existing explicit proxy.
+	if channel.Setting == nil {
+		channel.Setting = originChannel.Setting
+	}
+	model.ApplyDefaultProxyForNewChannel(&channel.Channel)
+
+	// 使用统一的校验函数
+	if err := validateChannel(c.Request.Context(), &channel.Channel, false); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": err.Error(),
