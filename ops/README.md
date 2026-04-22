@@ -76,3 +76,105 @@ curl http://127.0.0.1:3000/api/status
 docker logs --tail 100 new-api-prod
 docker inspect new-api-prod --format '{{json .Config.Env}}'
 ```
+
+## Codex 渠道排障经验
+
+### 症状：本地能用，服务器页面新填的 Codex 渠道不能用
+
+- 典型现象：
+  - 同一份 Codex JSON 凭证，在本地页面添加后可以正常用。
+  - 在阿里云部署的线上页面添加后，渠道测试或实际调用失败。
+  - 已有 `Codex-1/3/4/...` 正常，只有新建的 `Codex-pro20x-1` 不正常。
+
+### 根因
+
+- 真正发请求的是后端，不是浏览器本身。
+  - 本地页面成功：实际出网的是本地 `new-api` 后端。
+  - 服务器页面失败：实际出网的是阿里云上的 `new-api` 后端。
+- 这次故障的核心差异不是凭证，而是线上该渠道记录的 `setting.proxy` 为空。
+  - 正常的 Codex 渠道：
+    - `proxy = http://host.docker.internal:7890`
+  - 异常的 `Codex-pro20x-1`：
+    - `proxy = ""`
+- 当时线上运行的还是旧代码，尚未包含“编辑已有渠道并保存时，也自动回填默认代理”的修复。
+  - 所以即使在页面里点了“编辑 -> 保存”，也不会把空代理补上。
+
+### 如何确认
+
+- 先查生产数据库中的渠道记录：
+
+```bash
+ssh -F ops/ssh/config.local aheapi-prod <<'EOF'
+cd /opt/new-api/app
+docker exec new-api-postgres psql -U newapi -d newapi -c \
+"select id,name,type,\"group\",status,test_model,models,setting from channels where name like 'Codex-%' order by id;"
+EOF
+```
+
+- 如果 `Codex-pro20x-1` 的 `setting.proxy` 为空，而其他 Codex 渠道不为空，就说明是代理缺失。
+
+- 再确认线上源码是否已包含“更新渠道时回填代理”的修复：
+
+```bash
+ssh -F ops/ssh/config.local aheapi-prod <<'EOF'
+cd /opt/new-api/app
+sed -n '855,885p' controller/channel.go
+EOF
+```
+
+- 如果这里还是旧逻辑，说明服务器还没部署到最新版本。
+
+### 这次的实际修复方式
+
+1. 将本地最新代码同步到服务器。
+2. 因服务器拉 Docker Hub 超时，改为本地构建镜像并压缩传输到服务器。
+3. 服务器使用 `--no-build --no-deps --force-recreate new-api` 重建应用容器。
+4. 直接把生产库里 `Codex-pro20x-1` 的 `proxy` 补成和其他 Codex 一样的值：
+   - `http://host.docker.internal:7890`
+5. 重启 `new-api-prod`，等待健康检查通过。
+
+### 直接修复命令
+
+- 修改生产库里的 `proxy`：
+
+```bash
+ssh -F ops/ssh/config.local aheapi-prod <<'EOF'
+cd /opt/new-api/app
+docker exec new-api-postgres psql -U newapi -d newapi -c \
+"update channels
+ set setting = jsonb_set(
+   coalesce(setting::jsonb, '{}'::jsonb),
+   '{proxy}',
+   '\"http://host.docker.internal:7890\"'::jsonb,
+   true
+ )::text
+ where name='Codex-pro20x-1';"
+EOF
+```
+
+- 重建应用容器：
+
+```bash
+ssh -F ops/ssh/config.local aheapi-prod <<'EOF'
+cd /opt/new-api/app
+set -a
+. ./.env.prod
+set +a
+docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml \
+  up -d --no-build --no-deps --force-recreate new-api
+EOF
+```
+
+### 额外提醒
+
+- Codex 渠道只支持 `/v1/responses`，不支持 `/v1/chat/completions`。
+- 如果日志里出现：
+
+```text
+codex channel: /v1/chat/completions endpoint not supported
+```
+
+- 这不是渠道坏了，而是调用入口走错了协议。
+- 所以排查 Codex 渠道时要分开看：
+  - 渠道配置是否正确：看 `proxy / key / account_id / models / group`
+  - 客户端调用方式是否正确：看是不是走了 `/v1/responses`
