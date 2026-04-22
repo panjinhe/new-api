@@ -70,6 +70,13 @@ const EditTokenModal = (props) => {
   const [showQuotaInput, setShowQuotaInput] = useState(false);
   const isEdit = props.editingToken.id !== undefined;
 
+  const getDefaultGroupValue = (groupOptions = groups) => {
+    if (!statusState?.status?.default_use_auto_group) {
+      return '';
+    }
+    return groupOptions.some((group) => group.value === 'auto') ? 'auto' : '';
+  };
+
   const getInitValues = () => ({
     name: '',
     remain_quota: 0,
@@ -79,7 +86,7 @@ const EditTokenModal = (props) => {
     model_limits_enabled: false,
     model_limits: [],
     allow_ips: '',
-    group: '',
+    group: getDefaultGroupValue(),
     cross_group_retry: false,
     tokenCount: 1,
   });
@@ -148,9 +155,15 @@ const EditTokenModal = (props) => {
         }
       }
       setGroups(localGroupOptions);
-      // if (statusState?.status?.default_use_auto_group && formApiRef.current) {
-      //   formApiRef.current.setValue('group', 'auto');
-      // }
+      if (!isEdit && formApiRef.current) {
+        const currentGroup = formApiRef.current.getValue('group');
+        if (!currentGroup) {
+          const defaultGroup = getDefaultGroupValue(localGroupOptions);
+          if (defaultGroup) {
+            formApiRef.current.setValue('group', defaultGroup);
+          }
+        }
+      }
     } else {
       showError(t(message));
     }
