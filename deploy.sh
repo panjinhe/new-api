@@ -65,7 +65,7 @@ case "$ENV_NAME" in
     LOG_DIR="$ROOT_DIR/logs-dev"
     ENV_FILE="$ROOT_DIR/.env.dev"
     COMPOSE_FILE="$ROOT_DIR/docker-compose.dev.yml"
-    HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3001/api/status}"
+    HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/status}"
     POSTGRES_COMPOSE_FILE="$ROOT_DIR/docker-compose.dev.postgres.yml"
     ;;
   *)

@@ -82,14 +82,20 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 开发环境的特点：
 
-- 监听端口是 `3001`
+- 监听端口是 `3000`
 - 数据只写到 `data-dev/one-api.db`
 - 不会碰线上 `data-prod/`
 - 如果 `data-dev/one-api.db` 还不存在，而仓库根目录存在旧的 `one-api.db`，容器首次启动时会自动导入
 - 如果仓库根目录存在旧的 `data/` 目录，容器首次启动时也会把里面的文件合并进 `data-dev/`，且不会覆盖已存在文件
 
-如果你只是改小功能，也可以继续用本地 `go run main.go`。  
-但在准备上线前，建议至少再用一次 `docker-compose.dev.yml` 做“接近生产”的验证。
+本地开发建议固定只走 `docker-compose.dev.yml`，不要再和 `go run main.go` 混用。  
+这样可以避免：
+
+- 端口占用混乱
+- 前端构建产物已经更新，但本地进程还在跑旧的嵌入包
+- 你以为自己在验证 Docker，实际上访问到的是宿主机进程
+
+如果之前本地跑过 `go run main.go`，切回 Docker 前先停掉本机 `3000` 端口上的旧进程，再执行上面的 compose 命令。
 
 ## 线上部署
 

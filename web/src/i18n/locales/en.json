@@ -3673,6 +3673,10 @@
     "默认折叠侧边栏": "Default collapse sidebar",
     "默认测试模型": "Default Test Model",
     "默认用户消息": "Default User Message",
-    "默认补全倍率": "Default completion ratio"
+    "默认补全倍率": "Default completion ratio",
+    "推荐接入": "Recommended Setup",
+    "使用 CC Switch 一键配置": "One-click setup with CC Switch",
+    "登录后进入控制台创建令牌，点击 CC Switch，即可自动填入 Base URL、模型和 API Key。": "After signing in, create a token in the console and click CC Switch to auto-fill the Base URL, model, and API key.",
+    "前往令牌页": "Go to Tokens"
   }
 }

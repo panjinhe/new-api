@@ -60,7 +60,7 @@ const Home = () => {
       number: '03',
       title: t('替换 Base URL'),
       description: t(
-        '将原有配置中的 Base URL 替换为本站地址，按教程填入模型与密钥即可开始使用。',
+        '将原有配置中的 Base URL 替换为本站地址，填入模型与密钥即可开始使用。',
       ),
     },
   ];
@@ -141,14 +141,14 @@ const Home = () => {
               <div className='w-full text-center'>
                 <div className='mx-auto max-w-3xl'>
                   <div className='inline-flex items-center rounded-full border border-semi-color-border bg-white/75 px-4 py-1 text-sm text-semi-color-text-1 shadow-sm backdrop-blur dark:bg-black/20'>
-                    {t('快速接入教程')}
+                    {t('三步快速开始')}
                   </div>
                   <h1 className='mt-6 text-4xl font-bold leading-tight text-semi-color-text-0 md:text-5xl lg:text-6xl'>
                     {t('三步即可开始')}
                   </h1>
                   <p className='mx-auto mt-4 max-w-2xl text-base leading-7 text-semi-color-text-1 md:text-lg'>
                     {t(
-                      '接入你的 Codex API 极其简单，打开网站后按教程配置，最快 3 分钟即可开始编码。',
+                      '接入你的 Codex API 极其简单，打开网站后完成配置，最快 3 分钟即可开始编码。',
                     )}
                   </p>
                 </div>
@@ -193,7 +193,7 @@ const Home = () => {
                       />
                     </div>
                     <div className='grid gap-3 md:w-auto'>
-                      <Link to='/console'>
+                      <Link to='/console/token'>
                         <Button
                           theme='solid'
                           type='primary'
@@ -220,6 +220,37 @@ const Home = () => {
                       : t(
                           '进入网站后创建令牌即可获取 api-key，替换配置后即可开始使用。',
                         )}
+                  </div>
+                </div>
+
+                <div className='mx-auto mt-6 max-w-4xl rounded-[32px] border border-cyan-200/80 bg-cyan-500/[0.08] p-5 text-left shadow-[0_18px_50px_rgba(8,145,178,0.12)] backdrop-blur dark:border-cyan-500/30 dark:bg-cyan-500/10 md:p-6'>
+                  <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+                    <div className='max-w-2xl'>
+                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-cyan-600 dark:text-cyan-300'>
+                        {t('推荐接入')}
+                      </div>
+                      <div className='mt-2 text-2xl font-bold text-semi-color-text-0'>
+                        {t('使用 CC Switch 一键配置')}
+                      </div>
+                      <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
+                        {t(
+                          '登录后进入控制台创建令牌，点击 CC Switch，即可自动填入 Base URL、模型和 API Key。',
+                        )}
+                      </p>
+                    </div>
+                    <div className='grid gap-3 md:w-auto'>
+                      <Link to='/console/token'>
+                        <Button
+                          theme='solid'
+                          type='primary'
+                          size={isMobile ? 'default' : 'large'}
+                          className='!h-11 !w-full !rounded-full px-6'
+                          icon={<IconPlay />}
+                        >
+                          {t('前往令牌页')}
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
