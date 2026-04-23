@@ -133,8 +133,6 @@ const RechargeCard = ({
   }, [shouldShowSubscription, activeTab]);
   const topupContent = (
     <Space vertical style={{ width: '100%' }}>
-      <RechargeSupportCard />
-
       {/* 统计数据 */}
       <Card
         className='!rounded-xl w-full'
@@ -623,6 +621,8 @@ const RechargeCard = ({
           />
         </Form>
       </Card>
+
+      <RechargeSupportCard />
     </Space>
   );
 

@@ -149,12 +149,12 @@ const RechargeSupportCard = ({ compact = false, onGoTopup }) => {
                     className='grid grid-cols-2 text-xs text-[var(--semi-color-text-2)]'
                   >
                     <div
-                      className={`px-3 py-2 ${index !== pricingItems.length - 1 ? 'border-t border-[var(--semi-color-border)]' : ''}`}
+                      className={`px-3 py-2 ${index !== 0 ? 'border-t border-[var(--semi-color-border)]' : ''}`}
                     >
                       {item.quota}
                     </div>
                     <div
-                      className={`border-l border-[var(--semi-color-border)] px-3 py-2 ${index !== pricingItems.length - 1 ? 'border-t border-[var(--semi-color-border)]' : ''}`}
+                      className={`border-l border-[var(--semi-color-border)] px-3 py-2 ${index !== 0 ? 'border-t border-[var(--semi-color-border)]' : ''}`}
                     >
                       {item.price}
                     </div>
