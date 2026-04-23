@@ -15,11 +15,31 @@
 - 真实环境变量继续只保留在服务器 `.env.prod`
 - 如果以后新增服务器，也继续按这套命名扩展
 
-## 生产镜像传输约定
+## 生产部署默认约定
 
-- 生产部署时，如果服务器拉取 Docker Hub 镜像慢或超时，统一改为在本地构建镜像后传到服务器。
-- 镜像传输必须使用压缩流，不再直接使用未压缩的 `docker save | ssh ... docker load`。
-- 推荐命令：
+- 以后生产发版默认永远使用“本地重建前端 + 编译 Linux 二进制 + 同步源码包 + 替换容器内 `/new-api` + 重启容器”这套快速发布流程。
+- 不再把“本地构建镜像 + `docker save | gzip | ssh | docker load` + 服务器 `docker compose up -d --no-build`”作为日常发布方式。
+- 原因很简单：
+  - 整镜像传输太慢
+  - 前后端常规改动没有必要每次都搬运整包镜像
+  - 你的当前环境更适合走二进制热更新发布
+
+### 默认发布步骤
+
+```powershell
+pwsh ./scripts/build-linux-release.ps1
+```
+
+- 这一步会自动：
+  - 重建前端
+  - 编译 Linux `amd64` 二进制
+  - 校验产物是 Linux `ELF`
+
+然后同步源码包和二进制到服务器，再替换运行中的程序并重启容器。
+
+### 已废弃：标准镜像发布
+
+- 以下流程标记为废弃，不再作为默认发布方式：
 
 ```bash
 docker build -t new-api-local:prod .
@@ -27,12 +47,7 @@ docker save new-api-local:prod | gzip -1 | ssh -F ops/ssh/config.local aheapi-pr
 ssh -F ops/ssh/config.local aheapi-prod "cd /opt/new-api/app && docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build"
 ```
 
-- 如果需要验证镜像体积，可先查看：
-
-```bash
-docker images new-api-local:prod
-docker save new-api-local:prod | gzip -1 | wc -c
-```
+- 仅在你明确需要验证完整 Docker 构建链路时，才临时使用这套。
 
 ## 生产部署避坑
 
