@@ -27,10 +27,10 @@ const toolTags = [
 const modelTags = ['5.4', '5.3codex', '5.4mini', '5.2'];
 
 const pricingItems = [
-  '50 刀 10 元',
-  '100 刀 18 元',
-  '200 刀 35 元',
-  '500 刀 80 元',
+  { quota: '50 刀', price: '10 元' },
+  { quota: '100 刀', price: '18 元' },
+  { quota: '200 刀', price: '35 元' },
+  { quota: '500 刀', price: '80 元' },
 ];
 
 const RechargeSupportCard = ({ compact = false, onGoTopup }) => {
@@ -136,9 +136,32 @@ const RechargeSupportCard = ({ compact = false, onGoTopup }) => {
                 <CircleDollarSign size={16} className='text-emerald-500' />
                 定价与有效期
               </div>
-              <div className='mt-1 text-xs leading-6 text-[var(--semi-color-text-2)]'>
-                {pricingItems.join(' / ')}
-                <br />
+              <div className='mt-3 overflow-hidden rounded-lg border border-[var(--semi-color-border)] bg-white'>
+                <div className='grid grid-cols-2 bg-[var(--semi-color-fill-0)] text-xs font-medium text-[var(--semi-color-text-1)]'>
+                  <div className='px-3 py-2'>额度</div>
+                  <div className='border-l border-[var(--semi-color-border)] px-3 py-2'>
+                    价格
+                  </div>
+                </div>
+                {pricingItems.map((item, index) => (
+                  <div
+                    key={item.quota}
+                    className='grid grid-cols-2 text-xs text-[var(--semi-color-text-2)]'
+                  >
+                    <div
+                      className={`px-3 py-2 ${index !== pricingItems.length - 1 ? 'border-t border-[var(--semi-color-border)]' : ''}`}
+                    >
+                      {item.quota}
+                    </div>
+                    <div
+                      className={`border-l border-[var(--semi-color-border)] px-3 py-2 ${index !== pricingItems.length - 1 ? 'border-t border-[var(--semi-color-border)]' : ''}`}
+                    >
+                      {item.price}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className='mt-2 text-xs leading-6 text-[var(--semi-color-text-2)]'>
                 量大价格可谈 10000刀+/月，有效期一个月。
               </div>
             </div>

@@ -295,13 +295,6 @@ const Home = () => {
                           {t('前往令牌页')}
                         </Button>
                       </Link>
-                      <Button
-                        size={isMobile ? 'default' : 'large'}
-                        className='!h-11 !w-full !rounded-full px-6'
-                        onClick={() => setContactModalVisible(true)}
-                      >
-                        {t('咨询更多')}
-                      </Button>
                     </div>
                   </div>
                   <div className='mt-4 flex flex-wrap items-center gap-2 border-t border-cyan-200/70 pt-4 text-sm text-semi-color-text-1 dark:border-cyan-500/20'>
@@ -321,6 +314,30 @@ const Home = () => {
                       onClick={() => openExternalLink(ccSwitchRepoUrl)}
                     >
                       {t('查看 GitHub 仓库')}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className='mx-auto mt-6 max-w-2xl rounded-[28px] border border-semi-color-border bg-white/85 px-6 py-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25'>
+                  <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+                    {t('咨询更多')}
+                  </div>
+                  <div className='mt-3 text-base leading-7 text-semi-color-text-1 md:text-lg'>
+                    {t('如需接入协助、兑换码或配置支持，可加入 QQ 群咨询。')}
+                  </div>
+                  <div className='mt-5 text-sm text-semi-color-text-2'>
+                    {t('QQ群号')}
+                  </div>
+                  <div className='mt-2 text-3xl font-bold tracking-[0.08em] text-semi-color-text-0'>
+                    {qqGroupNumber}
+                  </div>
+                  <div className='mt-6 flex justify-center'>
+                    <Button
+                      size={isMobile ? 'default' : 'large'}
+                      className='!h-11 !rounded-full px-8'
+                      onClick={() => setContactModalVisible(true)}
+                    >
+                      {t('咨询更多')}
                     </Button>
                   </div>
                 </div>
