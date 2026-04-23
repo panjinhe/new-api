@@ -29,15 +29,18 @@ import {
 import { useTranslation } from 'react-i18next';
 import { encodeToBase64, selectFilter } from '../../../../helpers';
 
+const CLAUDE_CODE_COMPAT_MODEL = 'claude-opus-4-6';
+
 const APP_CONFIGS = {
   claude: {
     label: 'Claude',
-    defaultName: 'My Claude',
+    defaultName: 'aheapi',
     modelFields: [
-      { key: 'model', label: '主模型' },
-      { key: 'haikuModel', label: 'Haiku 模型' },
-      { key: 'sonnetModel', label: 'Sonnet 模型' },
-      { key: 'opusModel', label: 'Opus 模型' },
+      { key: 'model', label: '主模型', fixed: true },
+      { key: 'haikuModel', label: 'Haiku 模型', fixed: true },
+      { key: 'sonnetModel', label: 'Sonnet 模型', fixed: true },
+      { key: 'opusModel', label: 'Opus 模型', fixed: true },
+      { key: 'reasoningModel', label: 'Reasoning 模型', fixed: true },
     ],
   },
   codex: {
@@ -63,6 +66,17 @@ function getServerAddress() {
   return window.location.origin;
 }
 
+function getDefaultModels(app) {
+  if (app !== 'claude') return {};
+  return {
+    model: CLAUDE_CODE_COMPAT_MODEL,
+    haikuModel: CLAUDE_CODE_COMPAT_MODEL,
+    sonnetModel: CLAUDE_CODE_COMPAT_MODEL,
+    opusModel: CLAUDE_CODE_COMPAT_MODEL,
+    reasoningModel: CLAUDE_CODE_COMPAT_MODEL,
+  };
+}
+
 function buildCodexImportConfig(endpoint, model, apiKey) {
   const config = [
     'model_provider = "aheapi"',
@@ -85,6 +99,26 @@ function buildCodexImportConfig(endpoint, model, apiKey) {
   };
 }
 
+function buildClaudeImportConfig(endpoint, models, apiKey) {
+  const model = models.model || CLAUDE_CODE_COMPAT_MODEL;
+  const haikuModel = models.haikuModel || model;
+  const sonnetModel = models.sonnetModel || model;
+  const opusModel = models.opusModel || model;
+  const reasoningModel = models.reasoningModel || model;
+
+  return {
+    env: {
+      ANTHROPIC_AUTH_TOKEN: apiKey,
+      ANTHROPIC_BASE_URL: endpoint,
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: haikuModel,
+      ANTHROPIC_DEFAULT_OPUS_MODEL: opusModel,
+      ANTHROPIC_DEFAULT_SONNET_MODEL: sonnetModel,
+      ANTHROPIC_MODEL: model,
+      ANTHROPIC_REASONING_MODEL: reasoningModel,
+    },
+  };
+}
+
 function buildCCSwitchURL(app, name, models, apiKey) {
   const serverAddress = getServerAddress();
   const endpoint = app === 'codex' ? serverAddress + '/v1' : serverAddress;
@@ -96,6 +130,12 @@ function buildCCSwitchURL(app, name, models, apiKey) {
     const codexConfig = buildCodexImportConfig(endpoint, models.model, apiKey);
     params.set('configFormat', 'json');
     params.set('config', encodeToBase64(JSON.stringify(codexConfig)));
+  } else if (app === 'claude') {
+    const claudeConfig = buildClaudeImportConfig(endpoint, models, apiKey);
+    params.set('configFormat', 'json');
+    params.set('config', encodeToBase64(JSON.stringify(claudeConfig)));
+    params.set('endpoint', endpoint);
+    params.set('apiKey', apiKey);
   } else {
     params.set('endpoint', endpoint);
     params.set('apiKey', apiKey);
@@ -123,16 +163,16 @@ export default function CCSwitchModal({
 
   useEffect(() => {
     if (visible) {
-      setModels({});
       setApp('claude');
       setName(APP_CONFIGS.claude.defaultName);
+      setModels(getDefaultModels('claude'));
     }
   }, [visible]);
 
   const handleAppChange = (val) => {
     setApp(val);
     setName(APP_CONFIGS[val].defaultName);
-    setModels({});
+    setModels(getDefaultModels(val));
   };
 
   const handleModelChange = (field, value) => {
@@ -140,11 +180,12 @@ export default function CCSwitchModal({
   };
 
   const handleSubmit = () => {
-    if (!models.model) {
+    const finalModels = { ...getDefaultModels(app), ...models };
+    if (!finalModels.model) {
       Toast.warning(t('请选择主模型'));
       return;
     }
-    const url = buildCCSwitchURL(app, name, models, 'sk-' + tokenKey);
+    const url = buildCCSwitchURL(app, name, finalModels, 'sk-' + tokenKey);
     window.open(url, '_blank');
     onClose();
   };
@@ -203,17 +244,21 @@ export default function CCSwitchModal({
                 <Typography.Text type='danger'> *</Typography.Text>
               )}
             </div>
-            <Select
-              placeholder={t('请选择模型')}
-              optionList={modelOptions}
-              value={models[field.key] || undefined}
-              onChange={(val) => handleModelChange(field.key, val)}
-              filter={selectFilter}
-              style={{ width: '100%' }}
-              showClear
-              searchable
-              emptyContent={t('暂无数据')}
-            />
+            {field.fixed ? (
+              <Input value={models[field.key] || CLAUDE_CODE_COMPAT_MODEL} disabled />
+            ) : (
+              <Select
+                placeholder={t('请选择模型')}
+                optionList={modelOptions}
+                value={models[field.key] || undefined}
+                onChange={(val) => handleModelChange(field.key, val)}
+                filter={selectFilter}
+                style={{ width: '100%' }}
+                showClear
+                searchable
+                emptyContent={t('暂无数据')}
+              />
+            )}
           </div>
         ))}
       </div>
