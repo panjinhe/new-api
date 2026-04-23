@@ -97,6 +97,27 @@ sudo cp /opt/new-api/app/deploy/nginx/new-api.conf.example /etc/nginx/sites-avai
 - 日志里出现 `client intended to send too large body`
 - 出错地址通常是 `POST /v1/responses`
 
+如果你还要兼容长时间流式输出，建议不要把所有接口都走同一套代理参数，而是把这些流式接口单独拎出来：
+
+- `/v1/chat/completions`
+- `/pg/chat/completions`
+- `/v1/responses`
+- `/v1/responses/compact`
+- `/v1/messages`
+
+这些路径建议至少做到：
+
+- `proxy_read_timeout 3600s`
+- `proxy_send_timeout 3600s`
+- `proxy_buffering off`
+- `proxy_request_buffering off`
+- `add_header X-Accel-Buffering no always`
+
+项目模板 [new-api.conf.example](/E:/new-api/deploy/nginx/new-api.conf.example) 已经按这套思路拆好：
+
+- 流式接口单独 location
+- 普通页面/API 保持常规代理
+
 然后启用站点：
 
 ```bash
