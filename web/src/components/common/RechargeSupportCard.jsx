@@ -162,7 +162,7 @@ const RechargeSupportCard = ({ compact = false, onGoTopup }) => {
                 ))}
               </div>
               <div className='mt-2 text-xs leading-6 text-[var(--semi-color-text-2)]'>
-                量大价格可谈 10000刀+/月，有效期一个月。
+                量大价格可谈 10000刀+/月。
               </div>
             </div>
             <div className='rounded-xl bg-[var(--semi-color-fill-0)] px-4 py-3 md:col-span-2'>
