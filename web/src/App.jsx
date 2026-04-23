@@ -51,6 +51,8 @@ import Setup from './pages/Setup';
 import SetupCheck from './components/layout/SetupCheck';
 
 const Home = lazy(() => import('./pages/Home'));
+const Docs = lazy(() => import('./pages/Docs'));
+const DocsDetail = lazy(() => import('./pages/DocsDetail'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const About = lazy(() => import('./pages/About'));
 const UserAgreement = lazy(() => import('./pages/UserAgreement'));
@@ -332,6 +334,22 @@ function App() {
                 <Pricing />
               </Suspense>
             )
+          }
+        />
+        <Route
+          path='/docs'
+          element={
+            <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+              <Docs />
+            </Suspense>
+          }
+        />
+        <Route
+          path='/docs/:slug'
+          element={
+            <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+              <DocsDetail />
+            </Suspense>
           }
         />
         <Route

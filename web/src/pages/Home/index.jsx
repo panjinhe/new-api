@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect, useState } from 'react';
-import { Button, Input, Modal } from '@douyinfe/semi-ui';
+import { Button, Input, Modal, Tag } from '@douyinfe/semi-ui';
 import { API, showError, copy, showSuccess } from '../../helpers';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import { StatusContext } from '../../context/Status';
@@ -33,6 +33,7 @@ import {
 } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import NoticeModal from '../../components/layout/NoticeModal';
+import { featuredBuiltInDocs } from '../../constants/docs.constants';
 
 const Home = () => {
   const { t, i18n } = useTranslation();
@@ -50,6 +51,7 @@ const Home = () => {
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
+  const featuredTutorial = featuredBuiltInDocs[0];
 
   const quickStartSteps = [
     {
@@ -317,6 +319,65 @@ const Home = () => {
                     </Button>
                   </div>
                 </div>
+
+                {featuredTutorial && (
+                  <div className='mx-auto mt-6 max-w-4xl rounded-[32px] border border-semi-color-border bg-white/85 p-5 text-left shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:p-6'>
+                    <div className='flex flex-col gap-4 md:flex-row md:items-start md:justify-between'>
+                      <div className='max-w-2xl'>
+                        <div className='inline-flex items-center rounded-full border border-semi-color-border bg-semi-color-fill-0 px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+                          {t('精选教程')}
+                        </div>
+                        <div className='mt-4 text-2xl font-bold text-semi-color-text-0 md:text-3xl'>
+                          {t('教程及文档')}
+                        </div>
+                        <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
+                          {t(
+                            '先从这篇实现记录开始，了解我们如何把 Claude Code 前端兼容成 Anthropic 协议，同时把后端统一收敛到 Codex / GPT-5.4。',
+                          )}
+                        </p>
+                      </div>
+                      <div className='flex shrink-0 gap-3 md:flex-col'>
+                        <Link to={`/docs/${featuredTutorial.slug}`}>
+                          <Button
+                            theme='solid'
+                            type='primary'
+                            size={isMobile ? 'default' : 'large'}
+                            className='!h-11 !rounded-full px-6'
+                          >
+                            {t('查看详情')}
+                          </Button>
+                        </Link>
+                        <Link to='/docs'>
+                          <Button
+                            size={isMobile ? 'default' : 'large'}
+                            className='!h-11 !rounded-full px-6'
+                          >
+                            {t('查看全部文档')}
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className='mt-6 rounded-[28px] border border-semi-color-border bg-semi-color-fill-0 p-5'>
+                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-cyan-600 dark:text-cyan-300'>
+                        {featuredTutorial.updatedAt}
+                      </div>
+                      <div className='mt-3 text-2xl font-bold text-semi-color-text-0'>
+                        {featuredTutorial.title}
+                      </div>
+                      <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
+                        {featuredTutorial.summary}
+                      </p>
+                      <div className='mt-4 flex flex-wrap gap-2'>
+                        {featuredTutorial.tags.map((tag) => (
+                          <Tag key={tag} color='cyan' shape='circle'>
+                            {tag}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className='mx-auto mt-6 max-w-2xl rounded-[28px] border border-semi-color-border bg-white/85 px-6 py-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25'>
                   <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>

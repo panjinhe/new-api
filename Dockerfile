@@ -5,6 +5,7 @@ COPY web/package.json .
 COPY web/bun.lock .
 RUN for i in 1 2 3; do bun install && exit 0; echo "bun install failed, retrying ($i/3)"; sleep 5; done; exit 1
 COPY ./web .
+COPY ./docs /docs
 COPY ./VERSION .
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build
 
