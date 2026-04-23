@@ -108,6 +108,7 @@ function buildClaudeImportConfig(endpoint, models, apiKey) {
 
   return {
     env: {
+      ANTHROPIC_API_KEY: apiKey,
       ANTHROPIC_AUTH_TOKEN: apiKey,
       ANTHROPIC_BASE_URL: endpoint,
       ANTHROPIC_DEFAULT_HAIKU_MODEL: haikuModel,
