@@ -164,7 +164,7 @@ const Home = () => {
       >
         <div className='space-y-4'>
           <div className='text-sm leading-7 text-semi-color-text-1'>
-            {t('如需接入协助、兑换码或配置支持，可加入 QQ 群咨询。')}
+            {t('加群@群主可领取20刀兑换码')}
           </div>
           <div className='rounded-2xl border border-semi-color-border bg-semi-color-fill-0 p-4'>
             <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
@@ -320,6 +320,30 @@ const Home = () => {
                   </div>
                 </div>
 
+                <div className='mx-auto mt-6 max-w-2xl rounded-[28px] border border-semi-color-border bg-white/85 px-6 py-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25'>
+                  <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+                    {t('咨询更多')}
+                  </div>
+                  <div className='mt-3 text-base leading-7 text-semi-color-text-1 md:text-lg'>
+                    {t('加群@群主可领取20刀兑换码')}
+                  </div>
+                  <div className='mt-5 text-sm text-semi-color-text-2'>
+                    {t('QQ群号')}
+                  </div>
+                  <div className='mt-2 text-3xl font-bold tracking-[0.08em] text-semi-color-text-0'>
+                    {qqGroupNumber}
+                  </div>
+                  <div className='mt-6 flex justify-center'>
+                    <Button
+                      size={isMobile ? 'default' : 'large'}
+                      className='!h-11 !rounded-full px-8'
+                      onClick={() => setContactModalVisible(true)}
+                    >
+                      {t('咨询更多')}
+                    </Button>
+                  </div>
+                </div>
+
                 {featuredTutorial && (
                   <div className='mx-auto mt-6 max-w-4xl rounded-[32px] border border-semi-color-border bg-white/85 p-5 text-left shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:p-6'>
                     <div className='flex flex-col gap-4 md:flex-row md:items-start md:justify-between'>
@@ -378,30 +402,6 @@ const Home = () => {
                     </div>
                   </div>
                 )}
-
-                <div className='mx-auto mt-6 max-w-2xl rounded-[28px] border border-semi-color-border bg-white/85 px-6 py-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25'>
-                  <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
-                    {t('咨询更多')}
-                  </div>
-                  <div className='mt-3 text-base leading-7 text-semi-color-text-1 md:text-lg'>
-                    {t('如需接入协助、兑换码或配置支持，可加入 QQ 群咨询。')}
-                  </div>
-                  <div className='mt-5 text-sm text-semi-color-text-2'>
-                    {t('QQ群号')}
-                  </div>
-                  <div className='mt-2 text-3xl font-bold tracking-[0.08em] text-semi-color-text-0'>
-                    {qqGroupNumber}
-                  </div>
-                  <div className='mt-6 flex justify-center'>
-                    <Button
-                      size={isMobile ? 'default' : 'large'}
-                      className='!h-11 !rounded-full px-8'
-                      onClick={() => setContactModalVisible(true)}
-                    >
-                      {t('咨询更多')}
-                    </Button>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
