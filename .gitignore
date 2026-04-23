@@ -30,6 +30,9 @@ web/bun.lock
 plans
 .claude
 .playwright-cli/
+.codex-tmp/
+output/
+new-api-linux*
 头像001.jpg
 
 electron/node_modules
