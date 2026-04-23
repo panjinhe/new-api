@@ -251,6 +251,41 @@ docker commit new-api-prod new-api-local:prod >/dev/null
 docker restart new-api-prod
 ```
 
+如果你是在本地 PowerShell 里远程执行这些命令，需要额外注意一件事：
+
+- 不要把远端 shell 需要展开的 `$TS`、`$(date ...)` 直接写进 PowerShell 双引号字符串。
+- 错误示例：
+
+```powershell
+ssh -F ops/ssh/config.local aheapi-prod "TS=$(date +%Y%m%d-%H%M%S); docker cp new-api-prod:/new-api /opt/new-api/backups/bin/new-api-$TS"
+```
+
+- 这种写法里，`$(...)` 和 `$TS` 可能会先被本地 PowerShell 处理，导致远端命令异常。
+- 更稳妥的写法有两种：
+
+```powershell
+ssh -F ops/ssh/config.local aheapi-prod 'TS=$(date +%Y%m%d-%H%M%S); docker cp new-api-prod:/new-api /opt/new-api/backups/bin/new-api-$TS'
+```
+
+```powershell
+@'
+set -e
+mkdir -p /opt/new-api/backups/bin /opt/new-api/tmp
+TS=$(date +%Y%m%d-%H%M%S)
+docker cp new-api-prod:/new-api /opt/new-api/backups/bin/new-api-$TS
+chmod 755 /opt/new-api/tmp/new-api-linux-amd64
+cp /opt/new-api/tmp/new-api-linux-amd64 /opt/new-api/app/new-api-linux-amd64
+docker cp /opt/new-api/tmp/new-api-linux-amd64 new-api-prod:/new-api
+docker commit new-api-prod new-api-local:prod >/dev/null
+docker restart new-api-prod
+'@ | ssh -F ops/ssh/config.local aheapi-prod bash -s
+```
+
+- 对当前项目，推荐长期固定成下面这个约定：
+  - 短命令：`ssh '...'`
+  - 多行脚本：`@'...'@ | ssh ... bash -s`
+  - 避免：`ssh "...$(...)..."` 和 `ssh "...$VAR..."`
+
 最后检查：
 
 ```bash

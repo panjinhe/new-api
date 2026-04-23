@@ -37,6 +37,38 @@ pwsh ./scripts/build-linux-release.ps1
 
 然后同步源码包和二进制到服务器，再替换运行中的程序并重启容器。
 
+### PowerShell 远程执行注意事项
+
+- 如果你在本地用 PowerShell 调 `ssh` 执行远端 shell 命令，不要把本来应该留给远端展开的 `$VAR`、`$(...)` 直接写进双引号字符串。
+- 典型错误写法：
+
+```powershell
+ssh -F ops/ssh/config.local aheapi-prod "TS=$(date +%Y%m%d-%H%M%S); echo $TS"
+```
+
+- 这种写法里：
+  - `$(...)` 很可能先被本地 PowerShell 当成子表达式处理
+  - `$TS` 也可能被本地 PowerShell 提前展开
+  - 最终导致远端没有按预期执行，或者命令直接报错
+- 推荐固定使用下面两种方式：
+
+```powershell
+ssh -F ops/ssh/config.local aheapi-prod 'TS=$(date +%Y%m%d-%H%M%S); echo $TS'
+```
+
+```powershell
+@'
+set -e
+TS=$(date +%Y%m%d-%H%M%S)
+echo "$TS"
+'@ | ssh -F ops/ssh/config.local aheapi-prod bash -s
+```
+
+- 建议长期约定：
+  - 短命令用单引号包整段远端 shell
+  - 多行脚本统一用 here-string 管道到 `ssh ... bash -s`
+  - 不要默认写 `ssh "...$(...)..."` 这种形式
+
 ### 已废弃：标准镜像发布
 
 - 以下流程标记为废弃，不再作为默认发布方式：
