@@ -36,6 +36,7 @@ var defaultCacheRatio = map[string]float64{
 	"gpt-5":                               0.1,
 	"gpt-5-2025-08-07":                    0.1,
 	"gpt-5-chat-latest":                   0.1,
+	"gpt-5.5":                             0.1,
 	"gpt-5.4-mini":                        0.1,
 	"gpt-5-mini":                          0.1,
 	"gpt-5-mini-2025-08-07":               0.1,
@@ -111,6 +112,7 @@ var defaultCreateCacheRatio = map[string]float64{
 	"claude-opus-4-7-high":                1.25,
 	"claude-opus-4-7-medium":              1.25,
 	"claude-opus-4-7-low":                 1.25,
+	"gpt-5.5":                             1,
 }
 
 //var defaultCreateCacheRatio = map[string]float64{}

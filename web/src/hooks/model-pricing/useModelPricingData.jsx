@@ -24,6 +24,75 @@ import { Modal } from '@douyinfe/semi-ui';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
 
+const getModelFamilyPriority = (modelName = '') => {
+  const normalized = modelName.toLowerCase();
+  if (normalized.startsWith('gpt')) return 0;
+  if (normalized.startsWith('o')) return 1;
+  if (normalized.startsWith('claude')) return 2;
+  if (normalized.startsWith('gemini')) return 3;
+  return 4;
+};
+
+const getModelVariantPriority = (modelName = '') => {
+  const normalized = modelName.toLowerCase();
+  if (/^gpt-[\d.]+$/.test(normalized)) return 0;
+  if (normalized.includes('-pro')) return 1;
+  if (
+    normalized.includes('-codex') ||
+    normalized.includes('-chat') ||
+    normalized.includes('-latest')
+  ) {
+    return 2;
+  }
+  if (
+    normalized.includes('-mini') ||
+    normalized.includes('-nano') ||
+    normalized.includes('-flash')
+  ) {
+    return 3;
+  }
+  return 4;
+};
+
+const getModelVersionParts = (modelName = '') => {
+  const versionMatches = modelName.match(/\d+/g);
+  if (!versionMatches) {
+    return [];
+  }
+  return versionMatches.map(Number);
+};
+
+const compareModelNames = (a, b) => {
+  const familyCompare =
+    getModelFamilyPriority(a.model_name) - getModelFamilyPriority(b.model_name);
+  if (familyCompare !== 0) {
+    return familyCompare;
+  }
+
+  const aVersionParts = getModelVersionParts(a.model_name);
+  const bVersionParts = getModelVersionParts(b.model_name);
+  const maxLength = Math.max(aVersionParts.length, bVersionParts.length);
+  for (let i = 0; i < maxLength; i++) {
+    const aPart = aVersionParts[i] ?? -1;
+    const bPart = bVersionParts[i] ?? -1;
+    if (aPart !== bPart) {
+      return bPart - aPart;
+    }
+  }
+
+  const variantCompare =
+    getModelVariantPriority(a.model_name) - getModelVariantPriority(b.model_name);
+  if (variantCompare !== 0) {
+    return variantCompare;
+  }
+
+  if (a.quota_type !== b.quota_type) {
+    return a.quota_type - b.quota_type;
+  }
+
+  return a.model_name.localeCompare(b.model_name);
+};
+
 export const useModelPricingData = () => {
   const { t } = useTranslation();
   const [searchValue, setSearchValue] = useState('');
@@ -205,22 +274,7 @@ export const useModelPricingData = () => {
         m.vendor_description = vendor.description;
       }
     }
-    models.sort((a, b) => {
-      return a.quota_type - b.quota_type;
-    });
-
-    models.sort((a, b) => {
-      if (a.model_name.startsWith('gpt') && !b.model_name.startsWith('gpt')) {
-        return -1;
-      } else if (
-        !a.model_name.startsWith('gpt') &&
-        b.model_name.startsWith('gpt')
-      ) {
-        return 1;
-      } else {
-        return a.model_name.localeCompare(b.model_name);
-      }
-    });
+    models.sort(compareModelNames);
 
     setModels(models);
   };

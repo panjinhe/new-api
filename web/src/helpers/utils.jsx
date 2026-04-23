@@ -649,7 +649,7 @@ export const calculateModelPrice = ({
   if (record.quota_type === 0) {
     // 按量计费
     const isTokensDisplay = quotaDisplayType === 'TOKENS';
-    const inputRatioPriceUSD = record.model_ratio * 2 * usedGroupRatio;
+    const inputRatioPriceUSD = record.model_ratio * 2;
     const unitDivisor = tokenUnit === 'K' ? 1000 : 1;
     const unitLabel = tokenUnit === 'K' ? 'K' : 'M';
     const hasRatioValue = (value) =>
@@ -739,7 +739,7 @@ export const calculateModelPrice = ({
 
   if (record.quota_type === 1) {
     // 按次计费
-    const priceUSD = parseFloat(record.model_price) * usedGroupRatio;
+    const priceUSD = parseFloat(record.model_price);
     const displayVal = displayPrice(priceUSD);
 
     return {
