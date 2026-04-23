@@ -9,6 +9,12 @@ import (
 
 func GetUserUsableGroups(userGroup string) map[string]string {
 	groupsCopy := setting.GetUserUsableGroupsCopy()
+	if setting.DefaultUseAutoGroup {
+		// "auto" is a virtual routing group. When auto mode is enabled by default,
+		// it should be usable even if the persisted UserUsableGroups option forgot
+		// to include it explicitly.
+		groupsCopy["auto"] = "自动分组"
+	}
 	if userGroup != "" {
 		specialSettings, b := ratio_setting.GetGroupRatioSetting().GroupSpecialUsableGroup.Get(userGroup)
 		if b {
