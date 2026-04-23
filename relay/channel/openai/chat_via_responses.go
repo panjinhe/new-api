@@ -52,7 +52,14 @@ func OaiResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	}
 
 	if err := common.Unmarshal(body, &responsesResp); err != nil {
-		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		if !looksLikeEventStreamBody(body) {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+		completedResp, completedErr := OaiResponsesCompletedResponseFromBody(body)
+		if completedErr != nil {
+			return nil, types.NewOpenAIError(completedErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+		responsesResp = *completedResp
 	}
 
 	if oaiError := responsesResp.GetOpenAIError(); oaiError != nil && oaiError.Type != "" {

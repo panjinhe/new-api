@@ -2,6 +2,7 @@ package openai
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,12 +24,8 @@ const (
 	maxResponsesStreamScannerBuffer     = 64 << 20
 )
 
-func OaiResponsesCompletedResponseFromStream(resp *http.Response) (*dto.OpenAIResponsesResponse, error) {
-	if resp == nil || resp.Body == nil {
-		return nil, fmt.Errorf("invalid response")
-	}
-
-	scanner := bufio.NewScanner(resp.Body)
+func scanResponsesCompletedResponse(reader io.Reader) (*dto.OpenAIResponsesResponse, error) {
+	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, initialResponsesStreamScannerBuffer), maxResponsesStreamScannerBuffer)
 
 	var completed *dto.OpenAIResponsesResponse
@@ -72,6 +69,22 @@ func OaiResponsesCompletedResponseFromStream(resp *http.Response) (*dto.OpenAIRe
 		return nil, fmt.Errorf("responses stream completed event not found")
 	}
 	return completed, nil
+}
+
+func OaiResponsesCompletedResponseFromStream(resp *http.Response) (*dto.OpenAIResponsesResponse, error) {
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("invalid response")
+	}
+	return scanResponsesCompletedResponse(resp.Body)
+}
+
+func OaiResponsesCompletedResponseFromBody(body []byte) (*dto.OpenAIResponsesResponse, error) {
+	return scanResponsesCompletedResponse(bytes.NewReader(body))
+}
+
+func looksLikeEventStreamBody(body []byte) bool {
+	trimmed := strings.TrimSpace(string(body))
+	return strings.HasPrefix(trimmed, "data:") || strings.HasPrefix(trimmed, "event:")
 }
 
 func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {

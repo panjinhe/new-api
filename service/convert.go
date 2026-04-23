@@ -223,6 +223,58 @@ func generateStopBlock(index int) *dto.ClaudeResponse {
 	}
 }
 
+func normalizeClaudeStopReason(finishReason string) string {
+	stopReason := stopReasonOpenAI2Claude(finishReason)
+	if stopReason == "" {
+		return "end_turn"
+	}
+	return stopReason
+}
+
+func buildClaudeStreamCloseSequence(info *relaycommon.RelayInfo, usage *dto.Usage, finishReason string) []*dto.ClaudeResponse {
+	if info == nil || info.ClaudeConvertInfo == nil || info.ClaudeConvertInfo.Done {
+		return nil
+	}
+
+	claudeResponses := make([]*dto.ClaudeResponse, 0, 4)
+	switch info.ClaudeConvertInfo.LastMessagesType {
+	case relaycommon.LastMessageTypeText, relaycommon.LastMessageTypeThinking:
+		claudeResponses = append(claudeResponses, generateStopBlock(info.ClaudeConvertInfo.Index))
+	case relaycommon.LastMessageTypeTools:
+		base := info.ClaudeConvertInfo.ToolCallBaseIndex
+		for offset := 0; offset <= info.ClaudeConvertInfo.ToolCallMaxIndexOffset; offset++ {
+			claudeResponses = append(claudeResponses, generateStopBlock(base+offset))
+		}
+	}
+
+	if usage == nil {
+		usage = info.ClaudeConvertInfo.Usage
+	}
+	if finishReason == "" {
+		finishReason = info.ClaudeConvertInfo.FinishReason
+	}
+
+	claudeResponses = append(claudeResponses, &dto.ClaudeResponse{
+		Type:  "message_delta",
+		Usage: buildClaudeUsageFromOpenAIUsage(usage),
+		Delta: &dto.ClaudeMediaMessage{
+			StopReason: common.GetPointer[string](normalizeClaudeStopReason(finishReason)),
+		},
+	})
+	claudeResponses = append(claudeResponses, &dto.ClaudeResponse{
+		Type: "message_stop",
+	})
+
+	info.ClaudeConvertInfo.FinishReason = finishReason
+	info.ClaudeConvertInfo.LastMessagesType = relaycommon.LastMessageTypeNone
+	info.ClaudeConvertInfo.Done = true
+	return claudeResponses
+}
+
+func FinalizeClaudeStreamFromOpenAI(info *relaycommon.RelayInfo, usage *dto.Usage, finishReason string) []*dto.ClaudeResponse {
+	return buildClaudeStreamCloseSequence(info, usage, finishReason)
+}
+
 func buildClaudeUsageFromOpenAIUsage(oaiUsage *dto.Usage) *dto.ClaudeUsage {
 	if oaiUsage == nil {
 		return nil
@@ -413,24 +465,11 @@ func StreamResponseOpenAI2Claude(openAIResponse *dto.ChatCompletionsStreamRespon
 		// 如果首块就带 finish_reason，需要立即发送停止块
 		if len(openAIResponse.Choices) > 0 && openAIResponse.Choices[0].FinishReason != nil && *openAIResponse.Choices[0].FinishReason != "" {
 			info.FinishReason = *openAIResponse.Choices[0].FinishReason
-			stopOpenBlocks()
 			oaiUsage := openAIResponse.Usage
 			if oaiUsage == nil {
 				oaiUsage = info.ClaudeConvertInfo.Usage
 			}
-			if oaiUsage != nil {
-				claudeResponses = append(claudeResponses, &dto.ClaudeResponse{
-					Type:  "message_delta",
-					Usage: buildClaudeUsageFromOpenAIUsage(oaiUsage),
-					Delta: &dto.ClaudeMediaMessage{
-						StopReason: common.GetPointer[string](stopReasonOpenAI2Claude(info.FinishReason)),
-					},
-				})
-			}
-			claudeResponses = append(claudeResponses, &dto.ClaudeResponse{
-				Type: "message_stop",
-			})
-			info.ClaudeConvertInfo.Done = true
+			claudeResponses = append(claudeResponses, buildClaudeStreamCloseSequence(info, oaiUsage, info.FinishReason)...)
 		}
 		return claudeResponses
 	}
@@ -579,24 +618,11 @@ func StreamResponseOpenAI2Claude(openAIResponse *dto.ChatCompletionsStreamRespon
 		}
 
 		if doneChunk || info.ClaudeConvertInfo.Done {
-			stopOpenBlocks()
 			oaiUsage := openAIResponse.Usage
 			if oaiUsage == nil {
 				oaiUsage = info.ClaudeConvertInfo.Usage
 			}
-			if oaiUsage != nil {
-				claudeResponses = append(claudeResponses, &dto.ClaudeResponse{
-					Type:  "message_delta",
-					Usage: buildClaudeUsageFromOpenAIUsage(oaiUsage),
-					Delta: &dto.ClaudeMediaMessage{
-						StopReason: common.GetPointer[string](stopReasonOpenAI2Claude(info.FinishReason)),
-					},
-				})
-			}
-			claudeResponses = append(claudeResponses, &dto.ClaudeResponse{
-				Type: "message_stop",
-			})
-			info.ClaudeConvertInfo.Done = true
+			claudeResponses = append(claudeResponses, buildClaudeStreamCloseSequence(info, oaiUsage, info.FinishReason)...)
 			return claudeResponses
 		}
 	}
