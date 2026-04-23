@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button, Card, Space, Tag, Typography } from '@douyinfe/semi-ui';
 import {
-  Bot,
   CircleDollarSign,
   ExternalLink,
   Gift,
@@ -121,17 +120,8 @@ const RechargeSupportCard = ({ compact = false, onGoTopup }) => {
         </div>
       ) : (
         <>
-          <div className='mt-4 grid grid-cols-1 gap-3 md:grid-cols-2'>
-            <div className='rounded-xl bg-[var(--semi-color-fill-0)] px-4 py-3'>
-              <div className='flex items-center gap-2 text-sm font-medium'>
-                <Bot size={16} className='text-violet-500' />
-                支持常见工具快速接入
-              </div>
-              <div className='mt-1 text-xs leading-6 text-[var(--semi-color-text-2)]'>
-                支持 Codex、CLI、VSCode、OpenClaw、小龙虾、AstrBot。
-              </div>
-            </div>
-            <div className='rounded-xl bg-[var(--semi-color-fill-0)] px-4 py-3'>
+          <div className='mt-4 flex justify-center'>
+            <div className='w-full max-w-xl rounded-xl bg-[var(--semi-color-fill-0)] px-4 py-3'>
               <div className='flex items-center gap-2 text-sm font-medium'>
                 <CircleDollarSign size={16} className='text-emerald-500' />
                 定价与有效期
@@ -165,7 +155,9 @@ const RechargeSupportCard = ({ compact = false, onGoTopup }) => {
                 量大价格可谈 10000刀+/月。
               </div>
             </div>
-            <div className='rounded-xl bg-[var(--semi-color-fill-0)] px-4 py-3 md:col-span-2'>
+          </div>
+          <div className='mt-3 grid grid-cols-1 gap-3'>
+            <div className='rounded-xl bg-[var(--semi-color-fill-0)] px-4 py-3'>
               <div className='flex items-center gap-2 text-sm font-medium'>
                 <Gift size={16} className='text-rose-500' />
                 额外说明
