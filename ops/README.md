@@ -193,3 +193,84 @@ codex channel: /v1/chat/completions endpoint not supported
 - 所以排查 Codex 渠道时要分开看：
   - 渠道配置是否正确：看 `proxy / key / account_id / models / group`
   - 客户端调用方式是否正确：看是不是走了 `/v1/responses`
+
+## Nginx 源站收口经验
+
+### 为什么要做
+
+- 只有安全组放行 `80/443` 还不够。
+- 如果 Nginx 仍然接受 IP 直连、兜底 `server_name _;` 也正常转发，别人只要扫到源站 IP，就可以绕过域名直接打到站。
+- 对当前站点来说，至少要先做到：
+  - 拒绝 IP 直连
+  - 只响应正式域名
+  - 加一层基础限流
+  - 隐藏 Nginx 版本和不必要的上游响应头
+
+### 这次线上实际做了什么
+
+- 域名只保留：
+  - `pbroe.com`
+  - `www.pbroe.com`
+- Nginx 增加默认兜底站点：
+  - `80` 默认 `server` 直接 `return 444;`
+  - `443` 默认 `server` 直接 `return 444;`
+- 只有命中正式域名的请求才会：
+  - `80 -> 443` 跳转
+  - `443 -> 127.0.0.1:3000` 反代到 `new-api`
+- 开启基础限流：
+  - `limit_req_zone $binary_remote_addr zone=perip_general:10m rate=30r/s;`
+  - `limit_conn_zone $binary_remote_addr zone=perip_conn:10m;`
+  - `location /` 内：
+    - `limit_req zone=perip_general burst=60 nodelay;`
+    - `limit_conn perip_conn 30;`
+- 隐藏版本与敏感响应头：
+  - `server_tokens off;`
+  - `proxy_hide_header X-New-Api-Version;`
+  - `proxy_hide_header X-Oneapi-Request-Id;`
+
+### 验收方式
+
+- 校验 Nginx 配置：
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+- 验证正式域名仍然可用：
+
+```bash
+curl -I https://pbroe.com
+```
+
+- 验证 HTTP IP 直连被拒绝：
+
+```bash
+curl -I http://47.111.11.175
+```
+
+- 预期现象：
+  - 域名返回 `200` 或业务正常响应
+  - `http://47.111.11.175` 应该是空回复、连接被直接掐掉，或等价的拒绝行为
+
+- 验证 HTTPS IP 直连被兜底站点丢弃：
+
+```bash
+curl -vkI https://47.111.11.175
+```
+
+- 预期现象：
+  - 握手后拿不到业务页面
+  - 不会再被转发到 `new-api`
+
+### 仍然要注意的一点
+
+- 现在只是把“HTTP 层的裸奔”先收住了，不代表源站 IP 已完全隐藏。
+- 只要公网 DNS 还直接把：
+  - `pbroe.com`
+  - `www.pbroe.com`
+  解析到源站 IP
+- 那么源站 IP 依然能被公开看到。
+- 如果后面要继续增强防护，正确方向是：
+  - 接 CDN / WAF
+  - 回源只允许 CDN / WAF 出口
+  - 安全组和 Nginx 一起只信任代理层流量

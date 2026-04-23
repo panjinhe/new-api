@@ -150,6 +150,116 @@ sudo ufw allow 443/tcp
 sudo ufw reload
 ```
 
+## 源站收口与基础防护
+
+如果你准备长期把站跑在公网，除了 HTTPS，本身还建议把 Nginx 做一层最基础的“源站收口”。
+
+推荐至少做这四件事：
+
+- 拒绝 IP 直连
+- 只响应正式域名
+- 加基础限流
+- 隐藏版本号和不必要的上游响应头
+
+### 推荐配置思路
+
+1. 默认站点一律拒绝
+
+```nginx
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
+```
+
+```nginx
+server {
+    listen 443 ssl http2 default_server;
+    listen [::]:443 ssl http2 default_server;
+    server_name _;
+    ssl_certificate /etc/letsencrypt/live/your-domain.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.example.com/privkey.pem;
+    return 444;
+}
+```
+
+2. 只让正式域名进业务站点
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name your-domain.example.com www.your-domain.example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+```nginx
+limit_req_zone $binary_remote_addr zone=perip_general:10m rate=30r/s;
+limit_conn_zone $binary_remote_addr zone=perip_conn:10m;
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name your-domain.example.com www.your-domain.example.com;
+
+    server_tokens off;
+
+    ssl_certificate /etc/letsencrypt/live/your-domain.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/your-domain.example.com/privkey.pem;
+
+    location / {
+        limit_req zone=perip_general burst=60 nodelay;
+        limit_conn perip_conn 30;
+
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_hide_header X-New-Api-Version;
+        proxy_hide_header X-Oneapi-Request-Id;
+    }
+}
+```
+
+### 为什么这样更稳
+
+- 扫描器直接打 IP 时，不会再进入业务站点。
+- 只有命中你自己声明的域名，才会反代到 `127.0.0.1:3000`。
+- `30r/s + burst 60 + 单 IP 30 并发` 不算重防护，但已经能挡掉一批很随意的压测和探测。
+- `server_tokens off` 至少不会主动把 Nginx 具体版本暴露出去。
+- 隐藏 `X-New-Api-Version`、`X-Oneapi-Request-Id` 这类头，可以减少不必要的实现细节暴露。
+
+### 配完后怎么验证
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+curl -I https://your-domain.example.com
+curl -I http://你的公网IP
+curl -vkI https://你的公网IP
+```
+
+预期结果：
+
+- 正式域名正常返回
+- `http://公网IP` 被拒绝或空回复
+- `https://公网IP` 不会进入业务页面
+
+### 这一步的边界
+
+这能明显减少“裸奔”风险，但还不等于完全隐藏源站。
+
+如果你的 DNS 仍然直接把域名解析到源站公网 IP，那么别人依然能从 DNS 看到真实源站地址。要进一步收口，下一步应该是：
+
+- 接 CDN / WAF
+- 源站只允许 CDN / WAF 回源
+- 安全组进一步只对白名单来源放行
+
 ## 生产上线后的验证
 
 先看容器：
