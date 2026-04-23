@@ -35,14 +35,15 @@ func IOCopyBytesGracefully(c *gin.Context, src *http.Response, data []byte) {
 	// For example, Postman will report error, and we cannot check the response at all.
 	if src != nil {
 		for k, v := range src.Header {
-			// avoid setting Content-Length
-			if k == "Content-Length" {
+			// avoid forwarding framing headers when we rebuild the body locally
+			if k == "Content-Length" || k == "Transfer-Encoding" {
 				continue
 			}
 			c.Writer.Header().Set(k, v[0])
 		}
 	}
 
+	c.Writer.Header().Del("Transfer-Encoding")
 	// set Content-Length header manually BEFORE calling WriteHeader
 	c.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 

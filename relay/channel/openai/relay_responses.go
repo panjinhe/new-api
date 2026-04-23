@@ -29,6 +29,7 @@ func scanResponsesCompletedResponse(reader io.Reader) (*dto.OpenAIResponsesRespo
 	scanner.Buffer(make([]byte, initialResponsesStreamScannerBuffer), maxResponsesStreamScannerBuffer)
 
 	var completed *dto.OpenAIResponsesResponse
+	var outputTextBuilder strings.Builder
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -52,6 +53,10 @@ func scanResponsesCompletedResponse(reader io.Reader) (*dto.OpenAIResponsesRespo
 			if streamResp.Response != nil {
 				completed = streamResp.Response
 			}
+		case "response.output_text.delta":
+			if streamResp.Delta != "" {
+				outputTextBuilder.WriteString(streamResp.Delta)
+			}
 		case "response.error", "response.failed":
 			if streamResp.Response != nil {
 				if oaiErr := streamResp.Response.GetOpenAIError(); oaiErr != nil && oaiErr.Type != "" {
@@ -67,6 +72,20 @@ func scanResponsesCompletedResponse(reader io.Reader) (*dto.OpenAIResponsesRespo
 	}
 	if completed == nil {
 		return nil, fmt.Errorf("responses stream completed event not found")
+	}
+	if outputTextBuilder.Len() > 0 && service.ExtractOutputTextFromResponses(completed) == "" {
+		completed.Output = append(completed.Output, dto.ResponsesOutput{
+			Type:   "message",
+			Role:   "assistant",
+			Status: "completed",
+			Content: []dto.ResponsesOutputContent{
+				{
+					Type:        "output_text",
+					Text:        outputTextBuilder.String(),
+					Annotations: []interface{}{},
+				},
+			},
+		})
 	}
 	return completed, nil
 }

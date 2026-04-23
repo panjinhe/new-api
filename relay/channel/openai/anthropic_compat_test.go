@@ -121,3 +121,50 @@ func TestOaiResponsesToChatHandler_AggregatesEventStreamBodyForClaude(t *testing
 	require.Equal(t, 12, claudeResp.Usage.InputTokens)
 	require.Equal(t, 4, claudeResp.Usage.OutputTokens)
 }
+
+func TestOaiResponsesToChatHandler_FallsBackToDeltaTextWhenCompletedOutputEmpty(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	ctx.Set(common.RequestIdKey, "responses-sse-empty-output")
+
+	info := &relaycommon.RelayInfo{
+		RelayFormat: types.RelayFormatClaude,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "gpt-5.4",
+		},
+	}
+
+	streamBody := strings.Join([]string{
+		`event: response.created`,
+		`data: {"type":"response.created","response":{"id":"resp_1","object":"response","created_at":1710000000,"model":"gpt-5.4","output":[]}}`,
+		``,
+		`event: response.output_text.delta`,
+		`data: {"type":"response.output_text.delta","delta":"OK"}`,
+		``,
+		`event: response.completed`,
+		`data: {"type":"response.completed","response":{"id":"resp_1","object":"response","created_at":1710000000,"status":"completed","model":"gpt-5.4","output":[],"usage":{"input_tokens":12,"output_tokens":4,"total_tokens":16}}}`,
+		``,
+		`data: [DONE]`,
+		``,
+	}, "\n")
+	resp := &http.Response{
+		Header: http.Header{
+			"Content-Type":      []string{"text/event-stream"},
+			"Transfer-Encoding": []string{"chunked"},
+		},
+		Body: io.NopCloser(strings.NewReader(streamBody)),
+	}
+
+	usage, err := OaiResponsesToChatHandler(ctx, info, resp)
+	require.Nil(t, err)
+	require.NotNil(t, usage)
+
+	var claudeResp dto.ClaudeResponse
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &claudeResp))
+	require.Len(t, claudeResp.Content, 1)
+	require.Equal(t, "OK", claudeResp.Content[0].GetText())
+	require.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+	require.Empty(t, recorder.Header().Get("Transfer-Encoding"))
+}
