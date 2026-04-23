@@ -26,7 +26,7 @@ one-api.db
 data
 data-dev
 data-prod
-data-prod-snapshot
+prod-backup-snapshot
 logs
 logs-dev
 logs-prod

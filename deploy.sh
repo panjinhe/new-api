@@ -116,7 +116,7 @@ seed_from_legacy_layout() {
   local legacy_db="$ROOT_DIR/one-api.db"
   local legacy_data_dir="$ROOT_DIR/data"
 
-  if [[ "$ENV_NAME" != "prod" ]]; then
+  if [[ "$ENV_NAME" != "prod" || "$DB_BACKEND" != "sqlite" ]]; then
     return
   fi
 
@@ -142,7 +142,7 @@ fi
 load_env_file
 
 if [[ -z "$DB_BACKEND" ]]; then
-  DB_BACKEND="${DATABASE_BACKEND:-sqlite}"
+  DB_BACKEND="${DATABASE_BACKEND:-postgres}"
 fi
 
 case "$DB_BACKEND" in

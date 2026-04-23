@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_NAME="prod"
 REMOTE="${REMOTE:-}"
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/opt/new-api/app}"
-LOCAL_SNAPSHOT_ROOT="${LOCAL_SNAPSHOT_ROOT:-$ROOT_DIR/data-prod-snapshot}"
+LOCAL_SNAPSHOT_ROOT="${LOCAL_SNAPSHOT_ROOT:-$ROOT_DIR/prod-backup-snapshot}"
 
 usage() {
   cat <<'EOF'

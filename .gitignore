@@ -40,7 +40,7 @@ electron/dist
 data/
 data-dev/
 data-prod/
-data-prod-snapshot/
+prod-backup-snapshot/
 postgres-dev/
 postgres-prod/
 clash-prod/

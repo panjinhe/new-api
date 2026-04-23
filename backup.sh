@@ -118,7 +118,7 @@ mkdir -p "$DATA_DIR" "$LOG_DIR" "$BACKUP_ROOT" "$SNAPSHOT_DIR"
 load_env_file
 
 if [[ -z "$DB_BACKEND" ]]; then
-  DB_BACKEND="${DATABASE_BACKEND:-sqlite}"
+  DB_BACKEND="${DATABASE_BACKEND:-postgres}"
 fi
 
 case "$DB_BACKEND" in

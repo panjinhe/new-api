@@ -10,17 +10,17 @@
 
 仓库根目录下新增这几类目录：
 
-- `data-dev/`：本地 Docker 开发库
+- `data-dev/`：本地 Docker 开发数据目录
 - `logs-dev/`：本地 Docker 开发日志
 - `data-prod/`：服务器生产数据目录
 - `logs-prod/`：服务器生产日志目录
 - `backups/`：备份目录
-- `data-prod-snapshot/`：从线上拉回来的快照目录
+- `prod-backup-snapshot/`：从线上拉回来的备份副本目录
 
 对应文件：
 
-- `docker-compose.dev.yml`
 - `docker-compose.dev.postgres.yml`
+- `docker-compose.dev.yml`
 - `docker-compose.prod.yml`
 - `docker-compose.prod.postgres.yml`
 - `.env.dev`
@@ -77,18 +77,17 @@ cp .env.dev.example .env.dev
 启动本地 Docker 开发环境：
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d --build
+docker compose -f docker-compose.dev.yml -f docker-compose.dev.postgres.yml up -d --build
 ```
 
 开发环境的特点：
 
 - 监听端口是 `3000`
-- 数据只写到 `data-dev/one-api.db`
+- PostgreSQL 数据写到 `postgres-dev/`
+- 业务文件仍写到 `data-dev/`
 - 不会碰线上 `data-prod/`
-- 如果 `data-dev/one-api.db` 还不存在，而仓库根目录存在旧的 `one-api.db`，容器首次启动时会自动导入
-- 如果仓库根目录存在旧的 `data/` 目录，容器首次启动时也会把里面的文件合并进 `data-dev/`，且不会覆盖已存在文件
 
-本地开发建议固定只走 `docker-compose.dev.yml`，不要再和 `go run main.go` 混用。  
+本地开发建议固定只走 `docker compose -f docker-compose.dev.yml -f docker-compose.dev.postgres.yml`，不要再和 `go run main.go` 混用。  
 这样可以避免：
 
 - 端口占用混乱
@@ -369,7 +368,7 @@ cd /opt/new-api/app
 
 备份内容包括：
 
-- SQLite 数据库快照
+- PostgreSQL dump（当前默认）
 - `data-prod/` 里的其他文件打包
 - 当前 `.env.prod`
 - 当前 `docker-compose.prod.yml`
@@ -425,13 +424,7 @@ REMOTE=ubuntu@your-server REMOTE_APP_DIR=/opt/new-api/app ./pull-prod-snapshot.s
 然后把最新备份目录拉到本地：
 
 ```text
-data-prod-snapshot/<timestamp>/
-```
-
-如果你想把这份线上快照作为本地临时调试库，可以手工复制：
-
-```bash
-cp data-prod-snapshot/<timestamp>/one-api.db data-dev/one-api.db
+prod-backup-snapshot/<timestamp>/
 ```
 
 这样做的好处是：
@@ -444,14 +437,14 @@ cp data-prod-snapshot/<timestamp>/one-api.db data-dev/one-api.db
 推荐你以后一直按这个节奏走：
 
 1. 本地改代码。
-2. 本地用 `docker-compose.dev.yml` 验证。
+2. 本地用 `docker compose -f docker-compose.dev.yml -f docker-compose.dev.postgres.yml` 验证。
 3. 提交到 git 并 push 到自己的 fork。
 4. 本地执行 `bun run build` 和 Linux 二进制编译。
 5. 本地打源码归档并上传到服务器。
 6. 把新二进制传到服务器，替换运行中的 `/new-api` 并重启容器。
 7. 检查 `https://your-domain/api/status` 和首页是否正常。
 8. 不需要再额外跑 `./deploy.sh` 做镜像收口，默认到这里就可以结束发布。
-9. 如果要排查线上问题，再用 `pull-prod-snapshot.sh` 拉一次快照到本地。
+9. 如果要排查线上问题，再用 `pull-prod-snapshot.sh` 拉一次备份副本到本地。
 
 ## 不推荐的做法
 
@@ -467,9 +460,9 @@ cp data-prod-snapshot/<timestamp>/one-api.db data-dev/one-api.db
 如果你要回滚某次部署，可以这样做：
 
 1. 停掉生产容器
-2. 把某个备份目录里的 `one-api.db` 复制回 `data-prod/one-api.db`
+2. 从某个备份目录恢复对应的 PostgreSQL dump
 3. 如果需要，也把 `data-extra.tar.gz` 里的文件解回 `data-prod/`
-4. 重新执行 `./deploy.sh --skip-backup`
+4. 重新执行对应的启动/部署流程
 
 ## 说明
 
@@ -477,7 +470,7 @@ cp data-prod-snapshot/<timestamp>/one-api.db data-dev/one-api.db
 
 - 个人维护
 - 一套主线上环境
-- 先继续使用 SQLite
+- 当前本地与线上都以 PostgreSQL 为主
 - 需要从线上单向拉快照到本地
 
 如果后面你要升级成：
