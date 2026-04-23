@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,62 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+const (
+	initialResponsesStreamScannerBuffer = 64 << 10
+	maxResponsesStreamScannerBuffer     = 64 << 20
+)
+
+func OaiResponsesCompletedResponseFromStream(resp *http.Response) (*dto.OpenAIResponsesResponse, error) {
+	if resp == nil || resp.Body == nil {
+		return nil, fmt.Errorf("invalid response")
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, initialResponsesStreamScannerBuffer), maxResponsesStreamScannerBuffer)
+
+	var completed *dto.OpenAIResponsesResponse
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+
+		var streamResp dto.ResponsesStreamResponse
+		if err := common.UnmarshalJsonStr(data, &streamResp); err != nil {
+			return nil, err
+		}
+
+		switch streamResp.Type {
+		case "response.completed":
+			if streamResp.Response != nil {
+				completed = streamResp.Response
+			}
+		case "response.error", "response.failed":
+			if streamResp.Response != nil {
+				if oaiErr := streamResp.Response.GetOpenAIError(); oaiErr != nil && oaiErr.Type != "" {
+					return nil, fmt.Errorf("%s", oaiErr.Message)
+				}
+			}
+			return nil, fmt.Errorf("responses stream error: %s", streamResp.Type)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if completed == nil {
+		return nil, fmt.Errorf("responses stream completed event not found")
+	}
+	return completed, nil
+}
 
 func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	defer service.CloseResponseBodyGracefully(resp)

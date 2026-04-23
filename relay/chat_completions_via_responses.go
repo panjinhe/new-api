@@ -2,6 +2,7 @@ package relay
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func shouldForceResponsesUpstreamStream(channelType int, clientWantsStream bool) bool {
+	return channelType == constant.ChannelTypeCodex && !clientWantsStream
+}
 
 func applySystemPromptIfNeeded(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) {
 	if info == nil || request == nil {
@@ -100,19 +105,35 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 
 	savedRelayMode := info.RelayMode
 	savedRequestURLPath := info.RequestURLPath
+	savedIsStream := info.IsStream
 	defer func() {
 		info.RelayMode = savedRelayMode
 		info.RequestURLPath = savedRequestURLPath
+		info.IsStream = savedIsStream
 	}()
 
+	clientWantsStream := info.IsStream
+	forceUpstreamStream := shouldForceResponsesUpstreamStream(info.ChannelType, clientWantsStream)
 	info.RelayMode = relayconstant.RelayModeResponses
 	info.RequestURLPath = "/v1/responses"
+	if forceUpstreamStream {
+		info.IsStream = true
+	}
 
 	convertedRequest, err := adaptor.ConvertOpenAIResponsesRequest(c, info, *responsesReq)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 	}
 	relaycommon.AppendRequestConversionFromRequest(info, convertedRequest)
+
+	if forceUpstreamStream {
+		if req, ok := convertedRequest.(dto.OpenAIResponsesRequest); ok {
+			req.Stream = common.GetPointer(true)
+			convertedRequest = req
+		} else if req, ok := convertedRequest.(*dto.OpenAIResponsesRequest); ok {
+			req.Stream = common.GetPointer(true)
+		}
+	}
 
 	jsonData, err := common.Marshal(convertedRequest)
 	if err != nil {
@@ -136,13 +157,36 @@ func chatCompletionsViaResponses(c *gin.Context, info *relaycommon.RelayInfo, ad
 	statusCodeMappingStr := c.GetString("status_code_mapping")
 
 	httpResp = resp.(*http.Response)
-	info.IsStream = info.IsStream || strings.HasPrefix(httpResp.Header.Get("Content-Type"), "text/event-stream")
+	upstreamRespondedStream := strings.HasPrefix(httpResp.Header.Get("Content-Type"), "text/event-stream")
 	if httpResp.StatusCode != http.StatusOK {
 		newApiErr := service.RelayErrorHandler(c.Request.Context(), httpResp, false)
 		service.ResetStatusCode(newApiErr, statusCodeMappingStr)
 		return nil, newApiErr
 	}
 
+	if forceUpstreamStream && !clientWantsStream && upstreamRespondedStream {
+		completedResp, err := openaichannel.OaiResponsesCompletedResponseFromStream(httpResp)
+		if err != nil {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+		body, err := common.Marshal(completedResp)
+		if err != nil {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeJsonMarshalFailed, http.StatusInternalServerError)
+		}
+		_ = httpResp.Body.Close()
+		httpResp.Body = io.NopCloser(bytes.NewReader(body))
+		httpResp.ContentLength = int64(len(body))
+		httpResp.Header.Set("Content-Type", "application/json")
+		info.IsStream = false
+		usage, newApiErr := openaichannel.OaiResponsesToChatHandler(c, info, httpResp)
+		if newApiErr != nil {
+			service.ResetStatusCode(newApiErr, statusCodeMappingStr)
+			return nil, newApiErr
+		}
+		return usage, nil
+	}
+
+	info.IsStream = clientWantsStream || upstreamRespondedStream
 	if info.IsStream {
 		usage, newApiErr := openaichannel.OaiResponsesToChatStreamHandler(c, info, httpResp)
 		if newApiErr != nil {
