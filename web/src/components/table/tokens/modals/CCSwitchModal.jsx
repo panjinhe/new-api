@@ -134,8 +134,6 @@ function buildCCSwitchURL(app, name, models, apiKey) {
     const claudeConfig = buildClaudeImportConfig(endpoint, models, apiKey);
     params.set('configFormat', 'json');
     params.set('config', encodeToBase64(JSON.stringify(claudeConfig)));
-    params.set('endpoint', endpoint);
-    params.set('apiKey', apiKey);
   } else {
     params.set('endpoint', endpoint);
     params.set('apiKey', apiKey);
