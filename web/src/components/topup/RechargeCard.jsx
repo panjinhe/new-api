@@ -52,6 +52,88 @@ import RechargeSupportCard from '../common/RechargeSupportCard';
 
 const { Text } = Typography;
 
+const getUsdExchangeRate = () => {
+  if (typeof window === 'undefined') return 7;
+
+  const statusStr = localStorage.getItem('status');
+  let usdRate = 7;
+  try {
+    if (statusStr) {
+      const status = JSON.parse(statusStr);
+      usdRate = status?.usd_exchange_rate || 7;
+    }
+  } catch (e) {}
+
+  return usdRate;
+};
+
+const getPresetDisplayInfo = ({
+  preset,
+  priceRatio,
+  topupInfo,
+  currencyType,
+  currencyRate,
+  usdRate,
+}) => {
+  const discount = preset.discount || topupInfo?.discount?.[preset.value] || 1.0;
+  const originalPrice = preset.value * priceRatio;
+  const discountedPrice = originalPrice * discount;
+  const hasDiscount = discount < 1.0;
+  const save = originalPrice - discountedPrice;
+
+  let displayValue = preset.value;
+  let displayActualPay = discountedPrice;
+  let displayOriginalPay = originalPrice;
+  let displaySave = save;
+
+  if (currencyType === 'USD') {
+    displayActualPay = discountedPrice / usdRate;
+    displayOriginalPay = originalPrice / usdRate;
+    displaySave = save / usdRate;
+  } else if (currencyType === 'CNY') {
+    displayValue = preset.value * usdRate;
+  } else if (currencyType === 'CUSTOM') {
+    displayValue = preset.value * currencyRate;
+    displayActualPay = (discountedPrice / usdRate) * currencyRate;
+    displayOriginalPay = (originalPrice / usdRate) * currencyRate;
+    displaySave = (save / usdRate) * currencyRate;
+  }
+
+  return {
+    discount,
+    hasDiscount,
+    save,
+    displayValue,
+    displayActualPay,
+    displayOriginalPay,
+    displaySave,
+    unitPrice:
+      displayValue > 0 && Number.isFinite(displayValue)
+        ? displayActualPay / displayValue
+        : 0,
+  };
+};
+
+const formatUnitPrice = (value) => {
+  if (!Number.isFinite(value)) return '0.00';
+  if (value >= 10) return value.toFixed(2);
+  if (value >= 1) return value.toFixed(3);
+  return value.toFixed(4);
+};
+
+const getDiscountBadgeText = (discount, t) => {
+  if (!Number.isFinite(discount) || discount >= 1) {
+    return t('直充价');
+  }
+
+  const translatedDiscount = t('折');
+  if (translatedDiscount.includes('off')) {
+    return `${((1 - parseFloat(discount)) * 100).toFixed(0)}% ${translatedDiscount}`;
+  }
+
+  return `${(discount * 10).toFixed(1)}${translatedDiscount}`;
+};
+
 const RechargeCard = ({
   t,
   enableOnlineTopUp,
@@ -118,6 +200,44 @@ const RechargeCard = ({
   const redemptionOnlyMode =
     !shouldShowOnlineTopUp && !shouldShowSubscription;
   const regularPayMethods = payMethods || [];
+  const { symbol, rate, type } = getCurrencyConfig();
+  const usdRate = getUsdExchangeRate();
+  const bestValuePreset = presetAmounts.reduce((bestPreset, preset) => {
+    const currentPresetInfo = getPresetDisplayInfo({
+      preset,
+      priceRatio,
+      topupInfo,
+      currencyType: type,
+      currencyRate: rate,
+      usdRate,
+    });
+
+    if (!bestPreset) {
+      return {
+        value: preset.value,
+        unitPrice: currentPresetInfo.unitPrice,
+      };
+    }
+
+    if (currentPresetInfo.unitPrice < bestPreset.unitPrice) {
+      return {
+        value: preset.value,
+        unitPrice: currentPresetInfo.unitPrice,
+      };
+    }
+
+    if (
+      currentPresetInfo.unitPrice === bestPreset.unitPrice &&
+      preset.value > bestPreset.value
+    ) {
+      return {
+        value: preset.value,
+        unitPrice: currentPresetInfo.unitPrice,
+      };
+    }
+
+    return bestPreset;
+  }, null);
 
   useEffect(() => {
     if (initialTabSetRef.current) return;
@@ -416,7 +536,6 @@ const RechargeCard = ({
                     <div className='flex items-center gap-2'>
                       <span>{t('选择充值额度')}</span>
                       {(() => {
-                        const { symbol, rate, type } = getCurrencyConfig();
                         if (type === 'USD') return null;
 
                         return (
@@ -434,104 +553,263 @@ const RechargeCard = ({
                     </div>
                   }
                 >
-                  <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2'>
-                    {presetAmounts.map((preset, index) => {
-                      const discount =
-                        preset.discount ||
-                        topupInfo?.discount?.[preset.value] ||
-                        1.0;
-                      const originalPrice = preset.value * priceRatio;
-                      const discountedPrice = originalPrice * discount;
-                      const hasDiscount = discount < 1.0;
-                      const actualPay = discountedPrice;
-                      const save = originalPrice - discountedPrice;
+                  <div className='space-y-3'>
+                    <div
+                      className='rounded-2xl px-4 py-3 flex flex-wrap items-center gap-2'
+                      style={{
+                        background:
+                          'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.08))',
+                        border: '1px solid rgba(148, 163, 184, 0.2)',
+                      }}
+                    >
+                      <Sparkles
+                        size={16}
+                        style={{ color: 'var(--semi-color-primary)' }}
+                      />
+                      <Text strong>{t('大额档位通常更划算')}</Text>
+                      <Text
+                        type='tertiary'
+                        style={{ fontSize: '12px', lineHeight: 1.5 }}
+                      >
+                        {t('重点看实付、立省和折合单价，推荐优先选择高面额档位。')}
+                      </Text>
+                    </div>
 
-                      // 根据当前货币类型换算显示金额和数量
-                      const { symbol, rate, type } = getCurrencyConfig();
-                      const statusStr = localStorage.getItem('status');
-                      let usdRate = 7; // 默认CNY汇率
-                      try {
-                        if (statusStr) {
-                          const s = JSON.parse(statusStr);
-                          usdRate = s?.usd_exchange_rate || 7;
-                        }
-                      } catch (e) {}
+                    <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3'>
+                      {presetAmounts.map((preset, index) => {
+                        const {
+                          discount,
+                          hasDiscount,
+                          displayValue,
+                          displayActualPay,
+                          displayOriginalPay,
+                          displaySave,
+                          unitPrice,
+                        } = getPresetDisplayInfo({
+                          preset,
+                          priceRatio,
+                          topupInfo,
+                          currencyType: type,
+                          currencyRate: rate,
+                          usdRate,
+                        });
+                        const isSelected = selectedPreset === preset.value;
+                        const isBestValue =
+                          bestValuePreset?.value === preset.value;
 
-                      let displayValue = preset.value; // 显示的数量
-                      let displayActualPay = actualPay;
-                      let displaySave = save;
-
-                      if (type === 'USD') {
-                        // 数量保持USD，价格从CNY转USD
-                        displayActualPay = actualPay / usdRate;
-                        displaySave = save / usdRate;
-                      } else if (type === 'CNY') {
-                        // 数量转CNY，价格已是CNY
-                        displayValue = preset.value * usdRate;
-                      } else if (type === 'CUSTOM') {
-                        // 数量和价格都转自定义货币
-                        displayValue = preset.value * rate;
-                        displayActualPay = (actualPay / usdRate) * rate;
-                        displaySave = (save / usdRate) * rate;
-                      }
-
-                      return (
-                        <Card
-                          key={index}
-                          style={{
-                            cursor: 'pointer',
-                            border:
-                              selectedPreset === preset.value
+                        return (
+                          <Card
+                            key={preset.value ?? index}
+                            className='relative overflow-hidden !rounded-2xl transition-all duration-200 hover:-translate-y-1 hover:shadow-lg'
+                            style={{
+                              cursor: 'pointer',
+                              border: isSelected
                                 ? '2px solid var(--semi-color-primary)'
-                                : '1px solid var(--semi-color-border)',
-                            height: '100%',
-                            width: '100%',
-                          }}
-                          bodyStyle={{ padding: '12px' }}
-                          onClick={() => {
-                            selectPresetAmount(preset);
-                            onlineFormApiRef.current?.setValue(
-                              'topUpCount',
-                              preset.value,
-                            );
-                          }}
-                        >
-                          <div style={{ textAlign: 'center' }}>
-                            <Typography.Title
-                              heading={6}
-                              style={{ margin: '0 0 8px 0' }}
-                            >
-                              <Coins size={18} />
-                              {formatLargeNumber(displayValue)} {symbol}
-                              {hasDiscount && (
-                                <Tag style={{ marginLeft: 4 }} color='green'>
-                                  {t('折').includes('off')
-                                    ? (
-                                        (1 - parseFloat(discount)) *
-                                        100
-                                      ).toFixed(1)
-                                    : (discount * 10).toFixed(1)}
-                                  {t('折')}
-                                </Tag>
-                              )}
-                            </Typography.Title>
+                                : isBestValue
+                                  ? '1px solid rgba(59, 130, 246, 0.35)'
+                                  : '1px solid var(--semi-color-border)',
+                              height: '100%',
+                              width: '100%',
+                              background: isSelected
+                                ? 'linear-gradient(180deg, rgba(219, 234, 254, 0.95), rgba(255, 255, 255, 1))'
+                                : isBestValue
+                                  ? 'linear-gradient(180deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 1))'
+                                  : 'linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 1))',
+                              boxShadow: isSelected
+                                ? '0 18px 34px rgba(59, 130, 246, 0.14)'
+                                : undefined,
+                            }}
+                            bodyStyle={{ padding: '0' }}
+                            onClick={() => {
+                              selectPresetAmount(preset);
+                              onlineFormApiRef.current?.setValue(
+                                'topUpCount',
+                                preset.value,
+                              );
+                            }}
+                          >
                             <div
+                              className='h-1.5 w-full'
                               style={{
-                                color: 'var(--semi-color-text-2)',
-                                fontSize: '12px',
-                                margin: '4px 0',
+                                background: isSelected
+                                  ? 'linear-gradient(90deg, rgba(37, 99, 235, 1), rgba(96, 165, 250, 1))'
+                                  : isBestValue
+                                    ? 'linear-gradient(90deg, rgba(16, 185, 129, 1), rgba(59, 130, 246, 1))'
+                                    : 'linear-gradient(90deg, rgba(226, 232, 240, 1), rgba(248, 250, 252, 1))',
                               }}
-                            >
-                              {t('实付')} {symbol}
-                              {displayActualPay.toFixed(2)}，
-                              {hasDiscount
-                                ? `${t('节省')} ${symbol}${displaySave.toFixed(2)}`
-                                : `${t('节省')} ${symbol}0.00`}
+                            />
+                            <div className='p-4'>
+                              <div className='flex items-start justify-between gap-3'>
+                                <div>
+                                  <Text
+                                    strong
+                                    style={{
+                                      fontSize: '13px',
+                                      color: isBestValue
+                                        ? 'var(--semi-color-primary)'
+                                        : 'var(--semi-color-text-0)',
+                                    }}
+                                  >
+                                    {isBestValue
+                                      ? t('超值推荐')
+                                      : t('灵活充值')}
+                                  </Text>
+                                  <div className='mt-1 text-xs text-[var(--semi-color-text-2)]'>
+                                    {t('到账快，适合直接补充额度')}
+                                  </div>
+                                </div>
+                                <div className='flex flex-col items-end gap-1'>
+                                  <Tag
+                                    color={
+                                      hasDiscount
+                                        ? isBestValue
+                                          ? 'blue'
+                                          : 'green'
+                                        : 'grey'
+                                    }
+                                  >
+                                    {getDiscountBadgeText(discount, t)}
+                                  </Tag>
+                                  {isSelected && (
+                                    <Tag color='blue'>{t('当前选择')}</Tag>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className='mt-5'>
+                                <div className='flex items-center gap-2 text-[var(--semi-color-text-0)]'>
+                                  <Coins size={18} />
+                                  <Typography.Title
+                                    heading={5}
+                                    style={{ margin: 0 }}
+                                  >
+                                    {formatLargeNumber(displayValue)} {symbol}
+                                  </Typography.Title>
+                                </div>
+                                <div className='mt-1 text-xs text-[var(--semi-color-text-2)]'>
+                                  {t('到账额度')}
+                                </div>
+                              </div>
+
+                              <div
+                                className='mt-4 rounded-2xl px-4 py-3'
+                                style={{
+                                  background: isSelected
+                                    ? 'rgba(219, 234, 254, 0.72)'
+                                    : 'rgba(255, 255, 255, 0.92)',
+                                  border: '1px solid rgba(148, 163, 184, 0.18)',
+                                }}
+                              >
+                                <div className='text-xs text-[var(--semi-color-text-2)]'>
+                                  {t('实付金额')}
+                                </div>
+                                <div className='mt-2 flex items-end gap-2'>
+                                  <span
+                                    style={{
+                                      color: 'var(--semi-color-text-0)',
+                                      fontSize: '28px',
+                                      fontWeight: 700,
+                                      lineHeight: 1,
+                                    }}
+                                  >
+                                    {symbol}
+                                    {displayActualPay.toFixed(2)}
+                                  </span>
+                                  {hasDiscount && (
+                                    <span
+                                      style={{
+                                        color: 'var(--semi-color-text-2)',
+                                        fontSize: '13px',
+                                        textDecoration: 'line-through',
+                                        marginBottom: '2px',
+                                      }}
+                                    >
+                                      {symbol}
+                                      {displayOriginalPay.toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  className='mt-2 text-xs'
+                                  style={{
+                                    color: hasDiscount
+                                      ? 'rgba(5, 150, 105, 1)'
+                                      : 'var(--semi-color-text-2)',
+                                  }}
+                                >
+                                  {hasDiscount
+                                    ? `${t('立省')} ${symbol}${displaySave.toFixed(2)}`
+                                    : t('当前已是稳定直充价')}
+                                </div>
+                              </div>
+
+                              <div className='mt-4 grid grid-cols-2 gap-2'>
+                                <div
+                                  className='rounded-xl px-3 py-3'
+                                  style={{
+                                    background: 'rgba(248, 250, 252, 0.92)',
+                                  }}
+                                >
+                                  <div className='text-[11px] text-[var(--semi-color-text-2)]'>
+                                    {t('折合单价')}
+                                  </div>
+                                  <div className='mt-1 font-semibold text-[var(--semi-color-text-0)]'>
+                                    {symbol}
+                                    {formatUnitPrice(unitPrice)}
+                                  </div>
+                                </div>
+                                <div
+                                  className='rounded-xl px-3 py-3'
+                                  style={{
+                                    background: 'rgba(248, 250, 252, 0.92)',
+                                  }}
+                                >
+                                  <div className='text-[11px] text-[var(--semi-color-text-2)]'>
+                                    {hasDiscount ? t('优惠力度') : t('购买体验')}
+                                  </div>
+                                  <div className='mt-1 font-semibold text-[var(--semi-color-text-0)]'>
+                                    {hasDiscount
+                                      ? `${getDiscountBadgeText(discount, t)}`
+                                      : t('到账即用')}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div
+                                className='mt-4 flex items-center justify-between rounded-xl px-3 py-2'
+                                style={{
+                                  background: isBestValue
+                                    ? 'rgba(209, 250, 229, 0.85)'
+                                    : 'rgba(248, 250, 252, 0.88)',
+                                }}
+                              >
+                                <Text
+                                  strong
+                                  style={{
+                                    fontSize: '12px',
+                                    color: isBestValue
+                                      ? 'rgba(4, 120, 87, 1)'
+                                      : 'var(--semi-color-text-1)',
+                                  }}
+                                >
+                                  {isBestValue
+                                    ? t('推荐给高频用户')
+                                    : t('适合灵活补充额度')}
+                                </Text>
+                                <Text
+                                  style={{
+                                    fontSize: '12px',
+                                    color: 'var(--semi-color-text-2)',
+                                  }}
+                                >
+                                  {t('省心直观')}
+                                </Text>
+                              </div>
                             </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
+                          </Card>
+                        );
+                      })}
+                    </div>
                   </div>
                 </Form.Slot>
               )}
