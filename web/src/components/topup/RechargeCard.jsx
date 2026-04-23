@@ -48,6 +48,7 @@ import { IconGift } from '@douyinfe/semi-icons';
 import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime';
 import { getCurrencyConfig } from '../../helpers/render';
 import SubscriptionPlansCard from './SubscriptionPlansCard';
+import RechargeSupportCard from '../common/RechargeSupportCard';
 
 const { Text } = Typography;
 
@@ -132,6 +133,8 @@ const RechargeCard = ({
   }, [shouldShowSubscription, activeTab]);
   const topupContent = (
     <Space vertical style={{ width: '100%' }}>
+      <RechargeSupportCard />
+
       {/* 统计数据 */}
       <Card
         className='!rounded-xl w-full'

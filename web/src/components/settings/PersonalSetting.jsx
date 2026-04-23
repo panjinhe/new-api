@@ -47,6 +47,7 @@ import AccountDeleteModal from './personal/modals/AccountDeleteModal';
 import ChangePasswordModal from './personal/modals/ChangePasswordModal';
 import SecureVerificationModal from '../common/modals/SecureVerificationModal';
 import { useSecureVerification } from '../../hooks/common/useSecureVerification';
+import RechargeSupportCard from '../common/RechargeSupportCard';
 
 const PersonalSetting = () => {
   const [userState, userDispatch] = useContext(UserContext);
@@ -585,6 +586,11 @@ const PersonalSetting = () => {
 
               {/* 偏好设置（语言等） */}
               <PreferencesSettings t={t} />
+
+              <RechargeSupportCard
+                compact
+                onGoTopup={() => navigate('/console/topup')}
+              />
             </div>
 
             {/* 右侧：其他设置 */}
