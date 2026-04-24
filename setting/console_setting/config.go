@@ -20,7 +20,7 @@ var defaultConsoleSetting = ConsoleSetting{
 	Announcements:        "",
 	FAQ:                  "",
 	ApiInfoEnabled:       false,
-	UptimeKumaEnabled:    true,
+	UptimeKumaEnabled:    false,
 	AnnouncementsEnabled: true,
 	FAQEnabled:           true,
 }
