@@ -487,7 +487,7 @@ const SubscriptionPlansCard = ({
           {/* 可购买套餐 - 标准定价卡片 */}
           {plans.length > 0 ? (
             <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5 w-full px-1'>
-              {plans.map((p, index) => {
+              {plans.map((p) => {
                 const plan = p?.plan;
                 const totalAmount = Number(plan?.total_amount || 0);
                 const { symbol, rate } = getCurrencyConfig();
@@ -496,7 +496,8 @@ const SubscriptionPlansCard = ({
                 const displayPrice = convertedPrice.toFixed(
                   Number.isInteger(convertedPrice) ? 0 : 2,
                 );
-                const isPopular = index === 0 && plans.length > 1;
+                const isPopular =
+                  (plan?.title || '').trim() === '前进三：巡航';
                 const limit = Number(plan?.max_purchase_per_user || 0);
                 const limitLabel = limit > 0 ? `${t('限购')} ${limit}` : null;
                 const totalLabel =
