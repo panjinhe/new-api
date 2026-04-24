@@ -52,6 +52,7 @@ const Home = () => {
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
   const featuredTutorials = featuredBuiltInDocs;
+  const announcements = statusState?.status?.announcements || [];
 
   const quickStartSteps = [
     {
@@ -118,24 +119,14 @@ const Home = () => {
   };
 
   useEffect(() => {
-    const checkNoticeAndShow = async () => {
-      const lastCloseDate = localStorage.getItem('notice_close_date');
-      const today = new Date().toDateString();
-      if (lastCloseDate !== today) {
-        try {
-          const res = await API.get('/api/notice');
-          const { success, data } = res.data;
-          if (success && data && data.trim() !== '') {
-            setNoticeVisible(true);
-          }
-        } catch (error) {
-          console.error('获取公告失败:', error);
-        }
+    const lastCloseDate = localStorage.getItem('notice_close_date');
+    const today = new Date().toDateString();
+    if (lastCloseDate !== today) {
+      if (announcements.length > 0) {
+        setNoticeVisible(true);
       }
-    };
-
-    checkNoticeAndShow();
-  }, []);
+    }
+  }, [announcements.length]);
 
   useEffect(() => {
     displayHomePageContent().then();

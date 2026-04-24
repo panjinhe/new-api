@@ -367,7 +367,9 @@ code {
   line-height: 1;
   background-color: var(--semi-color-fill-0);
   color: var(--semi-color-text-2);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .sbg-badge-active {
@@ -590,6 +592,48 @@ html.dark .sbg-variant-green {
 .custom-request-textarea textarea::-webkit-scrollbar,
 .notice-content-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.notice-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--semi-color-text-0);
+  font-weight: 700;
+}
+
+.notice-modal-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  color: var(--semi-color-primary);
+  background: var(--semi-color-primary-light-default);
+}
+
+.notice-timeline-content {
+  line-height: 1.65;
+}
+
+.notice-timeline-content :where(p) {
+  margin: 0;
+}
+
+.notice-timeline-content strong {
+  color: var(--semi-color-text-0);
+  font-weight: 700;
+}
+
+.notice-timeline-content img {
+  display: block;
+  width: 118px;
+  margin-top: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: #fff;
+  padding: 7px;
 }
 
 /* 图片列表滚动条样式 */
@@ -1005,4 +1049,6 @@ html.dark .with-pastel-balls::before {
   }
 }
 
-.ec-dbcd0a3c01b55203 { forced-color-adjust: auto; }
+.ec-dbcd0a3c01b55203 {
+  forced-color-adjust: auto;
+}

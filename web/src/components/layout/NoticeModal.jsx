@@ -17,36 +17,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useState, useContext, useMemo } from 'react';
-import {
-  Button,
-  Modal,
-  Empty,
-  Tabs,
-  TabPane,
-  Timeline,
-} from '@douyinfe/semi-ui';
+import React, { useContext, useMemo } from 'react';
+import { Button, Modal, Empty, Timeline } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { API, showError, getRelativeTime } from '../../helpers';
+import { getRelativeTime } from '../../helpers';
 import { marked } from 'marked';
 import {
   IllustrationNoContent,
   IllustrationNoContentDark,
 } from '@douyinfe/semi-illustrations';
 import { StatusContext } from '../../context/Status';
-import { Bell, Megaphone } from 'lucide-react';
+import { Megaphone } from 'lucide-react';
 
-const NoticeModal = ({
-  visible,
-  onClose,
-  isMobile,
-  defaultTab = 'inApp',
-  unreadKeys = [],
-}) => {
+const NoticeModal = ({ visible, onClose, isMobile, unreadKeys = [] }) => {
   const { t } = useTranslation();
-  const [noticeContent, setNoticeContent] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState(defaultTab);
 
   const [statusState] = useContext(StatusContext);
 
@@ -80,73 +64,6 @@ const NoticeModal = ({
     const today = new Date().toDateString();
     localStorage.setItem('notice_close_date', today);
     onClose();
-  };
-
-  const displayNotice = async () => {
-    setLoading(true);
-    try {
-      const res = await API.get('/api/notice');
-      const { success, message, data } = res.data;
-      if (success) {
-        if (data !== '') {
-          const htmlNotice = marked.parse(data);
-          setNoticeContent(htmlNotice);
-        } else {
-          setNoticeContent('');
-        }
-      } else {
-        showError(message);
-      }
-    } catch (error) {
-      showError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (visible) {
-      displayNotice();
-    }
-  }, [visible]);
-
-  useEffect(() => {
-    if (visible) {
-      setActiveTab(defaultTab);
-    }
-  }, [defaultTab, visible]);
-
-  const renderMarkdownNotice = () => {
-    if (loading) {
-      return (
-        <div className='py-12'>
-          <Empty description={t('加载中...')} />
-        </div>
-      );
-    }
-
-    if (!noticeContent) {
-      return (
-        <div className='py-12'>
-          <Empty
-            image={
-              <IllustrationNoContent style={{ width: 150, height: 150 }} />
-            }
-            darkModeImage={
-              <IllustrationNoContentDark style={{ width: 150, height: 150 }} />
-            }
-            description={t('暂无公告')}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div
-        dangerouslySetInnerHTML={{ __html: noticeContent }}
-        className='notice-content-scroll max-h-[55vh] overflow-y-auto pr-2'
-      />
-    );
   };
 
   const renderAnnouncementTimeline = () => {
@@ -189,7 +106,9 @@ const NoticeModal = ({
               >
                 <div>
                   <div
-                    className={item.isUnread ? 'shine-text' : ''}
+                    className={`notice-timeline-content ${
+                      item.isUnread ? 'shine-text' : ''
+                    }`}
                     dangerouslySetInnerHTML={{ __html: htmlContent }}
                   />
                 </div>
@@ -201,36 +120,14 @@ const NoticeModal = ({
     );
   };
 
-  const renderBody = () => {
-    if (activeTab === 'inApp') {
-      return renderMarkdownNotice();
-    }
-    return renderAnnouncementTimeline();
-  };
-
   return (
     <Modal
       title={
-        <div className='flex items-center justify-between w-full'>
+        <div className='notice-modal-title'>
+          <span className='notice-modal-title-icon'>
+            <Megaphone size={18} />
+          </span>
           <span>{t('系统公告')}</span>
-          <Tabs activeKey={activeTab} onChange={setActiveTab} type='button'>
-            <TabPane
-              tab={
-                <span className='flex items-center gap-1'>
-                  <Bell size={14} /> {t('通知')}
-                </span>
-              }
-              itemKey='inApp'
-            />
-            <TabPane
-              tab={
-                <span className='flex items-center gap-1'>
-                  <Megaphone size={14} /> {t('系统公告')}
-                </span>
-              }
-              itemKey='system'
-            />
-          </Tabs>
         </div>
       }
       visible={visible}
@@ -247,7 +144,7 @@ const NoticeModal = ({
       }
       size={isMobile ? 'full-width' : 'large'}
     >
-      {renderBody()}
+      {renderAnnouncementTimeline()}
     </Modal>
   );
 };
