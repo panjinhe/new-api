@@ -219,58 +219,7 @@ const Home = () => {
                   ))}
                 </div>
 
-                <div className='mx-auto mt-8 max-w-4xl rounded-[32px] border border-semi-color-border bg-white/85 p-5 text-left shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:mt-10 md:p-6'>
-                  <div className='flex flex-col gap-4 md:flex-row md:items-center'>
-                    <div className='flex-1'>
-                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
-                        Base URL
-                      </div>
-                      <Input
-                        readonly
-                        value={serverAddress}
-                        size={isMobile ? 'default' : 'large'}
-                        className='mt-2'
-                        suffix={
-                          <Button
-                            type='tertiary'
-                            onClick={handleCopyBaseURL}
-                            icon={<IconCopy />}
-                          />
-                        }
-                      />
-                    </div>
-                    <div className='grid gap-3 md:w-auto'>
-                      <Link to='/console/token'>
-                        <Button
-                          theme='solid'
-                          type='primary'
-                          size={isMobile ? 'default' : 'large'}
-                          className='!h-11 !w-full !rounded-full px-6'
-                          icon={<IconPlay />}
-                        >
-                          {t('获取 API 密钥')}
-                        </Button>
-                      </Link>
-                      <Button
-                        size={isMobile ? 'default' : 'large'}
-                        className='!h-11 !w-full !rounded-full px-6'
-                        icon={<IconCopy />}
-                        onClick={handleCopyBaseURL}
-                      >
-                        {t('复制 Base URL')}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className='mt-4 text-sm leading-6 text-semi-color-text-2'>
-                    {isDemoSiteMode && statusState?.status?.version
-                      ? `${t('当前站点版本')} ${statusState.status.version}`
-                      : t(
-                          '进入网站后创建令牌即可获取 api-key，替换配置后即可开始使用。',
-                        )}
-                  </div>
-                </div>
-
-                <div className='mx-auto mt-6 max-w-4xl rounded-[32px] border border-cyan-200/80 bg-cyan-500/[0.08] p-5 text-left shadow-[0_18px_50px_rgba(8,145,178,0.12)] backdrop-blur dark:border-cyan-500/30 dark:bg-cyan-500/10 md:p-6'>
+                <div className='mx-auto mt-8 max-w-4xl rounded-[32px] border border-cyan-200/80 bg-cyan-500/[0.08] p-5 text-left shadow-[0_18px_50px_rgba(8,145,178,0.12)] backdrop-blur dark:border-cyan-500/30 dark:bg-cyan-500/10 md:mt-10 md:p-6'>
                   <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
                     <div className='max-w-2xl'>
                       <div className='text-xs font-semibold uppercase tracking-[0.24em] text-cyan-600 dark:text-cyan-300'>
@@ -284,6 +233,13 @@ const Home = () => {
                           '登录后进入控制台创建令牌，点击 CC Switch，即可自动填入 Base URL、模型和 API Key。',
                         )}
                       </p>
+                      <div className='mt-3 text-sm leading-6 text-semi-color-text-2'>
+                        {isDemoSiteMode && statusState?.status?.version
+                          ? `${t('当前站点版本')} ${statusState.status.version}`
+                          : t(
+                              '如果工具不支持一键配置，也可以使用下方 Base URL 手动接入。',
+                            )}
+                      </div>
                     </div>
                     <div className='grid gap-3 md:w-auto'>
                       <Link to='/console/token'>
@@ -317,6 +273,22 @@ const Home = () => {
                     >
                       {t('查看 GitHub 仓库')}
                     </Button>
+                  </div>
+                  <div className='mt-4 rounded-2xl border border-cyan-200/70 bg-white/70 p-4 dark:border-cyan-500/20 dark:bg-black/20'>
+                    <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
+                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+                        {t('手动配置备用')}
+                      </div>
+                      <Button
+                        type='tertiary'
+                        size='small'
+                        icon={<IconCopy />}
+                        onClick={handleCopyBaseURL}
+                      >
+                        {t('复制 Base URL')}
+                      </Button>
+                    </div>
+                    <Input readonly value={serverAddress} />
                   </div>
                 </div>
 

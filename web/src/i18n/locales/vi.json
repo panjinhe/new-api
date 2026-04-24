@@ -4184,6 +4184,8 @@
     "默认折叠侧边栏": "Mặc định thu gọn thanh bên",
     "默认测试模型": "Mô hình kiểm tra mặc định",
     "默认用户消息": "Xin chào",
-    "默认补全倍率": "Tỷ lệ hoàn thành mặc định"
+    "默认补全倍率": "Tỷ lệ hoàn thành mặc định",
+    "如果工具不支持一键配置，也可以使用下方 Base URL 手动接入。": "Neu cong cu khong ho tro cau hinh mot cham, hay dung Base URL ben duoi de cau hinh thu cong.",
+    "手动配置备用": "Cau hinh thu cong du phong"
   }
 }

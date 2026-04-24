@@ -3693,6 +3693,8 @@
     "QQ群号已复制到剪切板": "QQ group number copied to clipboard",
     "还没安装 CC Switch？": "Haven't installed CC Switch yet?",
     "安装 CC Switch": "Install CC Switch",
-    "查看 GitHub 仓库": "View GitHub Repository"
+    "查看 GitHub 仓库": "View GitHub Repository",
+    "如果工具不支持一键配置，也可以使用下方 Base URL 手动接入。": "If your tool does not support one-click setup, use the Base URL below for manual configuration.",
+    "手动配置备用": "Manual fallback"
   }
 }

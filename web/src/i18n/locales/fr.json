@@ -3650,6 +3650,8 @@
     "默认折叠侧边栏": "Réduire la barre latérale par défaut",
     "默认测试模型": "Modèle de test par défaut",
     "默认用户消息": "Bonjour",
-    "默认补全倍率": "Taux de complétion par défaut"
+    "默认补全倍率": "Taux de complétion par défaut",
+    "如果工具不支持一键配置，也可以使用下方 Base URL 手动接入。": "Si votre outil ne prend pas en charge la configuration en un clic, utilisez la Base URL ci-dessous pour une configuration manuelle.",
+    "手动配置备用": "Configuration manuelle"
   }
 }
