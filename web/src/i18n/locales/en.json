@@ -3695,6 +3695,12 @@
     "安装 CC Switch": "Install CC Switch",
     "查看 GitHub 仓库": "View GitHub Repository",
     "如果工具不支持一键配置，也可以使用下方 Base URL 手动接入。": "If your tool does not support one-click setup, use the Base URL below for manual configuration.",
-    "手动配置备用": "Manual fallback"
+    "手动配置备用": "Manual fallback",
+    "注册账号": "Register",
+    "完成注册或登录后即可进入控制台，开始配置你的专属 Codex 接入环境。": "Register or sign in, then enter the console to set up your Codex access.",
+    "创建令牌": "Create Token",
+    "在控制台一键创建令牌，支持多密钥管理，创建后即可作为 API Key 使用。": "Create a token in the console. Multiple keys are supported, and the token can be used as your API key.",
+    "导入 CC Switch": "Import to CC Switch",
+    "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。": "Click the CC Switch import button on the token page to auto-fill the Base URL, model, and API key."
   }
 }

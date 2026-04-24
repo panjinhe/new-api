@@ -4186,6 +4186,12 @@
     "默认用户消息": "Xin chào",
     "默认补全倍率": "Tỷ lệ hoàn thành mặc định",
     "如果工具不支持一键配置，也可以使用下方 Base URL 手动接入。": "Neu cong cu khong ho tro cau hinh mot cham, hay dung Base URL ben duoi de cau hinh thu cong.",
-    "手动配置备用": "Cau hinh thu cong du phong"
+    "手动配置备用": "Cau hinh thu cong du phong",
+    "注册账号": "Dang ky tai khoan",
+    "完成注册或登录后即可进入控制台，开始配置你的专属 Codex 接入环境。": "Dang ky hoac dang nhap, sau do vao bang dieu khien de cau hinh moi truong Codex rieng.",
+    "创建令牌": "Tao token",
+    "在控制台一键创建令牌，支持多密钥管理，创建后即可作为 API Key 使用。": "Tao token trong bang dieu khien. Ho tro quan ly nhieu khoa va token co the dung nhu API Key.",
+    "导入 CC Switch": "Nhap vao CC Switch",
+    "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。": "Bam nut nhap CC Switch tren trang token de tu dong dien Base URL, mo hinh va API Key."
   }
 }

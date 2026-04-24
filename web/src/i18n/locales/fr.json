@@ -3652,6 +3652,12 @@
     "默认用户消息": "Bonjour",
     "默认补全倍率": "Taux de complétion par défaut",
     "如果工具不支持一键配置，也可以使用下方 Base URL 手动接入。": "Si votre outil ne prend pas en charge la configuration en un clic, utilisez la Base URL ci-dessous pour une configuration manuelle.",
-    "手动配置备用": "Configuration manuelle"
+    "手动配置备用": "Configuration manuelle",
+    "注册账号": "Créer un compte",
+    "完成注册或登录后即可进入控制台，开始配置你的专属 Codex 接入环境。": "Créez un compte ou connectez-vous, puis ouvrez la console pour configurer votre accès Codex.",
+    "创建令牌": "Créer un jeton",
+    "在控制台一键创建令牌，支持多密钥管理，创建后即可作为 API Key 使用。": "Créez un jeton dans la console. Plusieurs clés sont prises en charge et le jeton sert de clé API.",
+    "导入 CC Switch": "Importer dans CC Switch",
+    "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。": "Cliquez sur le bouton d'import CC Switch dans la page des jetons pour remplir automatiquement la Base URL, le modèle et la clé API."
   }
 }

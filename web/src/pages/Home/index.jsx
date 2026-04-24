@@ -63,16 +63,16 @@ const Home = () => {
     },
     {
       number: '02',
-      title: t('获取 API 密钥'),
+      title: t('创建令牌'),
       description: t(
-        '在控制台一键创建令牌，支持多密钥管理，创建后即可作为 api-key 使用。',
+        '在控制台一键创建令牌，支持多密钥管理，创建后即可作为 API Key 使用。',
       ),
     },
     {
       number: '03',
-      title: t('替换 Base URL'),
+      title: t('导入 CC Switch'),
       description: t(
-        '将原有配置中的 Base URL 替换为本站地址，填入模型与密钥即可开始使用。',
+        '点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。',
       ),
     },
   ];
