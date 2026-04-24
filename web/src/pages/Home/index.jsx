@@ -40,6 +40,7 @@ const Home = () => {
   const [statusState] = useContext(StatusContext);
   const actualTheme = useActualTheme();
   const qqGroupNumber = '217637139';
+  const qqGroupQrCodeUrl = '/qq-group-qr.png';
   const ccSwitchInstallUrl =
     'https://github.com/farion1231/cc-switch/releases/latest';
   const ccSwitchRepoUrl = 'https://github.com/farion1231/cc-switch';
@@ -162,19 +163,36 @@ const Home = () => {
         footer={null}
         centered
       >
-        <div className='space-y-4'>
+        <div className='space-y-5 text-center'>
           <div className='text-sm leading-7 text-semi-color-text-1'>
             {t('加群@群主可领取20刀兑换码')}
           </div>
-          <div className='rounded-2xl border border-semi-color-border bg-semi-color-fill-0 p-4'>
-            <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
-              {t('QQ群号')}
+          <div className='mx-auto flex max-w-[220px] flex-col items-center gap-4'>
+            <div className='w-full rounded-2xl border border-semi-color-border bg-semi-color-fill-0 p-4 text-center'>
+              <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+                {t('QQ群号')}
+              </div>
+              <div className='mt-2 text-2xl font-bold tracking-[0.08em] text-semi-color-text-0'>
+                {qqGroupNumber}
+              </div>
             </div>
-            <div className='mt-2 text-2xl font-bold tracking-[0.08em] text-semi-color-text-0'>
-              {qqGroupNumber}
+            <div className='w-[148px] rounded-2xl border border-semi-color-border bg-white p-2 shadow-sm dark:bg-white'>
+              <img
+                src={qqGroupQrCodeUrl}
+                alt={t('QQ 群二维码')}
+                className='aspect-square w-full rounded-xl object-cover'
+              />
+              <div className='mt-2 text-center text-xs font-medium text-slate-600'>
+                {t('扫码加入QQ群')}
+              </div>
             </div>
           </div>
-          <Button theme='solid' type='primary' block onClick={handleCopyQQGroup}>
+          <Button
+            theme='solid'
+            type='primary'
+            block
+            onClick={handleCopyQQGroup}
+          >
             {t('复制群号')}
           </Button>
         </div>
@@ -292,27 +310,43 @@ const Home = () => {
                   </div>
                 </div>
 
-                <div className='mx-auto mt-6 max-w-2xl rounded-[28px] border border-semi-color-border bg-white/85 px-6 py-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25'>
-                  <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
-                    {t('咨询更多')}
-                  </div>
-                  <div className='mt-3 text-base leading-7 text-semi-color-text-1 md:text-lg'>
-                    {t('加群@群主可领取20刀兑换码')}
-                  </div>
-                  <div className='mt-5 text-sm text-semi-color-text-2'>
-                    {t('QQ群号')}
-                  </div>
-                  <div className='mt-2 text-3xl font-bold tracking-[0.08em] text-semi-color-text-0'>
-                    {qqGroupNumber}
-                  </div>
-                  <div className='mt-6 flex justify-center'>
-                    <Button
-                      size={isMobile ? 'default' : 'large'}
-                      className='!h-11 !rounded-full px-8'
-                      onClick={() => setContactModalVisible(true)}
-                    >
-                      {t('咨询更多')}
-                    </Button>
+                <div className='mx-auto mt-6 max-w-4xl rounded-[28px] border border-semi-color-border bg-white/85 px-5 py-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:px-8 md:py-7 md:text-left'>
+                  <div className='grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_240px]'>
+                    <div className='min-w-0'>
+                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
+                        {t('咨询更多')}
+                      </div>
+                      <div className='mt-3 text-base leading-7 text-semi-color-text-1 md:text-lg'>
+                        {t('加群@群主可领取20刀兑换码')}
+                      </div>
+                      <div className='mt-5 flex flex-col items-center gap-4 sm:flex-row sm:justify-center md:justify-start'>
+                        <div className='w-full max-w-[240px] rounded-2xl border border-semi-color-border bg-semi-color-fill-0 px-6 py-4 text-center'>
+                          <div className='text-sm text-semi-color-text-2'>
+                            {t('QQ群号')}
+                          </div>
+                          <div className='mt-2 text-3xl font-bold tracking-[0.08em] text-semi-color-text-0'>
+                            {qqGroupNumber}
+                          </div>
+                        </div>
+                        <Button
+                          size={isMobile ? 'default' : 'large'}
+                          className='!h-11 !w-[160px] !rounded-full px-8'
+                          onClick={() => setContactModalVisible(true)}
+                        >
+                          {t('咨询更多')}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className='mx-auto w-[220px] rounded-[26px] border border-semi-color-border bg-white p-3 shadow-sm md:mx-0 md:justify-self-end dark:bg-white'>
+                      <img
+                        src={qqGroupQrCodeUrl}
+                        alt={t('QQ 群二维码')}
+                        className='aspect-square w-full rounded-2xl object-cover'
+                      />
+                      <div className='mt-3 text-center text-sm font-medium text-slate-600'>
+                        {t('扫码加入QQ群')}
+                      </div>
+                    </div>
                   </div>
                 </div>
 

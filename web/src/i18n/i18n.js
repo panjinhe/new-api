@@ -37,6 +37,11 @@ i18n
       'zh-CN': zhCNTranslation,
     },
     fallbackLng: 'zh-CN',
+    detection: {
+      order: ['localStorage'],
+      lookupLocalStorage: 'i18nextLng',
+      caches: [],
+    },
     nsSeparator: false,
     keySeparator: false,
     interpolation: {
