@@ -18,8 +18,20 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import claudeCodeCodexCompatContent from '../../../docs/installation/claude-code-codex-compat.zh-CN.md?raw';
+import codexPro20xCacheHitFixContent from '../../../docs/installation/codex-pro20x-cache-hit-fix.zh-CN.md?raw';
 
 export const builtInDocs = [
+  {
+    slug: 'codex-pro20x-cache-hit-fix',
+    title: 'Codex-pro20x 缓存低命中排查与修复记录',
+    summary:
+      '复盘 Codex-pro20x-1 连续缓存读为 0 的排查过程：如何用 prefix hash、渠道对照、上游 usage 数据定位到 Session_id 缺失，并通过代码修复恢复缓存命中。',
+    tags: ['Codex-pro20x', '缓存命中', '使用日志', '排障记录'],
+    sourcePath: 'docs/installation/codex-pro20x-cache-hit-fix.zh-CN.md',
+    updatedAt: '2026-04-24',
+    featured: true,
+    content: codexPro20xCacheHitFixContent.trim(),
+  },
   {
     slug: 'claude-code-codex-compat',
     title: 'Claude Code 接入 Codex/GPT-5.4 的实现与排障记录',

@@ -38,7 +38,7 @@ const Docs = () => {
           </h1>
           <p className='mx-auto mt-4 max-w-2xl text-base leading-7 text-semi-color-text-1 md:text-lg'>
             {t(
-              '这里集中放接入教程、兼容方案与真实排障复盘，一期先公开 Claude Code 接入改造过程。',
+              '这里集中放接入教程、兼容方案与真实排障复盘，方便按问题场景快速查找处理方法。',
             )}
           </p>
         </div>

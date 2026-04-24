@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Usage log screenshot showing channel 9 cache tokens after fix">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#020617" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="720" fill="#e2e8f0"/>
+  <rect x="48" y="44" width="1184" height="632" rx="22" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="48" y="44" width="1184" height="72" rx="22" fill="#0f172a"/>
+  <text x="84" y="90" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="800" fill="#ffffff">线上使用日志截图：Codex-pro20x-1 修复后</text>
+  <text x="1010" y="90" font-family="Inter, Arial, sans-serif" font-size="15" fill="#cbd5e1">版本 6296cec41</text>
+
+  <g font-family="Inter, Arial, sans-serif" font-size="14">
+    <rect x="76" y="144" width="1128" height="42" rx="10" fill="#f1f5f9"/>
+    <text x="96" y="171" font-weight="700" fill="#334155">ID</text>
+    <text x="180" y="171" font-weight="700" fill="#334155">时间</text>
+    <text x="296" y="171" font-weight="700" fill="#334155">渠道</text>
+    <text x="408" y="171" font-weight="700" fill="#334155">Prompt</text>
+    <text x="520" y="171" font-weight="700" fill="#334155">缓存读</text>
+    <text x="650" y="171" font-weight="700" fill="#334155">补全</text>
+    <text x="760" y="171" font-weight="700" fill="#334155">费用</text>
+    <text x="890" y="171" font-weight="700" fill="#334155">前缀 Hash</text>
+
+    <g fill="#0f172a">
+      <rect x="76" y="198" width="1128" height="50" rx="10" fill="#ffffff"/>
+      <text x="96" y="229">3589</text><text x="180" y="229">14:05:55</text><text x="296" y="229">9</text><text x="408" y="229">3,020</text><text x="520" y="229" fill="#ef4444" font-weight="800">0</text><text x="650" y="229">37</text><text x="760" y="229">$0.004053</text><text x="890" y="229">cd2f13a6d76be645...</text>
+      <line x1="76" y1="256" x2="1204" y2="256" stroke="#e2e8f0"/>
+
+      <rect x="76" y="262" width="1128" height="50" rx="10" fill="#ecfeff"/>
+      <text x="96" y="293">3590</text><text x="180" y="293">14:06:00</text><text x="296" y="293">9</text><text x="408" y="293">3,020</text><text x="520" y="293" fill="#0891b2" font-weight="800">2,816</text><text x="650" y="293">20</text><text x="760" y="293">$0.000757</text><text x="890" y="293">cd2f13a6d76be645...</text>
+
+      <rect x="76" y="326" width="1128" height="50" rx="10" fill="#ffffff"/>
+      <text x="96" y="357">3592</text><text x="180" y="357">14:06:04</text><text x="296" y="357">9</text><text x="408" y="357">3,020</text><text x="520" y="357" fill="#ef4444" font-weight="800">0</text><text x="650" y="357">37</text><text x="760" y="357">$0.004053</text><text x="890" y="357">cd2f13a6d76be645...</text>
+
+      <rect x="76" y="390" width="1128" height="50" rx="10" fill="#ecfeff"/>
+      <text x="96" y="421">3593</text><text x="180" y="421">14:06:08</text><text x="296" y="421">9</text><text x="408" y="421">3,020</text><text x="520" y="421" fill="#0891b2" font-weight="800">2,816</text><text x="650" y="421">26</text><text x="760" y="421">$0.000802</text><text x="890" y="421">cd2f13a6d76be645...</text>
+
+      <rect x="76" y="454" width="1128" height="50" rx="10" fill="#ecfeff"/>
+      <text x="96" y="485">3595</text><text x="180" y="485">14:06:12</text><text x="296" y="485">9</text><text x="408" y="485">3,020</text><text x="520" y="485" fill="#0891b2" font-weight="800">2,816</text><text x="650" y="485">26</text><text x="760" y="485">$0.000802</text><text x="890" y="485">cd2f13a6d76be645...</text>
+
+      <rect x="76" y="518" width="1128" height="50" rx="10" fill="#ecfeff"/>
+      <text x="96" y="549">3598</text><text x="180" y="549">14:06:24</text><text x="296" y="549">9</text><text x="408" y="549">3,020</text><text x="520" y="549" fill="#0891b2" font-weight="800">2,816</text><text x="650" y="549">21</text><text x="760" y="549">$0.000765</text><text x="890" y="549">cd2f13a6d76be645...</text>
+
+      <rect x="76" y="582" width="1128" height="50" rx="10" fill="#ecfeff"/>
+      <text x="96" y="613">3599</text><text x="180" y="613">14:06:28</text><text x="296" y="613">9</text><text x="408" y="613">3,020</text><text x="520" y="613" fill="#0891b2" font-weight="800">2,816</text><text x="650" y="613">21</text><text x="760" y="613">$0.000765</text><text x="890" y="613">cd2f13a6d76be645...</text>
+    </g>
+  </g>
+  <text x="84" y="658" font-family="Inter, Arial, sans-serif" font-size="13" fill="#64748b">说明：截图式图表由线上 logs 表数据生成，展示修复后同一前缀 hash 下 channel 9 开始返回缓存读 token。</text>
+</svg>
