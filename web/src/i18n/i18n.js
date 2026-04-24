@@ -38,6 +38,7 @@ i18n
     },
     fallbackLng: 'zh-CN',
     nsSeparator: false,
+    keySeparator: false,
     interpolation: {
       escapeValue: false,
     },
