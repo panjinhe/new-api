@@ -55,6 +55,8 @@ func (a *Adaptor) ConvertEmbeddingRequest(c *gin.Context, info *relaycommon.Rela
 func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.OpenAIResponsesRequest) (any, error) {
 	isCompact := info != nil && info.RelayMode == relayconstant.RelayModeResponsesCompact
 
+	ensureCodexSessionIDFromPromptCacheKey(info, request.PromptCacheKey)
+
 	if info != nil && info.ChannelSetting.SystemPrompt != "" {
 		systemPrompt := info.ChannelSetting.SystemPrompt
 
@@ -105,6 +107,44 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 	request.MaxOutputTokens = nil
 	request.Temperature = nil
 	return request, nil
+}
+
+func ensureCodexSessionIDFromPromptCacheKey(info *relaycommon.RelayInfo, promptCacheKey json.RawMessage) {
+	if info == nil || len(promptCacheKey) == 0 {
+		return
+	}
+
+	sessionID := strings.TrimSpace(extractCodexPromptCacheKey(promptCacheKey))
+	if sessionID == "" {
+		return
+	}
+
+	headers := relaycommon.GetEffectiveHeaderOverride(info)
+	for key, value := range headers {
+		if !strings.EqualFold(key, "session_id") {
+			continue
+		}
+		if strings.TrimSpace(common.Interface2String(value)) != "" {
+			return
+		}
+	}
+
+	headers["session_id"] = sessionID
+	info.RuntimeHeadersOverride = headers
+	info.UseRuntimeHeadersOverride = true
+}
+
+func extractCodexPromptCacheKey(raw json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return ""
+	}
+
+	var value string
+	if err := common.Unmarshal(raw, &value); err == nil {
+		return value
+	}
+	return strings.Trim(trimmed, `"`)
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (any, error) {
