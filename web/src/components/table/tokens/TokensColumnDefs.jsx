@@ -38,11 +38,7 @@ import {
   renderQuota,
   getModelCategories,
 } from '../../../helpers';
-import {
-  IconCopy,
-  IconEyeOpened,
-  IconEyeClosed,
-} from '@douyinfe/semi-icons';
+import { IconCopy, IconEyeOpened, IconEyeClosed } from '@douyinfe/semi-icons';
 
 // progress color helper
 const getProgressColor = (pct) => {
@@ -320,7 +316,9 @@ const renderQuotaUsage = (text, record, t) => {
         {t('已用额度')}: {renderQuota(used)}
       </Paragraph>
       <Paragraph copyable={{ content: renderQuota(remain) }}>
-        {t('剩余额度')}: {renderQuota(remain)} ({percent.toFixed(0)}%)
+        {t('剩余额度')}: {renderQuota(remain)} {'('}
+        {percent.toFixed(0)}
+        {'%)'}
       </Paragraph>
       <Paragraph copyable={{ content: renderQuota(total) }}>
         {t('总额度')}: {renderQuota(total)}

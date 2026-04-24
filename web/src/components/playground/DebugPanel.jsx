@@ -146,7 +146,7 @@ const DebugPanel = ({
                 {t('预览请求体')}
                 {customRequestMode && (
                   <span className='px-1.5 py-0.5 text-xs bg-orange-100 text-orange-600 rounded-full'>
-                    自定义
+                    {t('自定义')}
                   </span>
                 )}
               </div>
@@ -183,7 +183,9 @@ const DebugPanel = ({
                 {t('响应')}
                 {debugData.sseMessages && debugData.sseMessages.length > 0 && (
                   <span className='px-1.5 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full'>
-                    SSE ({debugData.sseMessages.length})
+                    {'SSE ('}
+                    {debugData.sseMessages.length}
+                    {')'}
                   </span>
                 )}
               </div>

@@ -69,7 +69,7 @@ const AudioClipCard = ({ clip }) => {
             flexShrink: 0,
           }}
           onError={(e) => {
-            e.target.style.display = 'none';
+            e.target.hidden = true;
           }}
         />
       )}
@@ -82,7 +82,11 @@ const AudioClipCard = ({ clip }) => {
             marginBottom: '4px',
           }}
         >
-          <Text strong ellipsis={{ showTooltip: true }} style={{ fontSize: 15 }}>
+          <Text
+            strong
+            ellipsis={{ showTooltip: true }}
+            style={{ fontSize: 15 }}
+          >
             {title}
           </Text>
           {duration > 0 && (
@@ -136,7 +140,7 @@ const AudioClipCard = ({ clip }) => {
             ref={audioRef}
             src={audioUrl}
             controls
-            preload='none'
+            preload={'none'}
             onError={() => setHasError(true)}
             style={{ width: '100%', height: 36 }}
           />

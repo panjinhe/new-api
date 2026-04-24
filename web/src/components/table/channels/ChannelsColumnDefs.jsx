@@ -50,10 +50,7 @@ import {
   IconAlertTriangle,
 } from '@douyinfe/semi-icons';
 import { FaRandom } from 'react-icons/fa';
-import {
-  clampPercent,
-  CODEX_CHANNEL_TYPE,
-} from './codexUsageUtils';
+import { clampPercent, CODEX_CHANNEL_TYPE } from './codexUsageUtils';
 
 // Render functions
 const renderType = (type, record = {}, t) => {
@@ -136,7 +133,7 @@ const renderType = (type, record = {}, t) => {
             className='cursor-pointer'
             onClick={handleNavigate}
           >
-            IO.NET
+            {'IO.NET'}
           </Tag>
         </span>
       </Tooltip>
@@ -264,8 +261,7 @@ const renderChannelStatus = (record, t) => {
       cooldownNote += `，${t('Key 序号：')}${record.routing_cooldown_key_index + 1}`;
     }
     if (record.routing_cooldown_reset_at) {
-      cooldownNote +=
-        `，${t('恢复时间：')}${timestamp2string(record.routing_cooldown_reset_at)}`;
+      cooldownNote += `，${t('恢复时间：')}${timestamp2string(record.routing_cooldown_reset_at)}`;
     }
     statusNotes.push(cooldownNote);
   }
