@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect, useState } from 'react';
-import { Button, Input, Modal, Tag } from '@douyinfe/semi-ui';
+import { Button, Input, Tag } from '@douyinfe/semi-ui';
 import { API, showError, copy, showSuccess } from '../../helpers';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import { StatusContext } from '../../context/Status';
@@ -47,7 +47,6 @@ const Home = () => {
   const [homePageContentLoaded, setHomePageContentLoaded] = useState(false);
   const [homePageContent, setHomePageContent] = useState('');
   const [noticeVisible, setNoticeVisible] = useState(false);
-  const [contactModalVisible, setContactModalVisible] = useState(false);
   const isMobile = useIsMobile();
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
   const serverAddress =
@@ -114,13 +113,6 @@ const Home = () => {
     }
   };
 
-  const handleCopyQQGroup = async () => {
-    const ok = await copy(qqGroupNumber);
-    if (ok) {
-      showSuccess(t('QQ群号已复制到剪切板'));
-    }
-  };
-
   const openExternalLink = (url) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -156,47 +148,6 @@ const Home = () => {
         onClose={() => setNoticeVisible(false)}
         isMobile={isMobile}
       />
-      <Modal
-        title={t('咨询更多')}
-        visible={contactModalVisible}
-        onCancel={() => setContactModalVisible(false)}
-        footer={null}
-        centered
-      >
-        <div className='space-y-5 text-center'>
-          <div className='text-sm leading-7 text-semi-color-text-1'>
-            {t('加群@群主可领取20刀兑换码')}
-          </div>
-          <div className='mx-auto flex max-w-[220px] flex-col items-center gap-4'>
-            <div className='w-full rounded-2xl border border-semi-color-border bg-semi-color-fill-0 p-4 text-center'>
-              <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
-                {t('QQ群号')}
-              </div>
-              <div className='mt-2 text-2xl font-bold tracking-[0.08em] text-semi-color-text-0'>
-                {qqGroupNumber}
-              </div>
-            </div>
-            <div className='w-[148px] rounded-2xl border border-semi-color-border bg-white p-2 shadow-sm dark:bg-white'>
-              <img
-                src={qqGroupQrCodeUrl}
-                alt={t('QQ 群二维码')}
-                className='aspect-square w-full rounded-xl object-cover'
-              />
-              <div className='mt-2 text-center text-xs font-medium text-slate-600'>
-                {t('扫码加入QQ群')}
-              </div>
-            </div>
-          </div>
-          <Button
-            theme='solid'
-            type='primary'
-            block
-            onClick={handleCopyQQGroup}
-          >
-            {t('复制群号')}
-          </Button>
-        </div>
-      </Modal>
       {homePageContentLoaded && homePageContent === '' ? (
         <div className='w-full overflow-x-hidden'>
           <div className='relative w-full overflow-x-hidden border-b border-semi-color-border min-h-[calc(100svh-64px)]'>
@@ -310,38 +261,29 @@ const Home = () => {
                   </div>
                 </div>
 
-                <div className='mx-auto mt-6 max-w-4xl rounded-[28px] border border-semi-color-border bg-white/85 px-5 py-6 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:px-8 md:py-7 md:text-left'>
-                  <div className='grid items-center gap-6 md:grid-cols-[minmax(0,1fr)_240px]'>
-                    <div className='min-w-0'>
-                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
-                        {t('咨询更多')}
+                <div className='mx-auto mt-6 max-w-4xl overflow-hidden rounded-[28px] border border-semi-color-border bg-white/85 p-5 text-center shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:p-7 md:text-left'>
+                  <div className='grid items-stretch gap-5 md:grid-cols-[minmax(0,1fr)_260px] md:gap-7'>
+                    <div className='flex min-w-0 flex-col justify-center'>
+                      <div className='text-sm font-medium text-semi-color-text-2'>
+                        {t('QQ 咨询群')}
                       </div>
-                      <div className='mt-3 text-base leading-7 text-semi-color-text-1 md:text-lg'>
+                      <div className='mt-3 text-lg font-semibold leading-8 text-semi-color-text-0 md:text-xl'>
                         {t('加群@群主可领取20刀兑换码')}
                       </div>
-                      <div className='mt-5 flex flex-col items-center gap-4 sm:flex-row sm:justify-center md:justify-start'>
-                        <div className='w-full max-w-[240px] rounded-2xl border border-semi-color-border bg-semi-color-fill-0 px-6 py-4 text-center'>
-                          <div className='text-sm text-semi-color-text-2'>
-                            {t('QQ群号')}
-                          </div>
-                          <div className='mt-2 text-3xl font-bold tracking-[0.08em] text-semi-color-text-0'>
-                            {qqGroupNumber}
-                          </div>
+                      <div className='mx-auto mt-5 w-full max-w-[360px] rounded-2xl border border-semi-color-border bg-semi-color-fill-0 px-5 py-4 text-center md:mx-0 md:max-w-[420px] md:px-6 md:py-5 md:text-left'>
+                        <div className='text-sm text-semi-color-text-2'>
+                          {t('QQ群号')}
                         </div>
-                        <Button
-                          size={isMobile ? 'default' : 'large'}
-                          className='!h-11 !w-[160px] !rounded-full px-8'
-                          onClick={() => setContactModalVisible(true)}
-                        >
-                          {t('咨询更多')}
-                        </Button>
+                        <div className='mt-2 text-3xl font-bold tracking-[0.1em] text-semi-color-text-0 sm:text-4xl'>
+                          {qqGroupNumber}
+                        </div>
                       </div>
                     </div>
-                    <div className='mx-auto w-[220px] rounded-[26px] border border-semi-color-border bg-white p-3 shadow-sm md:mx-0 md:justify-self-end dark:bg-white'>
+                    <div className='mx-auto flex w-full max-w-[260px] flex-col items-center justify-center rounded-[26px] border border-semi-color-border bg-white p-4 shadow-sm md:mx-0 md:justify-self-end dark:bg-white'>
                       <img
                         src={qqGroupQrCodeUrl}
                         alt={t('QQ 群二维码')}
-                        className='aspect-square w-full rounded-2xl object-cover'
+                        className='aspect-square w-full max-w-[220px] rounded-2xl object-cover'
                       />
                       <div className='mt-3 text-center text-sm font-medium text-slate-600'>
                         {t('扫码加入QQ群')}
