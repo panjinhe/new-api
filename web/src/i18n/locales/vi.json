@@ -1747,6 +1747,7 @@
     "查看全部文档": "Xem toan bo tai lieu",
     "返回文档列表": "Quay lai danh sach tai lieu",
     "这里集中放接入教程、兼容方案与真实排障复盘，一期先公开 Claude Code 接入改造过程。": "Khu vuc nay tong hop huong dan tich hop, giai phap tuong thich va cac ban ghi xu ly su co thuc te. Dot dau tien cong khai qua trinh tich hop Claude Code.",
+    "这里会持续整理接入教程、兼容方案和真实排障复盘。": "Khu vuc nay se tiep tuc tong hop huong dan tich hop, ghi chu tuong thich va cac ban ghi xu ly su co thuc te.",
     "先从这篇实现记录开始，了解我们如何把 Claude Code 前端兼容成 Anthropic 协议，同时把后端统一收敛到 Codex / GPT-5.4。": "Hay bat dau tu ban ghi trien khai nay de xem cach chung toi lam cho Claude Code o frontend tuong thich voi giao thuc Anthropic, dong thoi quy ve backend thanh Codex / GPT-5.4.",
     "文档地址": "Liên kết tài liệu",
     "文生视频": "Văn bản sang video",

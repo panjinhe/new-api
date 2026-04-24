@@ -1775,6 +1775,7 @@
     "查看全部文档": "Voir toute la documentation",
     "返回文档列表": "Retour à la documentation",
     "这里集中放接入教程、兼容方案与真实排障复盘，一期先公开 Claude Code 接入改造过程。": "Cette section regroupe des guides d'integration, des schemas de compatibilite et des retours d'incident reels. La premiere publication presente notre integration de Claude Code.",
+    "这里会持续整理接入教程、兼容方案和真实排障复盘。": "Nous y regrouperons des guides d'integration, des notes de compatibilite et des retours d'incident reels.",
     "先从这篇实现记录开始，了解我们如何把 Claude Code 前端兼容成 Anthropic 协议，同时把后端统一收敛到 Codex / GPT-5.4。": "Commencez par cette note d'implementation pour voir comment nous avons rendu Claude Code compatible avec le protocole Anthropic cote frontend tout en routant le backend vers Codex / GPT-5.4.",
     "文档地址": "Lien du document",
     "文生视频": "Texte vers vidéo",

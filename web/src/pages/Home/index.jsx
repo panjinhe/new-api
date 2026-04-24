@@ -51,7 +51,7 @@ const Home = () => {
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
-  const featuredTutorial = featuredBuiltInDocs[0];
+  const featuredTutorials = featuredBuiltInDocs;
 
   const quickStartSteps = [
     {
@@ -344,9 +344,9 @@ const Home = () => {
                   </div>
                 </div>
 
-                {featuredTutorial && (
-                  <div className='mx-auto mt-6 max-w-4xl rounded-[32px] border border-semi-color-border bg-white/85 p-5 text-left shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:p-6'>
-                    <div className='flex flex-col gap-4 md:flex-row md:items-start md:justify-between'>
+                {featuredTutorials.length > 0 && (
+                  <section className='mx-auto mt-6 max-w-4xl rounded-[32px] border border-semi-color-border bg-white/85 p-5 text-left shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:p-6'>
+                    <div className='flex flex-col gap-4 border-b border-semi-color-border pb-6 md:flex-row md:items-start md:justify-between'>
                       <div className='max-w-2xl'>
                         <div className='inline-flex items-center rounded-full border border-semi-color-border bg-semi-color-fill-0 px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
                           {t('精选教程')}
@@ -356,21 +356,11 @@ const Home = () => {
                         </div>
                         <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
                           {t(
-                            '先从这篇实现记录开始，了解我们如何把 Claude Code 前端兼容成 Anthropic 协议，同时把后端统一收敛到 Codex / GPT-5.4。',
+                            '这里会持续整理接入教程、兼容方案和真实排障复盘。',
                           )}
                         </p>
                       </div>
-                      <div className='flex shrink-0 gap-3 md:flex-col'>
-                        <Link to={`/docs/${featuredTutorial.slug}`}>
-                          <Button
-                            theme='solid'
-                            type='primary'
-                            size={isMobile ? 'default' : 'large'}
-                            className='!h-11 !rounded-full px-6'
-                          >
-                            {t('查看详情')}
-                          </Button>
-                        </Link>
+                      <div className='flex shrink-0'>
                         <Link to='/docs'>
                           <Button
                             size={isMobile ? 'default' : 'large'}
@@ -382,25 +372,53 @@ const Home = () => {
                       </div>
                     </div>
 
-                    <div className='mt-6 rounded-[28px] border border-semi-color-border bg-semi-color-fill-0 p-5'>
-                      <div className='text-xs font-semibold uppercase tracking-[0.24em] text-cyan-600 dark:text-cyan-300'>
-                        {featuredTutorial.updatedAt}
-                      </div>
-                      <div className='mt-3 text-2xl font-bold text-semi-color-text-0'>
-                        {featuredTutorial.title}
-                      </div>
-                      <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
-                        {featuredTutorial.summary}
-                      </p>
-                      <div className='mt-4 flex flex-wrap gap-2'>
-                        {featuredTutorial.tags.map((tag) => (
-                          <Tag key={tag} color='cyan' shape='circle'>
-                            {tag}
-                          </Tag>
-                        ))}
-                      </div>
+                    <div className='mt-5 space-y-4'>
+                      {featuredTutorials.map((tutorial, index) => (
+                        <article
+                          key={tutorial.slug}
+                          className='group rounded-[28px] border border-semi-color-border bg-semi-color-fill-0 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-white hover:shadow-[0_18px_48px_rgba(8,145,178,0.10)] dark:hover:border-cyan-500/50 dark:hover:bg-black/30'
+                        >
+                          <div className='flex flex-col gap-4 md:flex-row md:items-start md:justify-between'>
+                            <div className='min-w-0 flex-1'>
+                              <div className='flex flex-wrap items-center gap-3'>
+                                <span className='text-xs font-semibold uppercase tracking-[0.24em] text-cyan-600 dark:text-cyan-300'>
+                                  {String(index + 1).padStart(2, '0')}
+                                </span>
+                                <span className='text-sm text-semi-color-text-2'>
+                                  {tutorial.updatedAt}
+                                </span>
+                              </div>
+                              <h3 className='mt-3 text-xl font-bold leading-8 text-semi-color-text-0 md:text-2xl'>
+                                {tutorial.title}
+                              </h3>
+                              <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
+                                {tutorial.summary}
+                              </p>
+                              <div className='mt-4 flex flex-wrap gap-2'>
+                                {tutorial.tags.map((tag) => (
+                                  <Tag key={tag} color='cyan' shape='circle'>
+                                    {tag}
+                                  </Tag>
+                                ))}
+                              </div>
+                            </div>
+                            <div className='shrink-0 md:pt-8'>
+                              <Link to={`/docs/${tutorial.slug}`}>
+                                <Button
+                                  theme={index === 0 ? 'solid' : 'light'}
+                                  type='primary'
+                                  size={isMobile ? 'default' : 'large'}
+                                  className='!h-11 !w-full !rounded-full px-6 md:!w-auto'
+                                >
+                                  {t('查看详情')}
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
                     </div>
-                  </div>
+                  </section>
                 )}
               </div>
             </div>
