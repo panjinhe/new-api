@@ -1,9 +1,9 @@
-🚀 Codex API 0.16元每刀 免费体验gpt.5.5💰
+🚀 Codex API 0.16元每刀 技术服务与配置支持💰
 🌐 https://pbroe.com/
 
 🧰 支持常见工具接入Codex、CLI、VSCode、OpenClaw 小龙虾、AstrBot
 ⭐ 平台当前主打 Codex 系列
-🤖 支持模型：⭐gpt5.5已上线⭐、5.4、5.3codex、5.4mini、5.2
+🤖 支持模型：Codex 系列、5.4、5.3codex、5.4mini、5.2
 
 🏠 官网主页https://pbroe.com/
 📖 可查看教程：接入信息、配置说明
@@ -20,9 +20,9 @@
 500 刀 80 元 
 🔗 使用及兑换网站：https://pbroe.com/
 
-🎁 另：gpt-plus账号一个月 80元全程质保
+🎁 另：gpt-plus账号一个月 70元全程质保
     gemini-pro账号一年 70元保一个月
-    5x(200元)和20x账号(320元)，无质保
+    5x(240元)和20x账号(400元)
     
 📩 购买兑换码私聊客服
 邀请人：新客首单额外赠送20刀额度
