@@ -39,7 +39,7 @@ import TopupHistoryModal from './modals/TopupHistoryModal';
 const TopUp = () => {
   const { t } = useTranslation();
   const onlineTopUpEntryEnabled = false;
-  const subscriptionEntryEnabled = false;
+  const subscriptionCatalogEnabled = false;
   const [searchParams, setSearchParams] = useSearchParams();
   const [userState, userDispatch] = useContext(UserContext);
   const [statusState] = useContext(StatusContext);
@@ -89,8 +89,9 @@ const TopUp = () => {
 
   // 订阅相关
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(
-    subscriptionEntryEnabled,
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscriptionCatalogLoading, setSubscriptionCatalogLoading] = useState(
+    subscriptionCatalogEnabled,
   );
   const [billingPreference, setBillingPreference] =
     useState('subscription_first');
@@ -510,7 +511,7 @@ const TopUp = () => {
   };
 
   const getSubscriptionPlans = async () => {
-    setSubscriptionLoading(true);
+    setSubscriptionCatalogLoading(true);
     try {
       const res = await API.get('/api/subscription/plans');
       if (res.data?.success) {
@@ -519,11 +520,12 @@ const TopUp = () => {
     } catch (e) {
       setSubscriptionPlans([]);
     } finally {
-      setSubscriptionLoading(false);
+      setSubscriptionCatalogLoading(false);
     }
   };
 
   const getSubscriptionSelf = async () => {
+    setSubscriptionLoading(true);
     try {
       const res = await API.get('/api/subscription/self');
       if (res.data?.success) {
@@ -538,7 +540,10 @@ const TopUp = () => {
         setAllSubscriptions(allSubs);
       }
     } catch (e) {
-      // ignore
+      setActiveSubscriptions([]);
+      setAllSubscriptions([]);
+    } finally {
+      setSubscriptionLoading(false);
     }
   };
 
@@ -689,9 +694,29 @@ const TopUp = () => {
 
   // URL 参数自动打开账单弹窗（支付回跳时触发）
   useEffect(() => {
+    let shouldReplace = false;
     if (searchParams.get('show_history') === 'true') {
       setOpenHistory(true);
       searchParams.delete('show_history');
+      shouldReplace = true;
+    }
+
+    const payStatus = searchParams.get('pay');
+    if (payStatus) {
+      if (payStatus === 'success') {
+        showSuccess(t('订阅支付成功，正在刷新权益'));
+      } else if (payStatus === 'pending') {
+        showInfo(t('支付处理中，请稍后刷新订阅状态'));
+      } else {
+        showError(t('支付未完成'));
+      }
+      getSubscriptionSelf().then();
+      getUserQuota().then();
+      searchParams.delete('pay');
+      shouldReplace = true;
+    }
+
+    if (shouldReplace) {
       setSearchParams(searchParams, { replace: true });
     }
   }, []);
@@ -704,17 +729,15 @@ const TopUp = () => {
   // 在 statusState 可用时获取充值信息
   useEffect(() => {
     getTopupInfo().then();
+    getSubscriptionSelf().then();
 
-    if (subscriptionEntryEnabled) {
+    if (subscriptionCatalogEnabled) {
       getSubscriptionPlans().then();
-      getSubscriptionSelf().then();
       return;
     }
 
-    setSubscriptionLoading(false);
+    setSubscriptionCatalogLoading(false);
     setSubscriptionPlans([]);
-    setActiveSubscriptions([]);
-    setAllSubscriptions([]);
   }, []);
 
   useEffect(() => {
@@ -893,7 +916,6 @@ const TopUp = () => {
           enableWaffoTopUp={enableWaffoTopUp}
           enableWaffoPancakeTopUp={enableWaffoPancakeTopUp}
           onlineTopUpEntryEnabled={onlineTopUpEntryEnabled}
-          subscriptionEntryEnabled={subscriptionEntryEnabled}
           presetAmounts={presetAmounts}
           selectedPreset={selectedPreset}
           selectPresetAmount={selectPresetAmount}
@@ -922,7 +944,9 @@ const TopUp = () => {
           statusLoading={statusLoading}
           topupInfo={topupInfo}
           onOpenHistory={handleOpenHistory}
+          subscriptionCatalogEnabled={subscriptionCatalogEnabled}
           subscriptionLoading={subscriptionLoading}
+          subscriptionCatalogLoading={subscriptionCatalogLoading}
           subscriptionPlans={subscriptionPlans}
           billingPreference={billingPreference}
           onChangeBillingPreference={updateBillingPreference}

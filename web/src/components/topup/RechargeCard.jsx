@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Avatar,
   Typography,
   Card,
   Button,
@@ -47,7 +46,8 @@ import {
 import { IconGift } from '@douyinfe/semi-icons';
 import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime';
 import { getCurrencyConfig } from '../../helpers/render';
-import SubscriptionPlansCard from './SubscriptionPlansCard';
+import SubscriptionPlanCatalog from './SubscriptionPlanCatalog';
+import SubscriptionStatusPanel from './SubscriptionStatusPanel';
 import RechargeSupportCard from '../common/RechargeSupportCard';
 
 const { Text } = Typography;
@@ -173,8 +173,9 @@ const RechargeCard = ({
   enableWaffoTopUp,
   enableWaffoPancakeTopUp,
   onlineTopUpEntryEnabled = true,
-  subscriptionEntryEnabled = true,
+  subscriptionCatalogEnabled = false,
   subscriptionLoading = false,
+  subscriptionCatalogLoading = false,
   subscriptionPlans = [],
   billingPreference,
   onChangeBillingPreference,
@@ -194,11 +195,9 @@ const RechargeCard = ({
     enableWaffoTopUp ||
     enableWaffoPancakeTopUp;
   const shouldShowOnlineTopUp = onlineTopUpEntryEnabled && hasOnlineTopUp;
-  const shouldShowSubscription =
-    subscriptionEntryEnabled &&
-    !subscriptionLoading &&
-    subscriptionPlans.length > 0;
-  const redemptionOnlyMode = !shouldShowOnlineTopUp && !shouldShowSubscription;
+  const shouldShowSubscriptionCatalog = subscriptionCatalogEnabled;
+  const redemptionOnlyMode =
+    !shouldShowOnlineTopUp && !shouldShowSubscriptionCatalog;
   const regularPayMethods = payMethods || [];
   const { symbol, rate, type } = getCurrencyConfig();
   const usdRate = getUsdExchangeRate();
@@ -242,123 +241,103 @@ const RechargeCard = ({
   useEffect(() => {
     if (initialTabSetRef.current) return;
     if (subscriptionLoading) return;
-    setActiveTab(shouldShowSubscription ? 'subscription' : 'topup');
+    setActiveTab(
+      !shouldShowOnlineTopUp && shouldShowSubscriptionCatalog
+        ? 'subscription'
+        : 'topup',
+    );
     initialTabSetRef.current = true;
-  }, [shouldShowSubscription, subscriptionLoading]);
+  }, [
+    shouldShowOnlineTopUp,
+    shouldShowSubscriptionCatalog,
+    subscriptionLoading,
+  ]);
 
   useEffect(() => {
-    if (!shouldShowSubscription && activeTab !== 'topup') {
+    if (!shouldShowSubscriptionCatalog && activeTab !== 'topup') {
       setActiveTab('topup');
     }
-  }, [shouldShowSubscription, activeTab]);
+  }, [shouldShowSubscriptionCatalog, activeTab]);
+
+  const accountStatsPanel = (
+    <Card className='!rounded-2xl shadow-sm h-full' bodyStyle={{ padding: 20 }}>
+      <div className='flex items-start justify-between gap-3'>
+        <div>
+          <div className='flex items-center gap-2'>
+            <Wallet size={18} color='var(--semi-color-primary)' />
+            <Text strong>{t('钱包概览')}</Text>
+          </div>
+          <Text type='tertiary' size='small'>
+            {t('余额、消耗和请求次数')}
+          </Text>
+        </div>
+        <Button
+          size='small'
+          theme='light'
+          type='tertiary'
+          icon={<Receipt size={14} />}
+          onClick={onOpenHistory}
+        >
+          {t('账单')}
+        </Button>
+      </div>
+
+      <div className='mt-5'>
+        <div className='text-xs text-[var(--semi-color-text-2)]'>
+          {t('当前余额')}
+        </div>
+        <div className='mt-1 text-3xl font-semibold text-[var(--semi-color-text-0)] break-words'>
+          {renderQuota(userState?.user?.quota)}
+        </div>
+      </div>
+
+      <div className='mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3'>
+        <div
+          className='rounded-xl px-3 py-3'
+          style={{
+            background: 'var(--semi-color-fill-0)',
+            border: '1px solid var(--semi-color-border)',
+          }}
+        >
+          <div className='flex items-center gap-2 text-xs text-[var(--semi-color-text-2)]'>
+            <TrendingUp size={14} />
+            <span>{t('历史消耗')}</span>
+          </div>
+          <div className='mt-2 text-base font-semibold text-[var(--semi-color-text-0)] break-words'>
+            {renderQuota(userState?.user?.used_quota)}
+          </div>
+        </div>
+        <div
+          className='rounded-xl px-3 py-3'
+          style={{
+            background: 'var(--semi-color-fill-0)',
+            border: '1px solid var(--semi-color-border)',
+          }}
+        >
+          <div className='flex items-center gap-2 text-xs text-[var(--semi-color-text-2)]'>
+            <BarChart2 size={14} />
+            <span>{t('请求次数')}</span>
+          </div>
+          <div className='mt-2 text-base font-semibold text-[var(--semi-color-text-0)]'>
+            {userState?.user?.request_count || 0}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+
   const topupContent = (
     <Space vertical style={{ width: '100%' }}>
-      {/* 统计数据 */}
-      <Card
-        className='!rounded-xl w-full'
-        bodyStyle={shouldShowOnlineTopUp ? undefined : { display: 'none' }}
-        cover={
-          <div
-            className='relative h-30'
-            style={{
-              '--palette-primary-darkerChannel': '37 99 235',
-              backgroundImage: `linear-gradient(0deg, rgba(var(--palette-primary-darkerChannel) / 80%), rgba(var(--palette-primary-darkerChannel) / 80%)), url('/cover-4.webp')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-            }}
-          >
-            <div className='relative z-10 h-full flex flex-col justify-between p-4'>
-              <div className='flex justify-between items-center'>
-                <Text strong style={{ color: 'white', fontSize: '16px' }}>
-                  {t('账户统计')}
-                </Text>
-              </div>
-
-              {/* 统计数据 */}
-              <div className='grid grid-cols-3 gap-6 mt-4'>
-                {/* 当前余额 */}
-                <div className='text-center'>
-                  <div
-                    className='text-base sm:text-2xl font-bold mb-2'
-                    style={{ color: 'white' }}
-                  >
-                    {renderQuota(userState?.user?.quota)}
-                  </div>
-                  <div className='flex items-center justify-center text-sm'>
-                    <Wallet
-                      size={14}
-                      className='mr-1'
-                      style={{ color: 'rgba(255,255,255,0.8)' }}
-                    />
-                    <Text
-                      style={{
-                        color: 'rgba(255,255,255,0.8)',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {t('当前余额')}
-                    </Text>
-                  </div>
-                </div>
-
-                {/* 历史消耗 */}
-                <div className='text-center'>
-                  <div
-                    className='text-base sm:text-2xl font-bold mb-2'
-                    style={{ color: 'white' }}
-                  >
-                    {renderQuota(userState?.user?.used_quota)}
-                  </div>
-                  <div className='flex items-center justify-center text-sm'>
-                    <TrendingUp
-                      size={14}
-                      className='mr-1'
-                      style={{ color: 'rgba(255,255,255,0.8)' }}
-                    />
-                    <Text
-                      style={{
-                        color: 'rgba(255,255,255,0.8)',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {t('历史消耗')}
-                    </Text>
-                  </div>
-                </div>
-
-                {/* 请求次数 */}
-                <div className='text-center'>
-                  <div
-                    className='text-base sm:text-2xl font-bold mb-2'
-                    style={{ color: 'white' }}
-                  >
-                    {userState?.user?.request_count || 0}
-                  </div>
-                  <div className='flex items-center justify-center text-sm'>
-                    <BarChart2
-                      size={14}
-                      className='mr-1'
-                      style={{ color: 'rgba(255,255,255,0.8)' }}
-                    />
-                    <Text
-                      style={{
-                        color: 'rgba(255,255,255,0.8)',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {t('请求次数')}
-                    </Text>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        }
-      >
-        {/* 在线充值表单 */}
-        {shouldShowOnlineTopUp ? (
-          statusLoading ? (
+      {shouldShowOnlineTopUp ? (
+        <Card
+          className='!rounded-xl w-full'
+          title={
+            <Text type='tertiary' strong>
+              {t('额度充值')}
+            </Text>
+          }
+        >
+          {statusLoading ? (
             <div className='py-8 flex justify-center'>
               <Spin size='large' />
             </div>
@@ -850,9 +829,9 @@ const RechargeCard = ({
                 )}
               </div>
             </Form>
-          )
-        ) : null}
-      </Card>
+          )}
+        </Card>
+      ) : null}
 
       {/* 兑换码充值 */}
       <Card
@@ -913,62 +892,49 @@ const RechargeCard = ({
   );
 
   return (
-    <Card className='!rounded-2xl shadow-sm border-0'>
-      {/* 卡片头部 */}
-      <div className='flex items-center justify-between mb-4'>
-        <div className='flex items-center'>
-          <Avatar size='small' color='blue' className='mr-3 shadow-md'>
-            <CreditCard size={16} />
-          </Avatar>
+    <div className='space-y-5'>
+      <div className='flex flex-wrap items-center justify-between gap-3'>
+        <div className='flex items-center gap-3'>
+          <div
+            className='h-10 w-10 rounded-xl flex items-center justify-center'
+            style={{
+              background: 'var(--semi-color-primary-light-default)',
+              color: 'var(--semi-color-primary)',
+            }}
+          >
+            <CreditCard size={18} />
+          </div>
           <div>
-            <Typography.Text className='text-lg font-medium'>
-              {redemptionOnlyMode ? t('钱包管理') : t('账户充值')}
-            </Typography.Text>
-            <div className='text-xs'>
+            <Typography.Title heading={4} style={{ margin: 0 }}>
+              {t('账户权益')}
+            </Typography.Title>
+            <Text type='tertiary' size='small'>
               {redemptionOnlyMode
-                ? t('使用兑换码兑换额度')
-                : t('多种充值方式，安全便捷')}
-            </div>
+                ? t('查看余额与已购订阅，使用兑换码补充额度')
+                : t('查看余额、订阅权益与充值入口')}
+            </Text>
           </div>
         </div>
-        <Button
-          icon={<Receipt size={16} />}
-          theme='solid'
-          onClick={onOpenHistory}
-        >
-          {t('账单')}
-        </Button>
       </div>
 
-      {shouldShowSubscription ? (
-        <Tabs type='card' activeKey={activeTab} onChange={setActiveTab}>
-          <TabPane
-            tab={
-              <div className='flex items-center gap-2'>
-                <Sparkles size={16} />
-                {t('订阅套餐')}
-              </div>
-            }
-            itemKey='subscription'
-          >
-            <div className='py-2'>
-              <SubscriptionPlansCard
-                t={t}
-                loading={subscriptionLoading}
-                plans={subscriptionPlans}
-                payMethods={payMethods}
-                enableOnlineTopUp={enableOnlineTopUp}
-                enableStripeTopUp={enableStripeTopUp}
-                enableCreemTopUp={enableCreemTopUp}
-                billingPreference={billingPreference}
-                onChangeBillingPreference={onChangeBillingPreference}
-                activeSubscriptions={activeSubscriptions}
-                allSubscriptions={allSubscriptions}
-                reloadSubscriptionSelf={reloadSubscriptionSelf}
-                withCard={false}
-              />
-            </div>
-          </TabPane>
+      <div className='grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4 items-stretch'>
+        {accountStatsPanel}
+        <SubscriptionStatusPanel
+          t={t}
+          loading={subscriptionLoading}
+          plans={subscriptionPlans}
+          billingPreference={billingPreference}
+          onChangeBillingPreference={onChangeBillingPreference}
+          activeSubscriptions={activeSubscriptions}
+          allSubscriptions={allSubscriptions}
+          reloadSubscriptionSelf={reloadSubscriptionSelf}
+          catalogEnabled={shouldShowSubscriptionCatalog}
+          onViewCatalog={() => setActiveTab('subscription')}
+        />
+      </div>
+
+      {shouldShowSubscriptionCatalog ? (
+        <Tabs type='line' activeKey={activeTab} onChange={setActiveTab}>
           <TabPane
             tab={
               <div className='flex items-center gap-2'>
@@ -980,11 +946,33 @@ const RechargeCard = ({
           >
             <div className='py-2'>{topupContent}</div>
           </TabPane>
+          <TabPane
+            tab={
+              <div className='flex items-center gap-2'>
+                <Sparkles size={16} />
+                {t('月卡套餐')}
+              </div>
+            }
+            itemKey='subscription'
+          >
+            <div className='py-2'>
+              <SubscriptionPlanCatalog
+                t={t}
+                loading={subscriptionCatalogLoading}
+                plans={subscriptionPlans}
+                payMethods={payMethods}
+                enableOnlineTopUp={enableOnlineTopUp}
+                enableStripeTopUp={enableStripeTopUp}
+                enableCreemTopUp={enableCreemTopUp}
+                allSubscriptions={allSubscriptions}
+              />
+            </div>
+          </TabPane>
         </Tabs>
       ) : (
         topupContent
       )}
-    </Card>
+    </div>
   );
 };
 
