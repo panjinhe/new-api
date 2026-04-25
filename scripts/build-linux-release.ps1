@@ -2,6 +2,7 @@
 param(
   [string]$Version = "",
   [string]$Output = "new-api-linux-amd64",
+  [switch]$AutoSkipFrontendBuild,
   [switch]$SkipFrontendBuild
 )
 
@@ -38,6 +39,68 @@ function Assert-ElfBinary {
   }
 }
 
+function Get-LatestWriteTimeUtc {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$Paths
+  )
+
+  $latest = [datetime]::MinValue
+
+  foreach ($path in $Paths) {
+    if (-not (Test-Path -LiteralPath $path)) {
+      continue
+    }
+
+    $item = Get-Item -LiteralPath $path -Force
+    if ($item.PSIsContainer) {
+      Get-ChildItem -LiteralPath $path -Recurse -File -Force | ForEach-Object {
+        if ($_.LastWriteTimeUtc -gt $latest) {
+          $latest = $_.LastWriteTimeUtc
+        }
+      }
+      continue
+    }
+
+    if ($item.LastWriteTimeUtc -gt $latest) {
+      $latest = $item.LastWriteTimeUtc
+    }
+  }
+
+  return $latest
+}
+
+function Test-FrontendBuildNeeded {
+  $distIndex = Join-Path $WebDir "dist\index.html"
+  if (-not (Test-Path -LiteralPath $distIndex)) {
+    Write-Host "Frontend dist is missing."
+    return $true
+  }
+
+  $frontendInputs = @(
+    (Join-Path $WebDir "src"),
+    (Join-Path $WebDir "public"),
+    (Join-Path $WebDir "index.html"),
+    (Join-Path $WebDir "package.json"),
+    (Join-Path $WebDir "bun.lock"),
+    (Join-Path $WebDir "vite.config.js"),
+    (Join-Path $WebDir "postcss.config.js"),
+    (Join-Path $WebDir "tailwind.config.js"),
+    (Join-Path $WebDir "jsconfig.json"),
+    (Join-Path $RootDir "docs")
+  )
+
+  $latestInput = Get-LatestWriteTimeUtc -Paths $frontendInputs
+  $distTime = (Get-Item -LiteralPath $distIndex).LastWriteTimeUtc
+
+  if ($latestInput -gt $distTime) {
+    Write-Host "Frontend inputs changed after the current dist."
+    return $true
+  }
+
+  return $false
+}
+
 if ([string]::IsNullOrWhiteSpace($Version)) {
   $Version = Get-ShortGitSha
 }
@@ -46,7 +109,13 @@ Write-Host "Root: $RootDir"
 Write-Host "Version: $Version"
 Write-Host "Output: $OutputPath"
 
-if (-not $SkipFrontendBuild) {
+if ($SkipFrontendBuild) {
+  Write-Host "==> Skipping frontend build"
+}
+elseif ($AutoSkipFrontendBuild -and -not (Test-FrontendBuildNeeded)) {
+  Write-Host "==> Skipping frontend build; web/dist is current"
+}
+else {
   Write-Host "==> Rebuilding frontend with bun"
   Push-Location $WebDir
   try {

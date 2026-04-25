@@ -203,6 +203,12 @@ pwsh ./scripts/build-linux-release.ps1
 pwsh ./scripts/build-linux-release.ps1 -SkipFrontendBuild
 ```
 
+如果你经常只改后端，可以让脚本在 `web/dist` 已是最新时自动跳过前端构建：
+
+```powershell
+pwsh ./scripts/build-linux-release.ps1 -AutoSkipFrontendBuild
+```
+
 ### 同步源码到服务器
 
 以下示例假设：
