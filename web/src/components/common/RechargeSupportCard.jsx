@@ -95,6 +95,131 @@ const buildPricingPlans = (officialUsdRate) =>
 
 const normalizePlan = (planWrapper) => planWrapper?.plan || planWrapper || null;
 
+const rechargePackVisuals = [
+  {
+    quota: '50 刀',
+    code: 'CELL-50',
+    label: '点火测试',
+    accent: 'rgba(8, 145, 178, 1)',
+    border: 'rgba(8, 145, 178, 0.30)',
+    background:
+      'linear-gradient(135deg, rgba(236, 254, 255, 0.98), rgba(255, 255, 255, 1) 56%, rgba(240, 249, 255, 0.9))',
+    rail: 'linear-gradient(90deg, rgba(8, 145, 178, 0.96), rgba(34, 211, 238, 0.72))',
+    glow: '0 14px 30px rgba(8, 145, 178, 0.10)',
+    level: '38%',
+    usage: '低成本验证',
+  },
+  {
+    quota: '100 刀',
+    code: 'DRIVE-100',
+    label: '日常推进',
+    accent: 'rgba(37, 99, 235, 1)',
+    border: 'rgba(37, 99, 235, 0.30)',
+    background:
+      'linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 1) 55%, rgba(238, 242, 255, 0.9))',
+    rail: 'linear-gradient(90deg, rgba(37, 99, 235, 0.96), rgba(96, 165, 250, 0.72))',
+    glow: '0 14px 30px rgba(37, 99, 235, 0.10)',
+    level: '52%',
+    usage: '日常 Coding',
+  },
+  {
+    quota: '200 刀',
+    code: 'ORBIT-200',
+    label: '高频航段',
+    accent: 'rgba(217, 119, 6, 1)',
+    border: 'rgba(217, 119, 6, 0.30)',
+    background:
+      'linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 1) 55%, rgba(255, 247, 237, 0.9))',
+    rail: 'linear-gradient(90deg, rgba(217, 119, 6, 0.96), rgba(251, 191, 36, 0.72))',
+    glow: '0 14px 30px rgba(217, 119, 6, 0.10)',
+    level: '70%',
+    usage: '高频自动化',
+  },
+  {
+    quota: '500 刀',
+    code: 'CORE-500',
+    label: '主推燃料舱',
+    accent: 'rgba(5, 150, 105, 1)',
+    border: 'rgba(5, 150, 105, 0.34)',
+    background:
+      'linear-gradient(135deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 1) 50%, rgba(239, 246, 255, 0.9))',
+    rail: 'linear-gradient(90deg, rgba(5, 150, 105, 0.96), rgba(59, 130, 246, 0.72))',
+    glow: '0 18px 38px rgba(5, 150, 105, 0.13)',
+    level: '100%',
+    usage: '长程主力',
+  },
+];
+
+const getRechargePackVisual = (item, index) =>
+  rechargePackVisuals.find((visual) => visual.quota === item.quota) ||
+  rechargePackVisuals[index % rechargePackVisuals.length];
+
+const subscriptionPlanVisuals = [
+  {
+    titleKeyword: '探测',
+    code: 'SCAN-01',
+    label: '低轨探测',
+    accent: 'rgba(8, 145, 178, 1)',
+    border: 'rgba(8, 145, 178, 0.32)',
+    background:
+      'linear-gradient(135deg, rgba(236, 254, 255, 0.98), rgba(255, 255, 255, 1) 56%, rgba(240, 249, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(8, 145, 178, 0.96), rgba(34, 211, 238, 0.72))',
+    glow: '0 16px 34px rgba(8, 145, 178, 0.10)',
+  },
+  {
+    titleKeyword: '启航',
+    code: 'LAUNCH-02',
+    label: '启航窗口',
+    accent: 'rgba(37, 99, 235, 1)',
+    border: 'rgba(37, 99, 235, 0.32)',
+    background:
+      'linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 1) 54%, rgba(238, 242, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(37, 99, 235, 0.96), rgba(96, 165, 250, 0.72))',
+    glow: '0 16px 34px rgba(37, 99, 235, 0.10)',
+  },
+  {
+    titleKeyword: '巡航',
+    code: 'CRUISE-03',
+    label: '主力巡航',
+    accent: 'rgba(5, 150, 105, 1)',
+    border: 'rgba(5, 150, 105, 0.34)',
+    background:
+      'linear-gradient(135deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 1) 50%, rgba(239, 246, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(5, 150, 105, 0.96), rgba(59, 130, 246, 0.72))',
+    glow: '0 18px 38px rgba(5, 150, 105, 0.13)',
+  },
+  {
+    titleKeyword: '加速',
+    code: 'BOOST-04',
+    label: '高能加速',
+    accent: 'rgba(217, 119, 6, 1)',
+    border: 'rgba(217, 119, 6, 0.34)',
+    background:
+      'linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 1) 52%, rgba(255, 247, 237, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(217, 119, 6, 0.96), rgba(251, 191, 36, 0.72))',
+    glow: '0 18px 38px rgba(217, 119, 6, 0.12)',
+  },
+  {
+    titleKeyword: '光速跃迁',
+    code: 'WARP-05',
+    label: '跃迁通道',
+    accent: 'rgba(124, 58, 237, 1)',
+    border: 'rgba(124, 58, 237, 0.36)',
+    background:
+      'linear-gradient(135deg, rgba(245, 243, 255, 0.98), rgba(255, 255, 255, 1) 52%, rgba(253, 244, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(124, 58, 237, 0.96), rgba(236, 72, 153, 0.66))',
+    glow: '0 18px 38px rgba(124, 58, 237, 0.13)',
+  },
+];
+
+const getSubscriptionPlanVisual = (plan, index) => {
+  const title = plan?.title || '';
+  return (
+    subscriptionPlanVisuals.find((item) => title.includes(item.titleKeyword)) ||
+    subscriptionPlanVisuals[index % subscriptionPlanVisuals.length]
+  );
+};
+
 const getPlanPriceLabel = (plan) => {
   const price = Number(plan?.price_amount || 0);
   const displayPrice = price.toFixed(Number.isInteger(price) ? 0 : 2);
@@ -212,12 +337,9 @@ const RechargeSupportCard = ({
   }
 
   return (
-    <div className='w-full grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4 items-stretch'>
-      <Card
-        className='!rounded-2xl shadow-sm h-full'
-        bodyStyle={{ padding: 0 }}
-      >
-        <div className='h-full p-5 flex flex-col'>
+    <div className='w-full grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4 items-start'>
+      <Card className='!rounded-2xl shadow-sm' bodyStyle={{ padding: 0 }}>
+        <div className='p-5 flex flex-col'>
           <div className='flex flex-wrap items-start justify-between gap-3'>
             <div className='min-w-0'>
               <div className='flex items-center gap-2 flex-wrap'>
@@ -258,50 +380,149 @@ const RechargeSupportCard = ({
           </div>
 
           <div className='mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2'>
-            {normalizedPricingPlans.map((item) => (
-              <div
-                key={item.quota}
-                className='rounded-2xl px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
-                style={{
-                  background: item.isBestValue
-                    ? 'linear-gradient(180deg, rgba(236, 253, 245, 0.95), rgba(255, 255, 255, 1))'
-                    : 'var(--semi-color-fill-0)',
-                  border: item.isBestValue
-                    ? '1px solid rgba(16, 185, 129, 0.35)'
-                    : '1px solid var(--semi-color-border)',
-                }}
-              >
-                <div className='flex items-center justify-between gap-2'>
-                  <Text strong>{item.quota}</Text>
-                  <Tag color={item.isBestValue ? 'green' : 'grey'} size='small'>
-                    {t(item.badge)}
-                  </Tag>
-                </div>
-                <div className='mt-3 flex items-end justify-between gap-2'>
-                  <div>
-                    <div className='text-2xl font-semibold leading-none text-[var(--semi-color-text-0)]'>
-                      {item.price}
+            {normalizedPricingPlans.map((item, index) => {
+              const visual = getRechargePackVisual(item, index);
+
+              return (
+                <div
+                  key={item.quota}
+                  className='group relative overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5'
+                  style={{
+                    background: visual.background,
+                    border: `1px solid ${visual.border}`,
+                    boxShadow: visual.glow,
+                  }}
+                >
+                  <div
+                    className='absolute inset-x-0 top-0 h-1.5'
+                    style={{ background: visual.rail }}
+                  />
+                  <div
+                    className='pointer-events-none absolute inset-0 opacity-60'
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.24) 0 1px, transparent 1px 22px)',
+                    }}
+                  />
+                  <div className='relative flex items-start justify-between gap-3'>
+                    <div className='min-w-0'>
+                      <div className='flex items-center gap-2 flex-wrap'>
+                        <span
+                          className='rounded-full px-2 py-0.5 text-[10px] font-semibold'
+                          style={{
+                            background: 'rgba(255,255,255,0.72)',
+                            border: `1px solid ${visual.border}`,
+                            color: visual.accent,
+                          }}
+                        >
+                          {visual.code}
+                        </span>
+                        <Text
+                          strong
+                          style={{ display: 'block', color: visual.accent }}
+                        >
+                          {item.quota}
+                        </Text>
+                      </div>
+                      <div
+                        className='mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium'
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.66)',
+                          color: visual.accent,
+                        }}
+                      >
+                        <Sparkles size={12} />
+                        {t(visual.label)}
+                      </div>
                     </div>
-                    <div className='mt-2 text-xs text-[var(--semi-color-text-2)]'>
-                      {item.unitPrice.toFixed(2)} {t('元 / 刀')}
+                    <span
+                      className='shrink-0 rounded-full px-2.5 py-1 text-xs font-medium'
+                      style={{
+                        background: item.isBestValue
+                          ? 'rgba(220, 252, 231, 0.86)'
+                          : 'rgba(255, 255, 255, 0.76)',
+                        border: `1px solid ${visual.border}`,
+                        color: visual.accent,
+                      }}
+                    >
+                      {t(item.badge)}
+                    </span>
+                  </div>
+
+                  <div className='relative mt-5 flex items-end justify-between gap-3'>
+                    <div>
+                      <div
+                        className='text-3xl font-semibold leading-none'
+                        style={{ color: visual.accent }}
+                      >
+                        {item.price}
+                      </div>
+                      <div className='mt-2 text-xs text-[var(--semi-color-text-2)]'>
+                        {item.unitPrice.toFixed(2)} {t('元 / 刀')}
+                      </div>
+                    </div>
+                    <div className='text-right'>
+                      <div className='text-[11px] text-[var(--semi-color-text-2)]'>
+                        {t('性价比')}
+                      </div>
+                      <div
+                        className='mt-2 h-1.5 w-20 overflow-hidden rounded-full bg-white/80'
+                        style={{ border: `1px solid ${visual.border}` }}
+                      >
+                        <div
+                          className='h-full rounded-full'
+                          style={{
+                            width: visual.level,
+                            background: visual.rail,
+                          }}
+                        />
+                      </div>
+                      <div className='mt-2 text-xs font-medium text-[var(--semi-color-text-1)]'>
+                        {item.saveAmount > 0
+                          ? `${t('省')} ${item.saveAmount.toFixed(0)} ${t('元')}`
+                          : t('点火入口')}
+                      </div>
                     </div>
                   </div>
-                  {item.saveAmount > 0 && (
-                    <div className='rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700'>
-                      {t('省')} {item.saveAmount.toFixed(0)} {t('元')}
+
+                  <div className='relative mt-4 rounded-xl bg-white/75 px-3 py-2'>
+                    <div className='flex items-center justify-between gap-3 text-xs'>
+                      <span className='truncate text-[var(--semi-color-text-2)]'>
+                        {t(visual.usage)}
+                      </span>
+                      <span
+                        className='shrink-0 font-semibold'
+                        style={{ color: visual.accent }}
+                      >
+                        {t('钱包扣费')}
+                      </span>
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          <div className='mt-5 rounded-2xl bg-[var(--semi-color-fill-0)] px-4 py-3'>
-            <div className='flex items-center gap-2 text-sm font-medium text-[var(--semi-color-text-0)]'>
-              <Gift size={16} className='text-rose-500' />
-              {t('兑换码与接入支持')}
+          <div
+            className='mt-5 relative overflow-hidden rounded-2xl px-4 py-3'
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(240, 253, 250, 0.96), rgba(255, 255, 255, 1) 60%, rgba(239, 246, 255, 0.9))',
+              border: '1px solid rgba(5, 150, 105, 0.18)',
+            }}
+          >
+            <div
+              className='absolute inset-y-0 left-0 w-1'
+              style={{
+                background:
+                  'linear-gradient(180deg, rgba(5, 150, 105, 0.96), rgba(59, 130, 246, 0.72))',
+              }}
+            />
+            <div className='relative flex items-center gap-2 text-sm font-medium text-[var(--semi-color-text-0)]'>
+              <Gift size={16} className='text-emerald-600' />
+              {t('兑换码补给站')}
             </div>
-            <div className='mt-2 text-xs leading-6 text-[var(--semi-color-text-2)]'>
+            <div className='relative mt-2 text-xs leading-6 text-[var(--semi-color-text-2)]'>
               {t('主推')} {featuredPricingPlan.quota} · {t('单价低至')}{' '}
               {featuredPricingPlan.unitPrice.toFixed(2)} {t('元 / 刀')} ·{' '}
               {t('官网同额')} {featuredPricingPlan.officialPriceLabel}
@@ -323,11 +544,8 @@ const RechargeSupportCard = ({
         </div>
       </Card>
 
-      <Card
-        className='!rounded-2xl shadow-sm h-full'
-        bodyStyle={{ padding: 0 }}
-      >
-        <div className='h-full p-5 flex flex-col'>
+      <Card className='!rounded-2xl shadow-sm' bodyStyle={{ padding: 0 }}>
+        <div className='p-5 flex flex-col'>
           <div className='flex flex-wrap items-start justify-between gap-3'>
             <div className='min-w-0'>
               <div className='flex items-center gap-2 flex-wrap'>
@@ -353,37 +571,54 @@ const RechargeSupportCard = ({
           ) : subscriptionPlanItems.length > 0 ? (
             <>
               <div className='mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2'>
-                {subscriptionPlanItems.map((plan) => {
+                {subscriptionPlanItems.map((plan, index) => {
                   const displayPrice = getPlanPriceLabel(plan);
                   const totalAmount = Number(plan?.total_amount || 0);
                   const limit = Number(plan?.max_purchase_per_user || 0);
                   const isRecommended =
                     (plan?.title || '').trim() === '前进三：巡航';
+                  const visual = getSubscriptionPlanVisual(plan, index);
 
                   return (
                     <div
                       key={plan?.id || plan?.title}
-                      className='rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md'
+                      className='group relative overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5'
                       style={{
-                        background: isRecommended
-                          ? 'linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 1) 58%, rgba(236, 253, 245, 0.92))'
-                          : 'var(--semi-color-fill-0)',
-                        border: isRecommended
-                          ? '1px solid rgba(37, 99, 235, 0.35)'
-                          : '1px solid var(--semi-color-border)',
+                        background: visual.background,
+                        border: `1px solid ${visual.border}`,
+                        boxShadow: visual.glow,
                       }}
                     >
-                      <div className='flex items-start justify-between gap-3'>
+                      <div
+                        className='absolute inset-x-0 top-0 h-1.5'
+                        style={{ background: visual.rail }}
+                      />
+                      <div
+                        className='pointer-events-none absolute inset-0 opacity-60'
+                        style={{
+                          backgroundImage:
+                            'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.26) 0 1px, transparent 1px 24px)',
+                        }}
+                      />
+                      <div className='relative flex items-start justify-between gap-3'>
                         <div className='min-w-0'>
                           <div className='flex items-center gap-2 flex-wrap'>
+                            <span
+                              className='rounded-full px-2 py-0.5 text-[10px] font-semibold'
+                              style={{
+                                background: 'rgba(255,255,255,0.72)',
+                                border: `1px solid ${visual.border}`,
+                                color: visual.accent,
+                              }}
+                            >
+                              {visual.code}
+                            </span>
                             <Text
                               strong
                               ellipsis={{ showTooltip: true }}
                               style={{
                                 display: 'block',
-                                color: isRecommended
-                                  ? 'var(--semi-color-primary)'
-                                  : 'var(--semi-color-text-0)',
+                                color: visual.accent,
                               }}
                             >
                               {plan?.title || t('订阅套餐')}
@@ -399,6 +634,16 @@ const RechargeSupportCard = ({
                               {plan.subtitle}
                             </div>
                           )}
+                          <div
+                            className='mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium'
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.66)',
+                              color: visual.accent,
+                            }}
+                          >
+                            <Sparkles size={12} />
+                            {t(visual.label)}
+                          </div>
                         </div>
                         <div className='shrink-0 text-right'>
                           <div className='text-[11px] text-[var(--semi-color-text-2)]'>
@@ -407,9 +652,7 @@ const RechargeSupportCard = ({
                           <div
                             className='mt-1 text-2xl font-semibold leading-none'
                             style={{
-                              color: isRecommended
-                                ? 'var(--semi-color-primary)'
-                                : 'var(--semi-color-text-0)',
+                              color: visual.accent,
                             }}
                           >
                             {displayPrice}
@@ -417,7 +660,7 @@ const RechargeSupportCard = ({
                         </div>
                       </div>
 
-                      <div className='mt-4 grid grid-cols-2 gap-2'>
+                      <div className='relative mt-4 grid grid-cols-2 gap-2'>
                         <div className='rounded-xl bg-white/80 px-3 py-2'>
                           <div className='flex items-center gap-1 text-[11px] text-[var(--semi-color-text-2)]'>
                             <Gauge size={12} />
@@ -440,17 +683,23 @@ const RechargeSupportCard = ({
                         </div>
                       </div>
 
-                      <div className='mt-3 flex flex-wrap gap-2 text-xs text-[var(--semi-color-text-2)]'>
-                        <span className='inline-flex items-center gap-1'>
-                          <CalendarClock size={12} />
-                          {formatSubscriptionDuration(plan, t)}
-                        </span>
-                        <span className='inline-flex items-center gap-1'>
-                          <CheckCircle2 size={12} />
-                          {limit > 0
-                            ? `${t('每档')} ${limit} ${t('次')}`
-                            : t('不限购')}
-                        </span>
+                      <div className='relative mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--semi-color-text-2)]'>
+                        <div className='flex flex-wrap gap-2'>
+                          <span className='inline-flex items-center gap-1'>
+                            <CalendarClock size={12} />
+                            {formatSubscriptionDuration(plan, t)}
+                          </span>
+                          <span className='inline-flex items-center gap-1'>
+                            <CheckCircle2 size={12} />
+                            {limit > 0
+                              ? `${t('每档')} ${limit} ${t('次')}`
+                              : t('不限购')}
+                          </span>
+                        </div>
+                        <span
+                          className='h-1.5 w-16 rounded-full'
+                          style={{ background: visual.rail }}
+                        />
                       </div>
                     </div>
                   );
