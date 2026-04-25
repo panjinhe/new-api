@@ -90,9 +90,8 @@ const TopUp = () => {
   // 订阅相关
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
-  const [subscriptionCatalogLoading, setSubscriptionCatalogLoading] = useState(
-    subscriptionCatalogEnabled,
-  );
+  const [subscriptionCatalogLoading, setSubscriptionCatalogLoading] =
+    useState(true);
   const [billingPreference, setBillingPreference] =
     useState('subscription_first');
   const [activeSubscriptions, setActiveSubscriptions] = useState([]);
@@ -645,7 +644,7 @@ const TopUp = () => {
                 ? data.waffo_min_topup
                 : enableWaffoPancakeTopUp
                   ? data.waffo_pancake_min_topup
-                : 1;
+                  : 1;
           setEnableOnlineTopUp(enableOnlineTopUp);
           setEnableStripeTopUp(enableStripeTopUp);
           setEnableCreemTopUp(enableCreemTopUp);
@@ -730,14 +729,7 @@ const TopUp = () => {
   useEffect(() => {
     getTopupInfo().then();
     getSubscriptionSelf().then();
-
-    if (subscriptionCatalogEnabled) {
-      getSubscriptionPlans().then();
-      return;
-    }
-
-    setSubscriptionCatalogLoading(false);
-    setSubscriptionPlans([]);
+    getSubscriptionPlans().then();
   }, []);
 
   useEffect(() => {

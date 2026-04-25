@@ -887,7 +887,10 @@ const RechargeCard = ({
         </Form>
       </Card>
 
-      <RechargeSupportCard />
+      <RechargeSupportCard
+        subscriptionPlans={subscriptionPlans}
+        subscriptionPlansLoading={subscriptionCatalogLoading}
+      />
     </Space>
   );
 
