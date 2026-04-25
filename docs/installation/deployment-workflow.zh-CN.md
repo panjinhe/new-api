@@ -341,6 +341,7 @@ cd /opt/new-api/app
 - Nginx 反向代理
 - HTTPS 证书
 - 合适的 `client_max_body_size`
+- 可排查请求大小和上游耗时的 Nginx `access_log` 格式
 
 对应说明见：
 
@@ -351,6 +352,7 @@ cd /opt/new-api/app
 - 如果你的客户端会走 `/v1/responses`，尤其是 Codex Desktop 或 CCSwitch，Nginx 不能保留默认约 `1m` 的请求体限制
 - 否则请求会在反向代理层直接失败，表现为 `413 Payload Too Large`
 - 项目提供的 Nginx 模板已经带了 `client_max_body_size 100m;`，正式上线时建议保留
+- `log_format` 建议按 Nginx 文档写入 `/etc/nginx/nginx.conf` 的 `http {}` 层，便于后续从 access log 直接看到 `req_len`、`content_len` 和上游耗时
 
 ## 线上数据备份
 
@@ -371,7 +373,8 @@ cd /opt/new-api/app
 - PostgreSQL dump（当前默认）
 - `data-prod/` 里的其他文件打包
 - 当前 `.env.prod`
-- 当前 `docker-compose.prod.yml`
+- 当前 `docker-compose.prod.yml` 和 PostgreSQL compose overlay（如果存在）
+- 当前可读取的 Nginx 关键配置，默认写入 `nginx/`
 - 一份元数据说明
 
 备份目录示例：
@@ -379,6 +382,29 @@ cd /opt/new-api/app
 ```text
 backups/prod/20260421-210000/
 ```
+
+Nginx 配置备份默认开启，会尽力保存：
+
+- `/etc/nginx/nginx.conf`
+- `/etc/nginx/sites-available/new-api.conf`
+- `/etc/nginx/sites-enabled/new-api.conf`
+- `nginx -T` 的完整生效配置输出，保存为 `nginx/nginx-T.txt`
+
+如果当前用户没有权限读取某些 Nginx 文件，备份不会因此失败，但 `metadata.txt` 会记录 `nginx_backup_status=partial` 或 `skipped_no_readable_config`。如果某台机器不使用 Nginx，可以显式跳过：
+
+```bash
+BACKUP_NGINX_CONFIG=0 ./backup.sh --env-name prod
+```
+
+迁移到新服务器时，恢复应用配置和数据库后，还要同步检查 Nginx：
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -ksS https://your-domain.example.com/api/status >/dev/null
+tail -n 5 /var/log/nginx/access.log
+```
+
+如果日志里能看到 `req_len=`、`content_len=`、`rt=`、`uht=`、`urt=`，说明排障日志格式也已经恢复。
 
 ## 生产环境自动备份
 

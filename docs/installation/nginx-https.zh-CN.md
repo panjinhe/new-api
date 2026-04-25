@@ -126,6 +126,46 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+## 配置访问日志格式
+
+为了后续排查 `413`、`507`、上游超时和大请求问题，建议把访问日志格式也一并固化。注意：`log_format` 必须写在 Nginx 的 `http {}` 层，通常是 `/etc/nginx/nginx.conf`；不要直接写进 `deploy/nginx/new-api.conf.example` 这种 `server {}` 站点模板，否则部分发行版会在 `nginx -t` 时失败。
+
+推荐在 `/etc/nginx/nginx.conf` 的 `http {}` 内使用：
+
+```nginx
+http {
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent req_len=$request_length content_len=$http_content_length '
+                    'rt=$request_time uct=$upstream_connect_time uht=$upstream_header_time urt=$upstream_response_time '
+                    'upstream="$upstream_addr" "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+}
+```
+
+关键字段含义：
+
+- `req_len`：Nginx 接收到的完整请求长度，包含请求行、请求头和请求体
+- `content_len`：客户端声明的请求体大小，更接近真实 body 大小
+- `rt`：Nginx 视角下的总请求耗时
+- `uct`、`uht`、`urt`：连接上游、等待上游响应头、上游完整响应耗时
+- `upstream`：本次请求实际反代到的上游地址
+
+修改后验证：
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -ksS https://your-domain.example.com/api/status >/dev/null
+tail -n 5 /var/log/nginx/access.log
+```
+
+新日志里应该能看到类似：
+
+```text
+req_len=847827 content_len=846897 rt=10.538 uct=0.001 uht=2.903 urt=10.538 upstream="127.0.0.1:3000"
+```
+
 ## 申请 HTTPS 证书
 
 推荐用 Certbot。

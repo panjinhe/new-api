@@ -6,6 +6,8 @@ ENV_NAME="prod"
 PRINT_PATH=0
 DB_BACKEND=""
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-0}"
+BACKUP_NGINX_CONFIG="${BACKUP_NGINX_CONFIG:-1}"
+NGINX_BACKUP_STATUS="not_run"
 
 usage() {
   cat <<'EOF'
@@ -59,6 +61,15 @@ if [[ ! "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
   echo "Invalid retention days: $RETENTION_DAYS" >&2
   exit 1
 fi
+
+case "$BACKUP_NGINX_CONFIG" in
+  0|1)
+    ;;
+  *)
+    echo "Invalid BACKUP_NGINX_CONFIG: $BACKUP_NGINX_CONFIG (expected 0 or 1)" >&2
+    exit 1
+    ;;
+esac
 
 case "$ENV_NAME" in
   prod)
@@ -159,6 +170,67 @@ copy_postgres_backup() {
   compose_with_files exec -T postgres sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$POSTGRES_DUMP"
 }
 
+copy_nginx_config_backup() {
+  if [[ "$BACKUP_NGINX_CONFIG" != "1" ]]; then
+    NGINX_BACKUP_STATUS="disabled"
+    return
+  fi
+
+  local nginx_backup_dir="$SNAPSHOT_DIR/nginx"
+  local copied=0
+  local missing_or_unreadable=0
+  mkdir -p "$nginx_backup_dir/sites-available" "$nginx_backup_dir/sites-enabled"
+
+  local source_file
+  for source_file in \
+    /etc/nginx/nginx.conf \
+    /etc/nginx/sites-available/new-api.conf \
+    /etc/nginx/sites-enabled/new-api.conf
+  do
+    if [[ ! -e "$source_file" ]]; then
+      missing_or_unreadable=1
+      printf 'missing: %s\n' "$source_file" >> "$nginx_backup_dir/README.txt"
+      continue
+    fi
+
+    if [[ ! -r "$source_file" ]]; then
+      missing_or_unreadable=1
+      printf 'unreadable: %s\n' "$source_file" >> "$nginx_backup_dir/README.txt"
+      continue
+    fi
+
+    local relative_path="${source_file#/etc/nginx/}"
+    local target_file="$nginx_backup_dir/$relative_path"
+    mkdir -p "$(dirname "$target_file")"
+    if cp -a "$source_file" "$target_file"; then
+      copied=1
+    else
+      missing_or_unreadable=1
+      printf 'copy_failed: %s\n' "$source_file" >> "$nginx_backup_dir/README.txt"
+    fi
+  done
+
+  if command -v nginx >/dev/null 2>&1; then
+    if nginx -T > "$nginx_backup_dir/nginx-T.txt" 2> "$nginx_backup_dir/nginx-T.stderr.txt"; then
+      copied=1
+    else
+      missing_or_unreadable=1
+      printf 'nginx -T failed; see nginx-T.stderr.txt\n' >> "$nginx_backup_dir/README.txt"
+    fi
+  else
+    missing_or_unreadable=1
+    printf 'nginx command not found\n' >> "$nginx_backup_dir/README.txt"
+  fi
+
+  if [[ "$copied" -eq 1 && "$missing_or_unreadable" -eq 1 ]]; then
+    NGINX_BACKUP_STATUS="partial"
+  elif [[ "$copied" -eq 1 ]]; then
+    NGINX_BACKUP_STATUS="saved"
+  else
+    NGINX_BACKUP_STATUS="skipped_no_readable_config"
+  fi
+}
+
 cleanup_old_backups() {
   if [[ "$RETENTION_DAYS" -le 0 ]]; then
     return
@@ -197,12 +269,20 @@ if [[ -f "$COMPOSE_FILE" ]]; then
   cp "$COMPOSE_FILE" "$SNAPSHOT_DIR/$(basename "$COMPOSE_FILE")"
 fi
 
+if [[ -f "$POSTGRES_COMPOSE_FILE" ]]; then
+  cp "$POSTGRES_COMPOSE_FILE" "$SNAPSHOT_DIR/$(basename "$POSTGRES_COMPOSE_FILE")"
+fi
+
+copy_nginx_config_backup
+
 {
   echo "env_name=$ENV_NAME"
   echo "created_at=$(date -Iseconds)"
   echo "hostname=$(hostname)"
   echo "db_backend=$DB_BACKEND"
   echo "retention_days=$RETENTION_DAYS"
+  echo "nginx_backup_enabled=$BACKUP_NGINX_CONFIG"
+  echo "nginx_backup_status=$NGINX_BACKUP_STATUS"
   echo "data_dir=$DATA_DIR"
   echo "sqlite_source=$SQLITE_SOURCE"
   if command -v git >/dev/null 2>&1 && git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
