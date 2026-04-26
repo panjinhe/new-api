@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -25,6 +26,28 @@ type SubscriptionUsageDaily struct {
 	RequestCount       int   `json:"request_count" gorm:"type:int;not null;default:0"`
 	CreatedAt          int64 `json:"created_at" gorm:"bigint"`
 	UpdatedAt          int64 `json:"updated_at" gorm:"bigint"`
+}
+
+var ensureSubscriptionUsageDailyTableMu sync.Mutex
+var ensureSubscriptionUsageDailyTableDone bool
+
+func EnsureSubscriptionUsageDailyTable() error {
+	if ensureSubscriptionUsageDailyTableDone {
+		return nil
+	}
+	ensureSubscriptionUsageDailyTableMu.Lock()
+	defer ensureSubscriptionUsageDailyTableMu.Unlock()
+	if ensureSubscriptionUsageDailyTableDone {
+		return nil
+	}
+	if DB == nil {
+		return errors.New("database is not initialized")
+	}
+	if err := DB.AutoMigrate(&SubscriptionUsageDaily{}); err != nil {
+		return err
+	}
+	ensureSubscriptionUsageDailyTableDone = true
+	return nil
 }
 
 func (u *SubscriptionUsageDaily) BeforeCreate(tx *gorm.DB) error {
@@ -158,6 +181,9 @@ func normalizeAdminUserSubscriptionSummaryQuery(query AdminUserSubscriptionSumma
 
 func ListAdminUserSubscriptionSummaries(query AdminUserSubscriptionSummaryQuery) ([]AdminUserSubscriptionSummaryItem, int64, error) {
 	query = normalizeAdminUserSubscriptionSummaryQuery(query)
+	if err := EnsureSubscriptionUsageDailyTable(); err != nil {
+		return nil, 0, err
+	}
 
 	userQuery := DB.Unscoped().Model(&User{})
 	if query.Keyword != "" {
