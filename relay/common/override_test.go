@@ -1258,6 +1258,35 @@ func TestApplyParamOverrideConditionFromRetryAndLastErrorContext(t *testing.T) {
 	assertJSONEqual(t, `{"temperature":0.1}`, string(out))
 }
 
+func TestBuildParamOverrideContextIncludesAttemptRetryFields(t *testing.T) {
+	info := &RelayInfo{
+		RetryIndex:            0,
+		AttemptIndex:          1,
+		SameChannelRetryIndex: 1,
+	}
+
+	ctx := BuildParamOverrideContext(info)
+	if isRetry, ok := ctx["is_retry"].(bool); !ok || !isRetry {
+		t.Fatalf("expected top-level is_retry to be true, got %#v", ctx["is_retry"])
+	}
+	retry, ok := ctx["retry"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected retry context map, got %#v", ctx["retry"])
+	}
+	if retry["index"] != 0 {
+		t.Fatalf("expected retry.index to preserve cross-channel retry index, got %#v", retry["index"])
+	}
+	if retry["attempt_index"] != 1 {
+		t.Fatalf("expected retry.attempt_index to be 1, got %#v", retry["attempt_index"])
+	}
+	if retry["same_channel_index"] != 1 {
+		t.Fatalf("expected retry.same_channel_index to be 1, got %#v", retry["same_channel_index"])
+	}
+	if isRetry, ok := retry["is_retry"].(bool); !ok || !isRetry {
+		t.Fatalf("expected retry.is_retry to be true, got %#v", retry["is_retry"])
+	}
+}
+
 func TestApplyParamOverrideConditionFromRequestHeaders(t *testing.T) {
 	input := []byte(`{"temperature":0.7}`)
 	override := map[string]interface{}{

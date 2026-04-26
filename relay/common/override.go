@@ -2027,11 +2027,14 @@ func BuildParamOverrideContext(info *RelayInfo) map[string]interface{} {
 	headerOverrideSource := GetEffectiveHeaderOverride(info)
 	ctx[paramOverrideContextHeaderOverride] = sanitizeHeaderOverrideMap(headerOverrideSource)
 
+	isRetry := info.AttemptIndex > 0 || info.RetryIndex > 0
 	ctx["retry_index"] = info.RetryIndex
-	ctx["is_retry"] = info.RetryIndex > 0
+	ctx["is_retry"] = isRetry
 	ctx["retry"] = map[string]interface{}{
-		"index":    info.RetryIndex,
-		"is_retry": info.RetryIndex > 0,
+		"index":              info.RetryIndex,
+		"is_retry":           isRetry,
+		"attempt_index":      info.AttemptIndex,
+		"same_channel_index": info.SameChannelRetryIndex,
 	}
 
 	if info.LastError != nil {
