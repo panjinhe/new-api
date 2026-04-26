@@ -239,6 +239,33 @@ export function date2StartOfDayTimestamp(value) {
   );
 }
 
+export function date2FutureStartOfDayTimestamp(value, days) {
+  if (!value) {
+    return 0;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  const parsedDays = Number(days);
+  if (Number.isNaN(date.getTime()) || !Number.isFinite(parsedDays)) {
+    return 0;
+  }
+  return date2StartOfDayTimestamp(
+    new Date(date.getFullYear(), date.getMonth(), date.getDate() + parsedDays),
+  );
+}
+
+export function timestamp2PastDate(timestamp, days) {
+  const date = timestamp2Date(timestamp);
+  const parsedDays = Number(days);
+  if (!date || !Number.isFinite(parsedDays)) {
+    return null;
+  }
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() - parsedDays,
+  );
+}
+
 export function timestamp2string1(
   timestamp,
   dataExportDefaultTime = 'hour',

@@ -31,10 +31,12 @@ import {
   Tooltip,
 } from '@douyinfe/semi-ui';
 import {
+  date2FutureStartOfDayTimestamp,
   date2StartOfDayTimestamp,
   formatDateString,
   timestamp2string,
   timestamp2Date,
+  timestamp2PastDate,
   renderGroup,
   renderQuota,
   getChannelIcon,
@@ -55,6 +57,8 @@ import {
 } from '@douyinfe/semi-icons';
 import { FaRandom } from 'react-icons/fa';
 import { clampPercent, CODEX_CHANNEL_TYPE } from './codexUsageUtils';
+
+const CODEX_ACCOUNT_VALID_DAYS = 30;
 
 // Render functions
 const renderType = (type, record = {}, t) => {
@@ -428,20 +432,31 @@ const renderCodexAccountExpiry = (record, manageChannel, t) => {
   }
 
   const timestamp = Number(record.account_expired_time || 0);
-  const dateValue = timestamp2Date(timestamp);
+  const stockInDateValue = timestamp2PastDate(
+    timestamp,
+    CODEX_ACCOUNT_VALID_DAYS,
+  );
+  const expiredDateValue = timestamp2Date(timestamp);
   const todayStart = date2StartOfDayTimestamp(new Date());
   const isExpired = timestamp > 0 && timestamp < todayStart;
-  const dateText = dateValue ? formatDateString(dateValue) : t('未设置');
+  const stockInDateText = stockInDateValue
+    ? formatDateString(stockInDateValue)
+    : t('未设置');
+  const expiredDateText = expiredDateValue
+    ? formatDateString(expiredDateValue)
+    : t('未设置');
 
   return (
     <div className='min-w-[168px]' onClick={(event) => event.stopPropagation()}>
       <Space spacing={4} align='center' wrap>
-        <Tooltip content={`${t('账号到期日')}: ${dateText}`}>
+        <Tooltip
+          content={`${t('账号入库日期')}: ${stockInDateText}; ${t('账号到期日')}: ${expiredDateText}`}
+        >
           <DatePicker
             type='date'
             size='small'
-            value={dateValue}
-            placeholder={t('未设置')}
+            value={stockInDateValue}
+            placeholder={t('账号入库日期')}
             showClear
             style={{ width: 126 }}
             onChange={(date) => {
@@ -449,7 +464,7 @@ const renderCodexAccountExpiry = (record, manageChannel, t) => {
                 record.id,
                 'account_expired_time',
                 record,
-                date2StartOfDayTimestamp(date),
+                date2FutureStartOfDayTimestamp(date, CODEX_ACCOUNT_VALID_DAYS),
               );
             }}
           />
@@ -795,7 +810,7 @@ export const getChannelsColumns = ({
     },
     {
       key: COLUMN_KEYS.CODEX_ACCOUNT_EXPIRES,
-      title: t('账号到期'),
+      title: t('账号入库'),
       dataIndex: 'account_expired_time',
       render: (text, record) =>
         renderCodexAccountExpiry(record, manageChannel, t),

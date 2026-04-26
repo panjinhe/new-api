@@ -21,11 +21,11 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   API,
-  date2StartOfDayTimestamp,
+  date2FutureStartOfDayTimestamp,
   showError,
   showInfo,
   showSuccess,
-  timestamp2Date,
+  timestamp2PastDate,
   verifyJSON,
 } from '../../../../helpers';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
@@ -107,6 +107,7 @@ const REGION_EXAMPLE = {
   'gemini-1.5-flash-002': 'europe-west2',
   'claude-3-5-sonnet-20240620': 'europe-west1',
 };
+const CODEX_ACCOUNT_VALID_DAYS = 30;
 const UPSTREAM_DETECTED_MODEL_PREVIEW_LIMIT = 8;
 const ADVANCED_SETTINGS_EXPANDED_KEY = 'channel-advanced-settings-expanded';
 
@@ -960,7 +961,10 @@ const EditChannelModal = (props) => {
       ) {
         data.base_url = 'https://ark.cn-beijing.volces.com';
       }
-      data.account_expired_time = timestamp2Date(data.account_expired_time);
+      data.account_expired_time = timestamp2PastDate(
+        data.account_expired_time,
+        CODEX_ACCOUNT_VALID_DAYS,
+      );
 
       initialBaseUrlRef.current = data.base_url || '';
       setInputs(data);
@@ -1577,8 +1581,9 @@ const EditChannelModal = (props) => {
           return;
         }
       }
-      localInputs.account_expired_time = date2StartOfDayTimestamp(
+      localInputs.account_expired_time = date2FutureStartOfDayTimestamp(
         localInputs.account_expired_time,
+        CODEX_ACCOUNT_VALID_DAYS,
       );
     } else {
       delete localInputs.account_expired_time;
@@ -2898,16 +2903,16 @@ const EditChannelModal = (props) => {
                       {inputs.type === 57 && (
                         <Form.DatePicker
                           field='account_expired_time'
-                          label={t('账号到期日')}
+                          label={t('账号入库日期')}
                           type='date'
-                          placeholder={t('选择账号到期日（可选）')}
+                          placeholder={t('选择账号入库日期（可选）')}
                           style={{ width: '100%' }}
                           showClear
                           onChange={(value) =>
                             handleInputChange('account_expired_time', value)
                           }
                           extraText={t(
-                            '用于记录 Codex 账号套餐到期日，仅用于后台查看和管理',
+                            '保存时自动按入库日期 + 30 天计算账号到期日，仅用于后台查看和管理',
                           )}
                         />
                       )}
