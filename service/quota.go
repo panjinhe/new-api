@@ -24,6 +24,14 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const (
+	quotaNotifyTaobaoURL      = "https://e.tb.cn/h.iGzXwvjipkLshGb?tk=WwFJ5jHHuZi"
+	quotaNotifyTaobaoCommand  = "WwFJ5jHHuZi HU287"
+	quotaNotifyTaobaoTitle    = "Codex Pro满血AI编程 订阅套餐接入配置服务"
+	quotaNotifySupportQQGroup = "217637139"
+	quotaNotifyPromoImagePath = "/codex-pro-taobao.jpg"
+)
+
 type TokenDetails struct {
 	TextTokens  int
 	AudioTokens int
@@ -410,6 +418,48 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 	return nil
 }
 
+func buildQuotaPublicURL(path string) string {
+	base := strings.TrimRight(system_setting.ServerAddress, "/")
+	if base == "" {
+		return path
+	}
+	return base + path
+}
+
+func buildQuotaNotifyContent(prompt string, remainingQuota int, notifyType string) string {
+	remainingText := logger.FormatQuota(remainingQuota)
+	switch notifyType {
+	case dto.NotifyTypeBark:
+		return fmt.Sprintf("%s，剩余额度：%s，请及时充值。淘宝充值（复制链接打开淘宝）：%s；口令：%s；搜索：%s；技术支持QQ群：%s",
+			prompt, remainingText, quotaNotifyTaobaoURL, quotaNotifyTaobaoCommand, quotaNotifyTaobaoTitle, quotaNotifySupportQQGroup)
+	case dto.NotifyTypeGotify:
+		return fmt.Sprintf("%s，当前剩余额度为 %s，请及时充值。淘宝充值（复制链接打开淘宝）：%s；口令：%s；搜索：%s；技术支持QQ群：%s",
+			prompt, remainingText, quotaNotifyTaobaoURL, quotaNotifyTaobaoCommand, quotaNotifyTaobaoTitle, quotaNotifySupportQQGroup)
+	default:
+		topUpLink := buildQuotaPublicURL("/console/topup")
+		promoImageURL := buildQuotaPublicURL(quotaNotifyPromoImagePath)
+		return fmt.Sprintf(
+			"%s，当前剩余额度为 %s，为了不影响您的使用，请及时充值。<br/>"+
+				"站内充值链接：<a href='%s'>%s</a><br/>"+
+				"淘宝充值（复制链接打开淘宝）：<a href='%s'>%s</a><br/>"+
+				"淘宝口令：%s<br/>"+
+				"打开方式：点击链接直接打开，或者在淘宝搜索商品标题。<br/>"+
+				"技术支持 QQ 群：%s<br/>"+
+				"<img src='%s' alt='%s' style='display:block;max-width:420px;width:100%%;height:auto;margin-top:12px;border-radius:8px;'/>",
+			prompt,
+			remainingText,
+			topUpLink,
+			topUpLink,
+			quotaNotifyTaobaoURL,
+			quotaNotifyTaobaoURL,
+			quotaNotifyTaobaoCommand,
+			quotaNotifySupportQQGroup,
+			promoImageURL,
+			quotaNotifyTaobaoTitle,
+		)
+	}
+}
+
 func checkAndSendQuotaNotify(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int) {
 	gopool.Go(func() {
 		userSetting := relayInfo.UserSetting
@@ -421,36 +471,21 @@ func checkAndSendQuotaNotify(relayInfo *relaycommon.RelayInfo, quota int, preCon
 		//noMoreQuota := userCache.Quota-(quota+preConsumedQuota) <= 0
 		quotaTooLow := false
 		consumeQuota := quota + preConsumedQuota
-		if relayInfo.UserQuota-consumeQuota < threshold {
+		remainingQuota := relayInfo.UserQuota - consumeQuota
+		if remainingQuota < threshold {
 			quotaTooLow = true
 		}
 		if quotaTooLow {
 			prompt := "您的额度即将用尽"
-			topUpLink := fmt.Sprintf("%s/console/topup", system_setting.ServerAddress)
-
-			// 根据通知方式生成不同的内容格式
-			var content string
-			var values []interface{}
 
 			notifyType := userSetting.NotifyType
 			if notifyType == "" {
 				notifyType = dto.NotifyTypeEmail
 			}
 
-			if notifyType == dto.NotifyTypeBark {
-				// Bark推送使用简短文本，不支持HTML
-				content = "{{value}}，剩余额度：{{value}}，请及时充值"
-				values = []interface{}{prompt, logger.FormatQuota(relayInfo.UserQuota)}
-			} else if notifyType == dto.NotifyTypeGotify {
-				content = "{{value}}，当前剩余额度为 {{value}}，请及时充值。"
-				values = []interface{}{prompt, logger.FormatQuota(relayInfo.UserQuota)}
-			} else {
-				// 默认内容格式，适用于Email和Webhook（支持HTML）
-				content = "{{value}}，当前剩余额度为 {{value}}，为了不影响您的使用，请及时充值。<br/>充值链接：<a href='{{value}}'>{{value}}</a>"
-				values = []interface{}{prompt, logger.FormatQuota(relayInfo.UserQuota), topUpLink, topUpLink}
-			}
+			content := buildQuotaNotifyContent(prompt, remainingQuota, notifyType)
 
-			err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values))
+			err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, nil))
 			if err != nil {
 				common.SysError(fmt.Sprintf("failed to send quota notify to user %d: %s", relayInfo.UserId, err.Error()))
 			}
@@ -480,27 +515,15 @@ func checkAndSendSubscriptionQuotaNotify(relayInfo *relaycommon.RelayInfo) {
 		}
 
 		prompt := "您的订阅额度即将用尽"
-		topUpLink := fmt.Sprintf("%s/console/topup", system_setting.ServerAddress)
 
-		var content string
-		var values []interface{}
 		notifyType := userSetting.NotifyType
 		if notifyType == "" {
 			notifyType = dto.NotifyTypeEmail
 		}
 
-		if notifyType == dto.NotifyTypeBark {
-			content = "{{value}}，剩余额度：{{value}}，请及时充值"
-			values = []interface{}{prompt, logger.FormatQuota(int(remaining))}
-		} else if notifyType == dto.NotifyTypeGotify {
-			content = "{{value}}，当前剩余额度为 {{value}}，请及时充值。"
-			values = []interface{}{prompt, logger.FormatQuota(int(remaining))}
-		} else {
-			content = "{{value}}，当前剩余额度为 {{value}}，为了不影响您的使用，请及时充值。<br/>充值链接：<a href='{{value}}'>{{value}}</a>"
-			values = []interface{}{prompt, logger.FormatQuota(int(remaining)), topUpLink, topUpLink}
-		}
+		content := buildQuotaNotifyContent(prompt, int(remaining), notifyType)
 
-		if err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values)); err != nil {
+		if err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, nil)); err != nil {
 			common.SysError(fmt.Sprintf("failed to send subscription quota notify to user %d: %s", relayInfo.UserId, err.Error()))
 		}
 	})
