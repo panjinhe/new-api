@@ -130,3 +130,12 @@ For request structs that are parsed from client JSON and then re-marshaled to up
   - field absent in client JSON => `nil` => omitted on marshal;
   - field explicitly set to zero/false => non-`nil` pointer => must still be sent upstream.
 - Avoid using non-pointer scalars with `omitempty` for optional request parameters, because zero values (`0`, `0.0`, `false`) will be silently dropped during marshal.
+
+### Rule 7: Production Checks — Default to Server Data
+
+When the user asks to check real users, subscriptions, orders, quotas, billing, channels, production health, or whether a customer can actually use the service, you MUST default to the production server/database, not the local workspace database or local Docker containers.
+
+- Use the server connection documented in `ops/ssh/config.local` / `ops/server.local.toml` and the production app directory there (currently `/opt/new-api/app`) unless the user explicitly asks for local/dev data.
+- Prefer checking the running production containers and PostgreSQL database directly, for example via `ssh -F ops/ssh/config.local aheapi-prod` and `docker exec new-api-postgres psql -U newapi -d newapi`.
+- Local files such as `.env.prod`, `postgres-prod/`, `data-prod/`, local Docker containers, and local snapshots are only references or fallbacks. Do NOT present local database results as production truth.
+- If production access fails, clearly say that the server check could not be completed and separate any local/snapshot findings from real server findings.
