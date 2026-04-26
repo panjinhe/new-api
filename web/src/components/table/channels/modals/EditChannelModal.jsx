@@ -21,9 +21,11 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   API,
+  date2StartOfDayTimestamp,
   showError,
   showInfo,
   showSuccess,
+  timestamp2Date,
   verifyJSON,
 } from '../../../../helpers';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
@@ -175,6 +177,7 @@ const EditChannelModal = (props) => {
   const originInputs = {
     name: '',
     type: 1,
+    account_expired_time: null,
     key: '',
     openai_organization: '',
     max_input_tokens: 0,
@@ -957,6 +960,7 @@ const EditChannelModal = (props) => {
       ) {
         data.base_url = 'https://ark.cn-beijing.volces.com';
       }
+      data.account_expired_time = timestamp2Date(data.account_expired_time);
 
       initialBaseUrlRef.current = data.base_url || '';
       setInputs(data);
@@ -1573,6 +1577,11 @@ const EditChannelModal = (props) => {
           return;
         }
       }
+      localInputs.account_expired_time = date2StartOfDayTimestamp(
+        localInputs.account_expired_time,
+      );
+    } else {
+      delete localInputs.account_expired_time;
     }
 
     if (localInputs.type === 41) {
@@ -2885,6 +2894,23 @@ const EditChannelModal = (props) => {
                         onChange={(value) => handleInputChange('name', value)}
                         autoComplete='new-password'
                       />
+
+                      {inputs.type === 57 && (
+                        <Form.DatePicker
+                          field='account_expired_time'
+                          label={t('账号到期日')}
+                          type='date'
+                          placeholder={t('选择账号到期日（可选）')}
+                          style={{ width: '100%' }}
+                          showClear
+                          onChange={(value) =>
+                            handleInputChange('account_expired_time', value)
+                          }
+                          extraText={t(
+                            '用于记录 Codex 账号套餐到期日，仅用于后台查看和管理',
+                          )}
+                        />
+                      )}
 
                       {inputs.type === 33 && (
                         <>

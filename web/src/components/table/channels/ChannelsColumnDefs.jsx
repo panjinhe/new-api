@@ -20,6 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import React from 'react';
 import {
   Button,
+  DatePicker,
   Dropdown,
   InputNumber,
   Modal,
@@ -30,7 +31,10 @@ import {
   Tooltip,
 } from '@douyinfe/semi-ui';
 import {
+  date2StartOfDayTimestamp,
+  formatDateString,
   timestamp2string,
+  timestamp2Date,
   renderGroup,
   renderQuota,
   getChannelIcon,
@@ -418,6 +422,48 @@ const renderCodexWindowUsage = (record, field, updateChannelBalance, t) => {
   );
 };
 
+const renderCodexAccountExpiry = (record, manageChannel, t) => {
+  if (record.children !== undefined || record.type !== CODEX_CHANNEL_TYPE) {
+    return '-';
+  }
+
+  const timestamp = Number(record.account_expired_time || 0);
+  const dateValue = timestamp2Date(timestamp);
+  const todayStart = date2StartOfDayTimestamp(new Date());
+  const isExpired = timestamp > 0 && timestamp < todayStart;
+  const dateText = dateValue ? formatDateString(dateValue) : t('未设置');
+
+  return (
+    <div className='min-w-[168px]' onClick={(event) => event.stopPropagation()}>
+      <Space spacing={4} align='center' wrap>
+        <Tooltip content={`${t('账号到期日')}: ${dateText}`}>
+          <DatePicker
+            type='date'
+            size='small'
+            value={dateValue}
+            placeholder={t('未设置')}
+            showClear
+            style={{ width: 126 }}
+            onChange={(date) => {
+              manageChannel(
+                record.id,
+                'account_expired_time',
+                record,
+                date2StartOfDayTimestamp(date),
+              );
+            }}
+          />
+        </Tooltip>
+        {isExpired ? (
+          <Tag color='red' shape='circle' size='small'>
+            {t('已过期')}
+          </Tag>
+        ) : null}
+      </Space>
+    </div>
+  );
+};
+
 const isRequestPassThroughEnabled = (record) => {
   if (!record || record.children !== undefined) {
     return false;
@@ -746,6 +792,13 @@ export const getChannelsColumns = ({
           updateChannelBalance,
           t,
         ),
+    },
+    {
+      key: COLUMN_KEYS.CODEX_ACCOUNT_EXPIRES,
+      title: t('账号到期'),
+      dataIndex: 'account_expired_time',
+      render: (text, record) =>
+        renderCodexAccountExpiry(record, manageChannel, t),
     },
     {
       key: COLUMN_KEYS.PRIORITY,

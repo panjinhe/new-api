@@ -150,6 +150,7 @@ export const useChannelsData = () => {
     BALANCE: 'balance',
     CODEX_FIVE_HOUR: 'codex_five_hour',
     CODEX_WEEKLY: 'codex_weekly',
+    CODEX_ACCOUNT_EXPIRES: 'codex_account_expires',
     PRIORITY: 'priority',
     WEIGHT: 'weight',
     OPERATE: 'operate',
@@ -192,6 +193,7 @@ export const useChannelsData = () => {
       [COLUMN_KEYS.BALANCE]: true,
       [COLUMN_KEYS.CODEX_FIVE_HOUR]: true,
       [COLUMN_KEYS.CODEX_WEEKLY]: true,
+      [COLUMN_KEYS.CODEX_ACCOUNT_EXPIRES]: true,
       [COLUMN_KEYS.PRIORITY]: true,
       [COLUMN_KEYS.WEIGHT]: true,
       [COLUMN_KEYS.OPERATE]: true,
@@ -358,13 +360,13 @@ export const useChannelsData = () => {
     const request = API.get(`/api/channel/${channelId}/codex/usage`, {
       skipErrorHandler: true,
     })
-      .then((res) => res?.data ?? { success: false, message: t('获取用量失败') })
+      .then(
+        (res) => res?.data ?? { success: false, message: t('获取用量失败') },
+      )
       .catch((error) => ({
         success: false,
         message:
-          error?.response?.data?.message ||
-          error?.message ||
-          t('获取用量失败'),
+          error?.response?.data?.message || error?.message || t('获取用量失败'),
       }))
       .finally(() => {
         codexUsageInflightRef.current.delete(channelId);
@@ -569,6 +571,10 @@ export const useChannelsData = () => {
         if (data.weight < 0) data.weight = 0;
         res = await API.put('/api/channel/', data);
         break;
+      case 'account_expired_time':
+        data.account_expired_time = parseInt(value) || 0;
+        res = await API.put('/api/channel/', data);
+        break;
       case 'enable_all':
         data.channel_info = record.channel_info;
         data.channel_info.multi_key_status_list = {};
@@ -582,6 +588,9 @@ export const useChannelsData = () => {
       let newChannels = [...channels];
       if (action !== 'delete') {
         record.status = channel.status;
+      }
+      if (action === 'account_expired_time') {
+        record.account_expired_time = channel.account_expired_time || 0;
       }
       setChannels(newChannels);
     } else {
@@ -961,7 +970,9 @@ export const useChannelsData = () => {
       openCodexUsageModal({
         t,
         record,
-        payload: hasFreshPayload ? record?.codex_usage?.payload ?? null : null,
+        payload: hasFreshPayload
+          ? (record?.codex_usage?.payload ?? null)
+          : null,
         onFetchStart: () => {
           if (recordId) {
             markCodexUsageLoading(recordId);
