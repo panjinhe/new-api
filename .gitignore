@@ -34,7 +34,6 @@ plans
 output/
 taobao_assets/
 new-api-linux*
-头像001.jpg
 
 electron/node_modules
 electron/dist
