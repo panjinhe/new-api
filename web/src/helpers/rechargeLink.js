@@ -17,17 +17,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-export * from './history';
-export * from './auth';
-export * from './utils';
-export * from './base64';
-export * from './api';
-export * from './render';
-export * from './log';
-export * from './data';
-export * from './token';
-export * from './boolean';
-export * from './dashboard';
-export * from './passkey';
-export * from './statusCodeRules';
-export * from './rechargeLink';
+export const DEFAULT_RECHARGE_LINK =
+  'https://item.taobao.com/item.htm?id=1045334787699&spm=a213gs.v2success.0.0.24244831C2XbNf';
+
+export const getRechargeLink = (topUpLink = '') => {
+  if (typeof topUpLink !== 'string') {
+    return DEFAULT_RECHARGE_LINK;
+  }
+
+  return topUpLink.trim() || DEFAULT_RECHARGE_LINK;
+};
+
+export const openRechargeLink = (topUpLink = '') => {
+  if (typeof window === 'undefined') return;
+  window.open(getRechargeLink(topUpLink), '_blank', 'noopener,noreferrer');
+};

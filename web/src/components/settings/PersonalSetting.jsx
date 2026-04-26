@@ -590,6 +590,7 @@ const PersonalSetting = () => {
               <RechargeSupportCard
                 compact
                 onGoTopup={() => navigate('/console/topup')}
+                topUpLink={status?.top_up_link}
               />
             </div>
 

@@ -28,10 +28,10 @@ import {
   Divider,
   Tooltip,
 } from '@douyinfe/semi-ui';
-import { Crown, CalendarClock, Package } from 'lucide-react';
+import { Crown, CalendarClock, ExternalLink, Package } from 'lucide-react';
 import { SiStripe } from 'react-icons/si';
 import { IconCreditCard } from '@douyinfe/semi-icons';
-import { renderQuota } from '../../../helpers';
+import { openRechargeLink, renderQuota } from '../../../helpers';
 import { getCurrencyConfig } from '../../../helpers/render';
 import {
   formatSubscriptionDuration,
@@ -56,6 +56,7 @@ const SubscriptionPurchaseModal = ({
   onPayStripe,
   onPayCreem,
   onPayEpay,
+  topUpLink = '',
 }) => {
   const plan = selectedPlan?.plan;
   const totalAmount = Number(plan?.total_amount || 0);
@@ -241,14 +242,37 @@ const SubscriptionPurchaseModal = ({
                   </Button>
                 </div>
               )}
+
+              <Button
+                theme='solid'
+                type='warning'
+                block
+                icon={<ExternalLink size={14} />}
+                onClick={() => openRechargeLink(topUpLink)}
+              >
+                {t('淘宝购买月卡')}
+              </Button>
             </div>
           ) : (
-            <Banner
-              type='info'
-              description={t('管理员未开启在线支付功能，请联系管理员配置。')}
-              className='!rounded-xl'
-              closeIcon={null}
-            />
+            <div className='space-y-3'>
+              <Banner
+                type='info'
+                description={t(
+                  '可通过淘宝购买月卡或兑换码，客服会按订单处理。',
+                )}
+                className='!rounded-xl'
+                closeIcon={null}
+              />
+              <Button
+                theme='solid'
+                type='warning'
+                block
+                icon={<ExternalLink size={14} />}
+                onClick={() => openRechargeLink(topUpLink)}
+              >
+                {t('淘宝购买月卡')}
+              </Button>
+            </div>
           )}
         </div>
       ) : null}

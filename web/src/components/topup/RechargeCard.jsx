@@ -888,6 +888,7 @@ const RechargeCard = ({
       </Card>
 
       <RechargeSupportCard
+        topUpLink={topUpLink}
         subscriptionPlans={subscriptionPlans}
         subscriptionPlansLoading={subscriptionCatalogLoading}
       />
@@ -968,6 +969,7 @@ const RechargeCard = ({
                 enableStripeTopUp={enableStripeTopUp}
                 enableCreemTopUp={enableCreemTopUp}
                 allSubscriptions={allSubscriptions}
+                topUpLink={topUpLink}
               />
             </div>
           </TabPane>

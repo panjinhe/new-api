@@ -21,7 +21,7 @@ import {
   Sparkles,
   Wallet,
 } from 'lucide-react';
-import { renderQuota } from '../../helpers';
+import { openRechargeLink, renderQuota } from '../../helpers';
 import {
   formatSubscriptionDuration,
   formatSubscriptionResetPeriod,
@@ -236,6 +236,7 @@ const getPlanResetLabel = (plan, t) => {
 const RechargeSupportCard = ({
   compact = false,
   onGoTopup,
+  topUpLink = '',
   subscriptionPlans = [],
   subscriptionPlansLoading = false,
 }) => {
@@ -243,6 +244,7 @@ const RechargeSupportCard = ({
   const openOfficialSite = () => {
     window.open(OFFICIAL_SITE, '_blank', 'noopener,noreferrer');
   };
+  const handleOpenRechargeLink = () => openRechargeLink(topUpLink);
   const officialUsdRate = getOfficialUsdRate();
   const pricingPlans = buildPricingPlans(officialUsdRate);
   const bestUnitPrice = Math.min(...pricingPlans.map((item) => item.unitPrice));
@@ -310,7 +312,7 @@ const RechargeSupportCard = ({
               {QQ_GROUP}
             </div>
             <div className='mt-1 text-xs text-[var(--semi-color-text-2)]'>
-              {t('新客首单额外赠送 20 刀额度，购买兑换码可私聊客服。')}
+              {t('兑换码和月卡都可通过淘宝购买，也可私聊客服确认。')}
             </div>
           </div>
           <Space wrap>
@@ -321,6 +323,14 @@ const RechargeSupportCard = ({
               onClick={onGoTopup}
             >
               {t('去钱包管理')}
+            </Button>
+            <Button
+              theme='solid'
+              type='warning'
+              icon={<ExternalLink size={14} />}
+              onClick={handleOpenRechargeLink}
+            >
+              {t('淘宝购买')}
             </Button>
             <Button
               theme='outline'
@@ -353,14 +363,24 @@ const RechargeSupportCard = ({
                 {t('按量扣费，使用钱包余额；余额不足时用兑换码补充。')}
               </div>
             </div>
-            <Button
-              theme='outline'
-              type='tertiary'
-              icon={<ExternalLink size={14} />}
-              onClick={openOfficialSite}
-            >
-              {t('官网')}
-            </Button>
+            <Space wrap>
+              <Button
+                theme='solid'
+                type='warning'
+                icon={<ExternalLink size={14} />}
+                onClick={handleOpenRechargeLink}
+              >
+                {t('淘宝购买')}
+              </Button>
+              <Button
+                theme='outline'
+                type='tertiary'
+                icon={<ExternalLink size={14} />}
+                onClick={openOfficialSite}
+              >
+                {t('官网')}
+              </Button>
+            </Space>
           </div>
 
           <div className='mt-4 flex flex-wrap gap-2'>
@@ -526,6 +546,17 @@ const RechargeSupportCard = ({
               {t('主推')} {featuredPricingPlan.quota} · {t('单价低至')}{' '}
               {featuredPricingPlan.unitPrice.toFixed(2)} {t('元 / 刀')} ·{' '}
               {t('官网同额')} {featuredPricingPlan.officialPriceLabel}
+            </div>
+            <div className='relative mt-3'>
+              <Button
+                size='small'
+                theme='solid'
+                type='warning'
+                icon={<ExternalLink size={14} />}
+                onClick={handleOpenRechargeLink}
+              >
+                {t('购买兑换码')}
+              </Button>
             </div>
           </div>
 
@@ -734,15 +765,25 @@ const RechargeSupportCard = ({
                   {t('进群发送套餐名，客服按对应月卡处理。')}
                 </div>
               </div>
-              <Paragraph
-                copyable={{ content: QQ_GROUP }}
-                className='!mb-0 !mt-0'
-              >
-                <span className='text-sm font-medium text-sky-800'>
-                  {t('Q群：')}
-                  {QQ_GROUP}
-                </span>
-              </Paragraph>
+              <Space wrap>
+                <Button
+                  theme='solid'
+                  type='warning'
+                  icon={<ExternalLink size={14} />}
+                  onClick={handleOpenRechargeLink}
+                >
+                  {t('淘宝购买月卡')}
+                </Button>
+                <Paragraph
+                  copyable={{ content: QQ_GROUP }}
+                  className='!mb-0 !mt-0'
+                >
+                  <span className='text-sm font-medium text-sky-800'>
+                    {t('Q群：')}
+                    {QQ_GROUP}
+                  </span>
+                </Paragraph>
+              </Space>
             </div>
           </div>
         </div>

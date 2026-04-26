@@ -27,8 +27,14 @@ import {
   Tooltip,
   Typography,
 } from '@douyinfe/semi-ui';
-import { CheckCircle2, Rocket, Sparkles } from 'lucide-react';
-import { API, renderQuota, showError, showSuccess } from '../../helpers';
+import { CheckCircle2, ExternalLink, Rocket, Sparkles } from 'lucide-react';
+import {
+  API,
+  openRechargeLink,
+  renderQuota,
+  showError,
+  showSuccess,
+} from '../../helpers';
 import { getCurrencyConfig } from '../../helpers/render';
 import {
   formatSubscriptionDuration,
@@ -88,6 +94,7 @@ const SubscriptionPlanCatalog = ({
   enableStripeTopUp = false,
   enableCreemTopUp = false,
   allSubscriptions = [],
+  topUpLink = '',
 }) => {
   const [open, setOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -240,6 +247,14 @@ const SubscriptionPlanCatalog = ({
               {t('购买区独立展示，已购权益以上方“我的订阅”为准')}
             </Text>
           </div>
+          <Button
+            theme='solid'
+            type='warning'
+            icon={<ExternalLink size={14} />}
+            onClick={() => openRechargeLink(topUpLink)}
+          >
+            {t('淘宝购买月卡')}
+          </Button>
         </div>
 
         {loading ? (
@@ -344,14 +359,13 @@ const SubscriptionPlanCatalog = ({
                       <Divider margin={12} />
                       {(() => {
                         const tip = reachedLimit
-                          ? t('已达到购买上限') +
-                            ` (${purchaseCount}/${limit})`
+                          ? t('已达到购买上限') + ` (${purchaseCount}/${limit})`
                           : '';
-                        const button = (
+                        const subscribeButton = (
                           <Button
                             theme={isRecommended ? 'solid' : 'outline'}
                             type='primary'
-                            block
+                            className='flex-1'
                             disabled={reachedLimit}
                             onClick={() => {
                               if (!reachedLimit) {
@@ -362,13 +376,30 @@ const SubscriptionPlanCatalog = ({
                             {reachedLimit ? t('已达上限') : t('立即订阅')}
                           </Button>
                         );
-                        return reachedLimit ? (
-                          <Tooltip content={tip} position='top'>
-                            {button}
-                          </Tooltip>
-                        ) : (
-                          button
+                        const taobaoButton = (
+                          <Button
+                            theme='outline'
+                            type='warning'
+                            className='flex-1'
+                            icon={<ExternalLink size={14} />}
+                            onClick={() => openRechargeLink(topUpLink)}
+                          >
+                            {t('淘宝购买')}
+                          </Button>
                         );
+                        const actions = (
+                          <div className='grid grid-cols-2 gap-2'>
+                            {reachedLimit ? (
+                              <Tooltip content={tip} position='top'>
+                                {subscribeButton}
+                              </Tooltip>
+                            ) : (
+                              subscribeButton
+                            )}
+                            {taobaoButton}
+                          </div>
+                        );
+                        return actions;
                       })()}
                     </div>
                   </div>
@@ -400,9 +431,7 @@ const SubscriptionPlanCatalog = ({
         purchaseLimitInfo={
           selectedPlan?.plan?.id
             ? {
-                limit: Number(
-                  selectedPlan?.plan?.max_purchase_per_user || 0,
-                ),
+                limit: Number(selectedPlan?.plan?.max_purchase_per_user || 0),
                 count: getPlanPurchaseCount(selectedPlan?.plan?.id),
               }
             : null
@@ -410,6 +439,7 @@ const SubscriptionPlanCatalog = ({
         onPayStripe={payStripe}
         onPayCreem={payCreem}
         onPayEpay={payEpay}
+        topUpLink={topUpLink}
       />
     </>
   );
