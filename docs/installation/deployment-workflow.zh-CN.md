@@ -253,7 +253,7 @@ chmod 755 /opt/new-api/tmp/new-api-linux-amd64
 cp /opt/new-api/tmp/new-api-linux-amd64 /opt/new-api/app/new-api-linux-amd64
 docker cp /opt/new-api/tmp/new-api-linux-amd64 new-api-prod:/new-api
 docker commit new-api-prod new-api-local:prod >/dev/null
-docker restart new-api-prod
+docker restart --time 120 new-api-prod
 ```
 
 如果你是在本地 PowerShell 里远程执行这些命令，需要额外注意一件事：
@@ -282,9 +282,11 @@ chmod 755 /opt/new-api/tmp/new-api-linux-amd64
 cp /opt/new-api/tmp/new-api-linux-amd64 /opt/new-api/app/new-api-linux-amd64
 docker cp /opt/new-api/tmp/new-api-linux-amd64 new-api-prod:/new-api
 docker commit new-api-prod new-api-local:prod >/dev/null
-docker restart new-api-prod
+docker restart --time 120 new-api-prod
 '@ | ssh -F ops/ssh/config.local aheapi-prod bash -s
 ```
+
+这里的 `--time 120` 要和生产 Compose 里的 `stop_grace_period: 120s` 保持一致。热更新流程不会重新创建容器，因此不会自动读取 Compose 的 `stop_grace_period`；显式传入 `--time` 可以让新版本的优雅停机逻辑在后续发布时有足够时间等待普通请求完成。
 
 - 对当前项目，推荐长期固定成下面这个约定：
   - 短命令：`ssh '...'`
