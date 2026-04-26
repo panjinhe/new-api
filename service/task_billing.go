@@ -50,6 +50,19 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = info.UpstreamModelName
 	}
+	if info.BillingSource == BillingSourceSubscription {
+		other["billing_source"] = BillingSourceSubscription
+		if info.SubscriptionId > 0 {
+			other["subscription_id"] = info.SubscriptionId
+		}
+		if info.SubscriptionPlanId > 0 {
+			other["subscription_plan_id"] = info.SubscriptionPlanId
+		}
+		if info.SubscriptionPlanTitle != "" {
+			other["subscription_plan_title"] = info.SubscriptionPlanTitle
+		}
+		other["subscription_consumed"] = info.PriceData.Quota
+	}
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
 		ChannelId: info.ChannelId,
 		ModelName: info.OriginModelName,
@@ -136,6 +149,10 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = props.UpstreamModelName
 	}
+	if taskIsSubscription(task) {
+		other["billing_source"] = BillingSourceSubscription
+		other["subscription_id"] = task.PrivateData.SubscriptionId
+	}
 	return other
 }
 
@@ -168,6 +185,9 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
 	other["reason"] = reason
+	if taskIsSubscription(task) {
+		other["subscription_consumed"] = -quota
+	}
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 		UserId:    task.UserId,
 		LogType:   model.LogTypeRefund,
@@ -231,6 +251,9 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	other["task_id"] = task.TaskID
 	other["pre_consumed_quota"] = preConsumedQuota
 	other["actual_quota"] = actualQuota
+	if taskIsSubscription(task) {
+		other["subscription_consumed"] = quotaDelta
+	}
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 		UserId:    task.UserId,
 		LogType:   logType,

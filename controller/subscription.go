@@ -300,6 +300,36 @@ func AdminBindSubscription(c *gin.Context) {
 	common.ApiSuccess(c, nil)
 }
 
+func AdminListUserSubscriptionSummaries(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	planId, _ := strconv.Atoi(c.Query("plan_id"))
+	expireDays, _ := strconv.Atoi(c.Query("expire_days"))
+	minTodayUsed, _ := strconv.ParseInt(c.Query("min_today_used"), 10, 64)
+	minUsagePercent, _ := strconv.ParseFloat(c.Query("min_usage_percent"), 64)
+
+	items, total, err := model.ListAdminUserSubscriptionSummaries(model.AdminUserSubscriptionSummaryQuery{
+		Page:            pageInfo.GetPage(),
+		PageSize:        pageInfo.GetPageSize(),
+		Keyword:         c.Query("keyword"),
+		Group:           c.Query("group"),
+		PlanId:          planId,
+		Status:          c.Query("status"),
+		ExpireDays:      expireDays,
+		MinTodayUsed:    minTodayUsed,
+		MinUsagePercent: minUsagePercent,
+		Sort:            c.Query("sort"),
+		Order:           c.Query("order"),
+	})
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
+}
+
 // ---- Admin: user subscription management ----
 
 func AdminListUserSubscriptions(c *gin.Context) {

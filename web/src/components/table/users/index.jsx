@@ -18,6 +18,9 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
+import { TabPane, Tabs } from '@douyinfe/semi-ui';
+import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import CardPro from '../../common/ui/CardPro';
 import UsersTable from './UsersTable';
 import UsersActions from './UsersActions';
@@ -28,8 +31,9 @@ import EditUserModal from './modals/EditUserModal';
 import { useUsersData } from '../../../hooks/users/useUsersData';
 import { useIsMobile } from '../../../hooks/common/useIsMobile';
 import { createCardProPagination } from '../../../helpers/utils';
+import UserSubscriptionsOverview from './UserSubscriptionsOverview';
 
-const UsersPage = () => {
+const UsersManagementPanel = ({ tabsArea }) => {
   const usersData = useUsersData();
   const isMobile = useIsMobile();
 
@@ -78,7 +82,7 @@ const UsersPage = () => {
       />
 
       <CardPro
-        type='type1'
+        type='type3'
         descriptionArea={
           <UsersDescription
             compactMode={compactMode}
@@ -86,6 +90,7 @@ const UsersPage = () => {
             t={t}
           />
         }
+        tabsArea={tabsArea}
         actionsArea={
           <div className='flex flex-col md:flex-row justify-between items-center gap-2 w-full'>
             <UsersActions setShowAddUser={setShowAddUser} t={t} />
@@ -119,6 +124,32 @@ const UsersPage = () => {
       </CardPro>
     </>
   );
+};
+
+const UsersPage = () => {
+  const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab =
+    searchParams.get('tab') === 'subscriptions' ? 'subscriptions' : 'users';
+
+  const handleTabChange = (key) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', key);
+    setSearchParams(next);
+  };
+
+  const tabsArea = (
+    <Tabs type='line' activeKey={activeTab} onChange={handleTabChange}>
+      <TabPane tab={t('用户管理')} itemKey='users' />
+      <TabPane tab={t('用户套餐')} itemKey='subscriptions' />
+    </Tabs>
+  );
+
+  if (activeTab === 'subscriptions') {
+    return <UserSubscriptionsOverview tabsArea={tabsArea} />;
+  }
+
+  return <UsersManagementPanel tabsArea={tabsArea} />;
 };
 
 export default UsersPage;

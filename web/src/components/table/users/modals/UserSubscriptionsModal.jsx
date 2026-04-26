@@ -33,7 +33,7 @@ import {
   IllustrationNoResult,
   IllustrationNoResultDark,
 } from '@douyinfe/semi-illustrations';
-import { API, showError, showSuccess } from '../../../../helpers';
+import { API, renderQuota, showError, showSuccess } from '../../../../helpers';
 import { convertUSDToCurrency } from '../../../../helpers/render';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import CardTable from '../../../common/ui/CardTable';
@@ -297,7 +297,7 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
         },
       },
       {
-        title: t('总额度'),
+        title: t('当前周期额度'),
         key: 'total',
         width: 120,
         render: (_, record) => {
@@ -306,9 +306,20 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
           const used = Number(sub?.amount_used || 0);
           return (
             <Text type={total > 0 ? 'secondary' : 'tertiary'}>
-              {total > 0 ? `${used}/${total}` : t('不限')}
+              {total > 0
+                ? `${renderQuota(used)} / ${renderQuota(total)}`
+                : `${t('不限')} · ${renderQuota(used)}`}
             </Text>
           );
+        },
+      },
+      {
+        title: t('累计用量'),
+        key: 'lifetime_used',
+        width: 120,
+        render: (_, record) => {
+          const used = Number(record?.subscription?.amount_used_total || 0);
+          return <Text strong>{renderQuota(used)}</Text>;
         },
       },
       {

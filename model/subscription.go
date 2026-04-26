@@ -237,6 +237,8 @@ type UserSubscription struct {
 
 	AmountTotal int64 `json:"amount_total" gorm:"type:bigint;not null;default:0"`
 	AmountUsed  int64 `json:"amount_used" gorm:"type:bigint;not null;default:0"`
+	// Historical net usage. Unlike AmountUsed, this is not reset by quota reset periods.
+	AmountUsedTotal int64 `json:"amount_used_total" gorm:"type:bigint;not null;default:0"`
 
 	StartTime int64  `json:"start_time" gorm:"bigint"`
 	EndTime   int64  `json:"end_time" gorm:"bigint;index;index:idx_user_sub_active,priority:3"`
@@ -484,20 +486,21 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		}
 	}
 	sub := &UserSubscription{
-		UserId:        userId,
-		PlanId:        plan.Id,
-		AmountTotal:   plan.TotalAmount,
-		AmountUsed:    0,
-		StartTime:     now.Unix(),
-		EndTime:       endUnix,
-		Status:        "active",
-		Source:        source,
-		LastResetTime: lastReset,
-		NextResetTime: nextReset,
-		UpgradeGroup:  upgradeGroup,
-		PrevUserGroup: prevGroup,
-		CreatedAt:     common.GetTimestamp(),
-		UpdatedAt:     common.GetTimestamp(),
+		UserId:          userId,
+		PlanId:          plan.Id,
+		AmountTotal:     plan.TotalAmount,
+		AmountUsed:      0,
+		AmountUsedTotal: 0,
+		StartTime:       now.Unix(),
+		EndTime:         endUnix,
+		Status:          "active",
+		Source:          source,
+		LastResetTime:   lastReset,
+		NextResetTime:   nextReset,
+		UpgradeGroup:    upgradeGroup,
+		PrevUserGroup:   prevGroup,
+		CreatedAt:       common.GetTimestamp(),
+		UpdatedAt:       common.GetTimestamp(),
 	}
 	if err := tx.Create(sub).Error; err != nil {
 		return nil, err
@@ -1076,7 +1079,11 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 				return err
 			}
 			sub.AmountUsed += amount
+			sub.AmountUsedTotal += amount
 			if err := tx.Save(&sub).Error; err != nil {
+				return err
+			}
+			if err := applySubscriptionUsageDeltaTx(tx, &sub, amount, 1, now); err != nil {
 				return err
 			}
 			returnValue.UserSubscriptionId = sub.Id
@@ -1112,7 +1119,7 @@ func RefundSubscriptionPreConsume(requestId string) error {
 			record.Status = "refunded"
 			return tx.Save(&record).Error
 		}
-		if err := PostConsumeUserSubscriptionDelta(record.UserSubscriptionId, -record.PreConsumed); err != nil {
+		if err := postConsumeUserSubscriptionDeltaTx(tx, record.UserSubscriptionId, -record.PreConsumed); err != nil {
 			return err
 		}
 		record.Status = "refunded"
@@ -1211,20 +1218,33 @@ func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error
 		return nil
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
-		var sub UserSubscription
-		if err := tx.Set("gorm:query_option", "FOR UPDATE").
-			Where("id = ?", userSubscriptionId).
-			First(&sub).Error; err != nil {
-			return err
-		}
-		newUsed := sub.AmountUsed + delta
-		if newUsed < 0 {
-			newUsed = 0
-		}
-		if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
-			return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
-		}
-		sub.AmountUsed = newUsed
-		return tx.Save(&sub).Error
+		return postConsumeUserSubscriptionDeltaTx(tx, userSubscriptionId, delta)
 	})
+}
+
+func postConsumeUserSubscriptionDeltaTx(tx *gorm.DB, userSubscriptionId int, delta int64) error {
+	var sub UserSubscription
+	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+		Where("id = ?", userSubscriptionId).
+		First(&sub).Error; err != nil {
+		return err
+	}
+	newUsed := sub.AmountUsed + delta
+	if newUsed < 0 {
+		newUsed = 0
+	}
+	if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
+		return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
+	}
+	newUsedTotal := sub.AmountUsedTotal + delta
+	if newUsedTotal < 0 {
+		newUsedTotal = 0
+	}
+	sub.AmountUsed = newUsed
+	sub.AmountUsedTotal = newUsedTotal
+	now := common.GetTimestamp()
+	if err := applySubscriptionUsageDeltaTx(tx, &sub, delta, 0, now); err != nil {
+		return err
+	}
+	return tx.Save(&sub).Error
 }
