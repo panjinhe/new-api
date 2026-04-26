@@ -2,13 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -195,10 +199,71 @@ func main() {
 	// Log startup success message
 	common.LogStartupSuccess(startTime, port)
 
-	err = server.Run(":" + port)
+	err = runHTTPServer(server, port)
 	if err != nil {
 		common.FatalLog("failed to start HTTP server: " + err.Error())
 	}
+}
+
+func runHTTPServer(handler http.Handler, port string) error {
+	httpServer := &http.Server{
+		Addr:    ":" + port,
+		Handler: handler,
+	}
+	serverErr := make(chan error, 1)
+
+	go func() {
+		serverErr <- httpServer.ListenAndServe()
+	}()
+
+	shutdownSignals := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignals, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(shutdownSignals)
+
+	select {
+	case err := <-serverErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case sig := <-shutdownSignals:
+		common.SysLog(fmt.Sprintf("received %s, shutting down HTTP server", sig.String()))
+	}
+
+	timeout := getGracefulShutdownTimeout()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		common.SysError(fmt.Sprintf("graceful shutdown failed after %s: %v", timeout.String(), err))
+		if closeErr := httpServer.Close(); closeErr != nil {
+			common.SysError("failed to close HTTP server: " + closeErr.Error())
+		}
+	}
+
+	err := <-serverErr
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	common.SysLog("HTTP server stopped gracefully")
+	return nil
+}
+
+func getGracefulShutdownTimeout() time.Duration {
+	const defaultTimeout = 90 * time.Second
+
+	rawTimeout := strings.TrimSpace(os.Getenv("GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS"))
+	if rawTimeout == "" {
+		return defaultTimeout
+	}
+
+	seconds, err := strconv.Atoi(rawTimeout)
+	if err != nil || seconds <= 0 {
+		common.SysError("invalid GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS, using default 90s")
+		return defaultTimeout
+	}
+
+	return time.Duration(seconds) * time.Second
 }
 
 func configureTrustedProxies(server *gin.Engine) {
