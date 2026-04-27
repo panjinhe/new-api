@@ -95,11 +95,18 @@ func applySubscriptionUsageDeltaTx(tx *gorm.DB, sub *UserSubscription, delta int
 			{Name: "day_start"},
 		},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"quota":         gorm.Expr("quota + ?", delta),
-			"request_count": gorm.Expr("request_count + ?", requestDelta),
+			"quota":         gorm.Expr(subscriptionUsageDailyColumn("quota")+" + ?", delta),
+			"request_count": gorm.Expr(subscriptionUsageDailyColumn("request_count")+" + ?", requestDelta),
 			"updated_at":    timestamp,
 		}),
 	}).Create(row).Error
+}
+
+func subscriptionUsageDailyColumn(name string) string {
+	if common.UsingPostgreSQL {
+		return `"subscription_usage_dailies"."` + name + `"`
+	}
+	return "`subscription_usage_dailies`.`" + name + "`"
 }
 
 type AdminUserSubscriptionSummaryQuery struct {
