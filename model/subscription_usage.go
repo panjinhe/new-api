@@ -511,19 +511,39 @@ func subscriptionActualUsageWindowForSub(sub UserSubscription, now int64) subscr
 	if start <= 0 || end <= start || now <= start {
 		return subscriptionActualUsageWindow{}
 	}
-	elapsed := now - start
 	period := end - start
-	if elapsed > period {
-		elapsed = period
+	totalDays := int64(math.Ceil(float64(period) / 86400.0))
+	if totalDays <= 0 {
+		return subscriptionActualUsageWindow{}
 	}
-	expected := float64(sub.AmountTotal) * float64(elapsed) / float64(period)
+	startDay := SubscriptionUsageDayStart(start)
+	endAt := now
+	if endAt >= end {
+		endAt = end - 1
+	}
+	if endAt < start {
+		return subscriptionActualUsageWindow{}
+	}
+	endDay := SubscriptionUsageDayStart(endAt)
+	elapsedDays := (endDay-startDay)/86400 + 1
+	if elapsedDays <= 0 {
+		return subscriptionActualUsageWindow{}
+	}
+	if elapsedDays > totalDays {
+		elapsedDays = totalDays
+	}
+	expected := float64(sub.AmountTotal) * float64(elapsedDays) / float64(totalDays)
 	if expected <= 0 {
 		return subscriptionActualUsageWindow{}
 	}
+	theoreticalQuota := int64(math.Round(expected))
+	if theoreticalQuota > sub.AmountTotal {
+		theoreticalQuota = sub.AmountTotal
+	}
 	return subscriptionActualUsageWindow{
-		StartDay:         SubscriptionUsageDayStart(start),
-		EndDay:           SubscriptionUsageDayStart(start + elapsed),
-		TheoreticalQuota: int64(math.Round(expected)),
+		StartDay:         startDay,
+		EndDay:           endDay,
+		TheoreticalQuota: theoreticalQuota,
 	}
 }
 

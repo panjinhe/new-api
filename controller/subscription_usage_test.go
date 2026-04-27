@@ -64,6 +64,7 @@ func TestAdminListUserSubscriptionSummariesFiltersAndSorts(t *testing.T) {
 	setupSubscriptionSummaryControllerTestDB(t)
 
 	now := common.GetTimestamp()
+	startDay := model.SubscriptionUsageDayStart(now) - int64(2*24*time.Hour/time.Second)
 	require.NoError(t, model.DB.Create(&model.User{Id: 1, Username: "alpha", Group: "default", Status: common.UserStatusEnabled, AffCode: "summary-alpha"}).Error)
 	require.NoError(t, model.DB.Create(&model.User{Id: 2, Username: "beta", Group: "default", Status: common.UserStatusEnabled, AffCode: "summary-beta"}).Error)
 	plan := &model.SubscriptionPlan{Title: "Pro", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 3000}
@@ -75,8 +76,8 @@ func TestAdminListUserSubscriptionSummariesFiltersAndSorts(t *testing.T) {
 		AmountTotal:     3000,
 		AmountUsed:      900,
 		AmountUsedTotal: 1500,
-		StartTime:       now - int64(3*24*time.Hour/time.Second),
-		EndTime:         now + int64(27*24*time.Hour/time.Second),
+		StartTime:       startDay,
+		EndTime:         startDay + int64(30*24*time.Hour/time.Second),
 		Status:          "active",
 	}).Error)
 	for i := 0; i < 3; i++ {
