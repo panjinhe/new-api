@@ -85,6 +85,11 @@ const getDisplayPrice = (plan) => {
   };
 };
 
+const isPremiumBlackPlan = (plan) => {
+  const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
+  return /pro\s*50x|pro50x|黑卡|每日\s*\$?300/i.test(text);
+};
+
 const SubscriptionPlanCatalog = ({
   t,
   loading = false,
@@ -267,6 +272,7 @@ const SubscriptionPlanCatalog = ({
               const { symbol, displayPrice } = getDisplayPrice(plan);
               const isRecommended =
                 (plan?.title || '').trim() === '前进三：巡航';
+              const isPremium = isPremiumBlackPlan(plan);
               const limit = Number(plan?.max_purchase_per_user || 0);
               const purchaseCount = getPlanPurchaseCount(plan?.id);
               const reachedLimit = limit > 0 && purchaseCount >= limit;
@@ -291,12 +297,19 @@ const SubscriptionPlanCatalog = ({
                   className='!rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md h-full'
                   bodyStyle={{ padding: 0 }}
                   style={{
-                    border: isRecommended
-                      ? '1px solid rgba(37, 99, 235, 0.45)'
-                      : '1px solid var(--semi-color-border)',
-                    boxShadow: isRecommended
-                      ? '0 18px 40px rgba(37, 99, 235, 0.10)'
+                    border: isPremium
+                      ? '1px solid rgba(148, 163, 184, 0.34)'
+                      : isRecommended
+                        ? '1px solid rgba(37, 99, 235, 0.45)'
+                        : '1px solid var(--semi-color-border)',
+                    background: isPremium
+                      ? 'linear-gradient(135deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 1) 54%, rgba(39, 39, 42, 0.96))'
                       : undefined,
+                    boxShadow: isPremium
+                      ? '0 22px 48px rgba(2, 6, 23, 0.24)'
+                      : isRecommended
+                        ? '0 18px 40px rgba(37, 99, 235, 0.10)'
+                        : undefined,
                   }}
                 >
                   <div className='h-full p-4 flex flex-col'>
@@ -305,7 +318,12 @@ const SubscriptionPlanCatalog = ({
                         <Typography.Title
                           heading={5}
                           ellipsis={{ rows: 1, showTooltip: true }}
-                          style={{ margin: 0 }}
+                          style={{
+                            margin: 0,
+                            color: isPremium
+                              ? 'rgba(248, 250, 252, 1)'
+                              : undefined,
+                          }}
                         >
                           {plan?.title || t('订阅套餐')}
                         </Typography.Title>
@@ -314,28 +332,59 @@ const SubscriptionPlanCatalog = ({
                             type='tertiary'
                             size='small'
                             ellipsis={{ rows: 1, showTooltip: true }}
-                            style={{ display: 'block' }}
+                            style={{
+                              display: 'block',
+                              color: isPremium
+                                ? 'rgba(203, 213, 225, 1)'
+                                : undefined,
+                            }}
                           >
                             {plan.subtitle}
                           </Text>
                         )}
                       </div>
-                      {isRecommended && (
-                        <Tag color='blue' shape='circle' size='small'>
+                      {(isRecommended || isPremium) && (
+                        <Tag
+                          color={isPremium ? 'grey' : 'blue'}
+                          shape='circle'
+                          size='small'
+                        >
                           <Sparkles size={10} className='mr-1' />
-                          {t('推荐')}
+                          {t(isPremium ? '旗舰' : '推荐')}
                         </Tag>
                       )}
                     </div>
 
                     <div className='mt-5 flex items-end gap-1'>
-                      <span className='text-lg font-semibold text-[var(--semi-color-primary)]'>
+                      <span
+                        className='text-lg font-semibold'
+                        style={{
+                          color: isPremium
+                            ? 'rgba(248, 250, 252, 1)'
+                            : 'var(--semi-color-primary)',
+                        }}
+                      >
                         {symbol}
                       </span>
-                      <span className='text-4xl font-semibold leading-none text-[var(--semi-color-primary)]'>
+                      <span
+                        className='text-4xl font-semibold leading-none'
+                        style={{
+                          color: isPremium
+                            ? 'rgba(248, 250, 252, 1)'
+                            : 'var(--semi-color-primary)',
+                        }}
+                      >
                         {displayPrice}
                       </span>
-                      <Text type='tertiary' size='small'>
+                      <Text
+                        type='tertiary'
+                        size='small'
+                        style={{
+                          color: isPremium
+                            ? 'rgba(203, 213, 225, 1)'
+                            : undefined,
+                        }}
+                      >
                         / {t('月')}
                       </Text>
                     </div>
@@ -344,11 +393,20 @@ const SubscriptionPlanCatalog = ({
                       {benefits.map((benefit) => (
                         <div
                           key={benefit}
-                          className='flex items-center gap-2 text-sm text-[var(--semi-color-text-1)]'
+                          className='flex items-center gap-2 text-sm'
+                          style={{
+                            color: isPremium
+                              ? 'rgba(226, 232, 240, 1)'
+                              : 'var(--semi-color-text-1)',
+                          }}
                         >
                           <CheckCircle2
                             size={14}
-                            color='rgba(5, 150, 105, 1)'
+                            color={
+                              isPremium
+                                ? 'rgba(248, 250, 252, 0.92)'
+                                : 'rgba(5, 150, 105, 1)'
+                            }
                           />
                           <span>{benefit}</span>
                         </div>

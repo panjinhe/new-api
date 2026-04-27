@@ -156,6 +156,19 @@ const getRechargePackVisual = (item, index) =>
 
 const subscriptionPlanVisuals = [
   {
+    titleKeyword: 'Pro 50x',
+    code: 'PRO-50X',
+    label: '黑卡旗舰',
+    dark: true,
+    accent: 'rgba(248, 250, 252, 1)',
+    muted: 'rgba(203, 213, 225, 1)',
+    border: 'rgba(148, 163, 184, 0.34)',
+    background:
+      'linear-gradient(135deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 1) 54%, rgba(39, 39, 42, 0.96))',
+    rail: 'linear-gradient(90deg, rgba(248, 250, 252, 0.96), rgba(148, 163, 184, 0.76))',
+    glow: '0 22px 48px rgba(2, 6, 23, 0.24)',
+  },
+  {
     titleKeyword: '探测',
     code: 'SCAN-01',
     label: '低轨探测',
@@ -219,6 +232,18 @@ const getSubscriptionPlanVisual = (plan, index) => {
     subscriptionPlanVisuals[index % subscriptionPlanVisuals.length]
   );
 };
+
+const getPlanVisualSurface = (visual, fallback = 'rgba(255, 255, 255, 0.72)') =>
+  visual?.dark ? 'rgba(255, 255, 255, 0.12)' : fallback;
+
+const getPlanVisualPanel = (visual) =>
+  visual?.dark ? 'rgba(15, 23, 42, 0.74)' : 'rgba(255,255,255,0.80)';
+
+const getPlanVisualText = (visual) =>
+  visual?.dark ? 'rgba(248, 250, 252, 1)' : 'var(--semi-color-text-0)';
+
+const getPlanVisualMutedText = (visual) =>
+  visual?.dark ? 'rgba(203, 213, 225, 1)' : 'var(--semi-color-text-2)';
 
 const getPlanPriceLabel = (plan) => {
   const price = Number(plan?.price_amount || 0);
@@ -609,6 +634,7 @@ const RechargeSupportCard = ({
                   const isRecommended =
                     (plan?.title || '').trim() === '前进三：巡航';
                   const visual = getSubscriptionPlanVisual(plan, index);
+                  const isPremium = Boolean(visual?.dark);
 
                   return (
                     <div
@@ -637,7 +663,7 @@ const RechargeSupportCard = ({
                             <span
                               className='rounded-full px-2 py-0.5 text-[10px] font-semibold'
                               style={{
-                                background: 'rgba(255,255,255,0.72)',
+                                background: getPlanVisualSurface(visual),
                                 border: `1px solid ${visual.border}`,
                                 color: visual.accent,
                               }}
@@ -654,21 +680,31 @@ const RechargeSupportCard = ({
                             >
                               {plan?.title || t('订阅套餐')}
                             </Text>
-                            {isRecommended && (
-                              <Tag color='blue' shape='circle' size='small'>
-                                {t('推荐')}
+                            {(isRecommended || isPremium) && (
+                              <Tag
+                                color={isPremium ? 'grey' : 'blue'}
+                                shape='circle'
+                                size='small'
+                              >
+                                {t(isPremium ? '旗舰' : '推荐')}
                               </Tag>
                             )}
                           </div>
                           {plan?.subtitle && (
-                            <div className='mt-1 text-xs leading-5 text-[var(--semi-color-text-2)]'>
+                            <div
+                              className='mt-1 text-xs leading-5'
+                              style={{ color: getPlanVisualMutedText(visual) }}
+                            >
                               {plan.subtitle}
                             </div>
                           )}
                           <div
                             className='mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium'
                             style={{
-                              background: 'rgba(255, 255, 255, 0.66)',
+                              background: getPlanVisualSurface(
+                                visual,
+                                'rgba(255, 255, 255, 0.66)',
+                              ),
                               color: visual.accent,
                             }}
                           >
@@ -677,7 +713,10 @@ const RechargeSupportCard = ({
                           </div>
                         </div>
                         <div className='shrink-0 text-right'>
-                          <div className='text-[11px] text-[var(--semi-color-text-2)]'>
+                          <div
+                            className='text-[11px]'
+                            style={{ color: getPlanVisualMutedText(visual) }}
+                          >
                             {t('月价')}
                           </div>
                           <div
@@ -692,29 +731,50 @@ const RechargeSupportCard = ({
                       </div>
 
                       <div className='relative mt-4 grid grid-cols-2 gap-2'>
-                        <div className='rounded-xl bg-white/80 px-3 py-2'>
-                          <div className='flex items-center gap-1 text-[11px] text-[var(--semi-color-text-2)]'>
+                        <div
+                          className='rounded-xl px-3 py-2'
+                          style={{ background: getPlanVisualPanel(visual) }}
+                        >
+                          <div
+                            className='flex items-center gap-1 text-[11px]'
+                            style={{ color: getPlanVisualMutedText(visual) }}
+                          >
                             <Gauge size={12} />
                             {t('每日额度')}
                           </div>
-                          <div className='mt-1 text-sm font-semibold text-[var(--semi-color-text-0)]'>
+                          <div
+                            className='mt-1 text-sm font-semibold'
+                            style={{ color: getPlanVisualText(visual) }}
+                          >
                             {totalAmount > 0
                               ? renderQuota(totalAmount)
                               : t('不限')}
                           </div>
                         </div>
-                        <div className='rounded-xl bg-white/80 px-3 py-2'>
-                          <div className='flex items-center gap-1 text-[11px] text-[var(--semi-color-text-2)]'>
+                        <div
+                          className='rounded-xl px-3 py-2'
+                          style={{ background: getPlanVisualPanel(visual) }}
+                        >
+                          <div
+                            className='flex items-center gap-1 text-[11px]'
+                            style={{ color: getPlanVisualMutedText(visual) }}
+                          >
                             <RefreshCw size={12} />
                             {t('重置')}
                           </div>
-                          <div className='mt-1 text-sm font-semibold text-[var(--semi-color-text-0)]'>
+                          <div
+                            className='mt-1 text-sm font-semibold'
+                            style={{ color: getPlanVisualText(visual) }}
+                          >
                             {getPlanResetLabel(plan, t)}
                           </div>
                         </div>
                       </div>
 
-                      <div className='relative mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--semi-color-text-2)]'>
+                      <div
+                        className='relative mt-3 flex flex-wrap items-center justify-between gap-2 text-xs'
+                        style={{ color: getPlanVisualMutedText(visual) }}
+                      >
                         <div className='flex flex-wrap gap-2'>
                           <span className='inline-flex items-center gap-1'>
                             <CalendarClock size={12} />
