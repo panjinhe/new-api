@@ -160,13 +160,13 @@ const subscriptionPlanVisuals = [
     code: 'PRO-50X',
     label: '黑卡旗舰',
     dark: true,
-    accent: 'rgba(248, 250, 252, 1)',
-    muted: 'rgba(203, 213, 225, 1)',
-    border: 'rgba(148, 163, 184, 0.34)',
+    accent: 'rgba(245, 199, 108, 1)',
+    muted: 'rgba(214, 211, 202, 0.82)',
+    border: 'rgba(245, 199, 108, 0.34)',
     background:
-      'linear-gradient(135deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 1) 54%, rgba(39, 39, 42, 0.96))',
-    rail: 'linear-gradient(90deg, rgba(248, 250, 252, 0.96), rgba(148, 163, 184, 0.76))',
-    glow: '0 22px 48px rgba(2, 6, 23, 0.24)',
+      'linear-gradient(132deg, rgba(245, 199, 108, 0.16), transparent 26%, rgba(255, 255, 255, 0.055) 54%, transparent 74%), linear-gradient(145deg, rgba(10, 12, 16, 1), rgba(25, 25, 24, 1) 48%, rgba(8, 10, 14, 1))',
+    rail: 'linear-gradient(90deg, rgba(245, 199, 108, 0), rgba(245, 199, 108, 0.96), rgba(255, 244, 214, 0.84), rgba(245, 199, 108, 0))',
+    glow: '0 22px 50px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.36)',
   },
   {
     titleKeyword: '探测',
@@ -233,17 +233,32 @@ const getSubscriptionPlanVisual = (plan, index) => {
   );
 };
 
-const getPlanVisualSurface = (visual, fallback = 'rgba(255, 255, 255, 0.72)') =>
-  visual?.dark ? 'rgba(255, 255, 255, 0.12)' : fallback;
+const getPlanVisualSurface = (
+  visual,
+  fallback = 'rgba(255, 255, 255, 0.72)',
+) =>
+  visual?.dark
+    ? 'linear-gradient(180deg, rgba(245, 199, 108, 0.16), rgba(255, 255, 255, 0.07))'
+    : fallback;
 
 const getPlanVisualPanel = (visual) =>
-  visual?.dark ? 'rgba(15, 23, 42, 0.74)' : 'rgba(255,255,255,0.80)';
+  visual?.dark
+    ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.055))'
+    : 'rgba(255,255,255,0.80)';
 
 const getPlanVisualText = (visual) =>
-  visual?.dark ? 'rgba(248, 250, 252, 1)' : 'var(--semi-color-text-0)';
+  visual?.dark ? 'rgba(255, 251, 235, 0.96)' : 'var(--semi-color-text-0)';
+
+const getPlanVisualHeadingText = (visual) =>
+  visual?.dark ? 'rgba(255, 255, 255, 0.96)' : visual.accent;
 
 const getPlanVisualMutedText = (visual) =>
-  visual?.dark ? 'rgba(203, 213, 225, 1)' : 'var(--semi-color-text-2)';
+  visual?.dark ? visual.muted : 'var(--semi-color-text-2)';
+
+const getPlanVisualTexture = (visual) =>
+  visual?.dark
+    ? 'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.08) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 26px)'
+    : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.26) 0 1px, transparent 1px 24px)';
 
 const getPlanPriceLabel = (plan) => {
   const price = Number(plan?.price_amount || 0);
@@ -256,6 +271,17 @@ const getPlanResetLabel = (plan, t) => {
   if (plan?.quota_reset_period === 'daily') return t('每日重置');
   if (resetText === t('不重置')) return resetText;
   return `${resetText}${t('重置')}`;
+};
+
+const getPlanComparisonLabel = (plan) => {
+  const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
+  if (/pro\s*50x|pro50x|黑卡/i.test(text)) return '等于 2.5 个 Pro 20x';
+  if (text.includes('光速跃迁')) return '约等于 1 个 Pro 20x';
+  if (text.includes('加速')) return '约等于 14 个 Plus 账号';
+  if (text.includes('巡航')) return '约等于 7 个 Plus 账号';
+  if (text.includes('启航')) return '约等于 4 个 Plus 账号';
+  if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
+  return '';
 };
 
 const RechargeSupportCard = ({
@@ -635,6 +661,7 @@ const RechargeSupportCard = ({
                     (plan?.title || '').trim() === '前进三：巡航';
                   const visual = getSubscriptionPlanVisual(plan, index);
                   const isPremium = Boolean(visual?.dark);
+                  const comparisonLabel = getPlanComparisonLabel(plan);
 
                   return (
                     <div
@@ -651,10 +678,10 @@ const RechargeSupportCard = ({
                         style={{ background: visual.rail }}
                       />
                       <div
-                        className='pointer-events-none absolute inset-0 opacity-60'
+                        className='pointer-events-none absolute inset-0'
                         style={{
-                          backgroundImage:
-                            'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.26) 0 1px, transparent 1px 24px)',
+                          backgroundImage: getPlanVisualTexture(visual),
+                          opacity: isPremium ? 0.72 : 0.6,
                         }}
                       />
                       <div className='relative flex items-start justify-between gap-3'>
@@ -675,20 +702,27 @@ const RechargeSupportCard = ({
                               ellipsis={{ showTooltip: true }}
                               style={{
                                 display: 'block',
-                                color: visual.accent,
+                                color: getPlanVisualHeadingText(visual),
                               }}
                             >
                               {plan?.title || t('订阅套餐')}
                             </Text>
-                            {(isRecommended || isPremium) && (
-                              <Tag
-                                color={isPremium ? 'grey' : 'blue'}
-                                shape='circle'
-                                size='small'
+                            {isPremium ? (
+                              <span
+                                className='inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium'
+                                style={{
+                                  background: 'rgba(245, 199, 108, 0.14)',
+                                  border: '1px solid rgba(245, 199, 108, 0.32)',
+                                  color: 'rgba(255, 244, 214, 0.94)',
+                                }}
                               >
-                                {t(isPremium ? '旗舰' : '推荐')}
+                                {t('旗舰')}
+                              </span>
+                            ) : isRecommended ? (
+                              <Tag color='blue' shape='circle' size='small'>
+                                {t('推荐')}
                               </Tag>
-                            )}
+                            ) : null}
                           </div>
                           {plan?.subtitle && (
                             <div
@@ -711,6 +745,24 @@ const RechargeSupportCard = ({
                             <Sparkles size={12} />
                             {t(visual.label)}
                           </div>
+                          {comparisonLabel && (
+                            <div
+                              className='mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium'
+                              style={{
+                                background: getPlanVisualSurface(
+                                  visual,
+                                  'rgba(255, 255, 255, 0.72)',
+                                ),
+                                border: `1px solid ${visual.border}`,
+                                color: isPremium
+                                  ? 'rgba(255, 244, 214, 0.94)'
+                                  : visual.accent,
+                              }}
+                            >
+                              <CircleDollarSign size={12} />
+                              {t(comparisonLabel)}
+                            </div>
+                          )}
                         </div>
                         <div className='shrink-0 text-right'>
                           <div

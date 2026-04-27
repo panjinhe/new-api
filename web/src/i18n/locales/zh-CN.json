@@ -3711,6 +3711,12 @@
     "创建令牌": "创建令牌",
     "在控制台一键创建令牌，支持多密钥管理，创建后即可作为 API Key 使用。": "在控制台一键创建令牌，支持多密钥管理，创建后即可作为 API Key 使用。",
     "导入 CC Switch": "导入 CC Switch",
-    "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。": "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。"
+    "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。": "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。",
+    "约等于 1.4 个 Plus 账号": "约等于 1.4 个 Plus 账号",
+    "约等于 4 个 Plus 账号": "约等于 4 个 Plus 账号",
+    "约等于 7 个 Plus 账号": "约等于 7 个 Plus 账号",
+    "约等于 14 个 Plus 账号": "约等于 14 个 Plus 账号",
+    "约等于 1 个 Pro 20x": "约等于 1 个 Pro 20x",
+    "等于 2.5 个 Pro 20x": "等于 2.5 个 Pro 20x"
   }
 }

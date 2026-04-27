@@ -90,6 +90,32 @@ const isPremiumBlackPlan = (plan) => {
   return /pro\s*50x|pro50x|黑卡|每日\s*\$?300/i.test(text);
 };
 
+const getPlanComparisonLabel = (plan) => {
+  const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
+  if (/pro\s*50x|pro50x|黑卡/i.test(text)) return '等于 2.5 个 Pro 20x';
+  if (text.includes('光速跃迁')) return '约等于 1 个 Pro 20x';
+  if (text.includes('加速')) return '约等于 14 个 Plus 账号';
+  if (text.includes('巡航')) return '约等于 7 个 Plus 账号';
+  if (text.includes('启航')) return '约等于 4 个 Plus 账号';
+  if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
+  return '';
+};
+
+const premiumBlackPlanVisual = {
+  border: 'rgba(245, 199, 108, 0.34)',
+  background:
+    'linear-gradient(132deg, rgba(245, 199, 108, 0.16), transparent 26%, rgba(255, 255, 255, 0.055) 54%, transparent 74%), linear-gradient(145deg, rgba(10, 12, 16, 1), rgba(25, 25, 24, 1) 48%, rgba(8, 10, 14, 1))',
+  texture:
+    'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.08) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 26px)',
+  rail: 'linear-gradient(90deg, rgba(245, 199, 108, 0), rgba(245, 199, 108, 0.96), rgba(255, 244, 214, 0.84), rgba(245, 199, 108, 0))',
+  shadow:
+    '0 22px 50px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.36)',
+  accent: 'rgba(245, 199, 108, 1)',
+  accentText: 'rgba(255, 244, 214, 0.94)',
+  text: 'rgba(255, 255, 255, 0.96)',
+  muted: 'rgba(214, 211, 202, 0.82)',
+};
+
 const SubscriptionPlanCatalog = ({
   t,
   loading = false,
@@ -277,6 +303,7 @@ const SubscriptionPlanCatalog = ({
               const purchaseCount = getPlanPurchaseCount(plan?.id);
               const reachedLimit = limit > 0 && purchaseCount >= limit;
               const resetText = formatSubscriptionResetPeriod(plan, t);
+              const comparisonLabel = getPlanComparisonLabel(plan);
               const benefits = [
                 `${t('有效期')}: ${formatSubscriptionDuration(plan, t)}`,
                 resetText === t('不重置')
@@ -285,6 +312,7 @@ const SubscriptionPlanCatalog = ({
                 totalAmount > 0
                   ? `${t('总额度')}: ${renderQuota(totalAmount)}`
                   : `${t('总额度')}: ${t('不限')}`,
+                comparisonLabel ? t(comparisonLabel) : null,
                 limit > 0 ? `${t('限购')} ${limit}` : null,
                 plan?.upgrade_group
                   ? `${t('升级分组')}: ${plan.upgrade_group}`
@@ -294,25 +322,40 @@ const SubscriptionPlanCatalog = ({
               return (
                 <Card
                   key={plan?.id}
-                  className='!rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md h-full'
+                  className='!rounded-2xl relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md h-full'
                   bodyStyle={{ padding: 0 }}
                   style={{
                     border: isPremium
-                      ? '1px solid rgba(148, 163, 184, 0.34)'
+                      ? `1px solid ${premiumBlackPlanVisual.border}`
                       : isRecommended
                         ? '1px solid rgba(37, 99, 235, 0.45)'
                         : '1px solid var(--semi-color-border)',
                     background: isPremium
-                      ? 'linear-gradient(135deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 1) 54%, rgba(39, 39, 42, 0.96))'
+                      ? premiumBlackPlanVisual.background
                       : undefined,
                     boxShadow: isPremium
-                      ? '0 22px 48px rgba(2, 6, 23, 0.24)'
+                      ? premiumBlackPlanVisual.shadow
                       : isRecommended
                         ? '0 18px 40px rgba(37, 99, 235, 0.10)'
                         : undefined,
                   }}
                 >
-                  <div className='h-full p-4 flex flex-col'>
+                  {isPremium && (
+                    <>
+                      <div
+                        className='pointer-events-none absolute inset-x-0 top-0 h-1.5'
+                        style={{ background: premiumBlackPlanVisual.rail }}
+                      />
+                      <div
+                        className='pointer-events-none absolute inset-0'
+                        style={{
+                          backgroundImage: premiumBlackPlanVisual.texture,
+                          opacity: 0.72,
+                        }}
+                      />
+                    </>
+                  )}
+                  <div className='relative h-full p-4 flex flex-col'>
                     <div className='flex items-start justify-between gap-3'>
                       <div className='min-w-0'>
                         <Typography.Title
@@ -321,7 +364,7 @@ const SubscriptionPlanCatalog = ({
                           style={{
                             margin: 0,
                             color: isPremium
-                              ? 'rgba(248, 250, 252, 1)'
+                              ? premiumBlackPlanVisual.text
                               : undefined,
                           }}
                         >
@@ -335,7 +378,7 @@ const SubscriptionPlanCatalog = ({
                             style={{
                               display: 'block',
                               color: isPremium
-                                ? 'rgba(203, 213, 225, 1)'
+                                ? premiumBlackPlanVisual.muted
                                 : undefined,
                             }}
                           >
@@ -343,16 +386,24 @@ const SubscriptionPlanCatalog = ({
                           </Text>
                         )}
                       </div>
-                      {(isRecommended || isPremium) && (
-                        <Tag
-                          color={isPremium ? 'grey' : 'blue'}
-                          shape='circle'
-                          size='small'
+                      {isPremium ? (
+                        <span
+                          className='inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-medium'
+                          style={{
+                            background: 'rgba(245, 199, 108, 0.14)',
+                            border: `1px solid ${premiumBlackPlanVisual.border}`,
+                            color: premiumBlackPlanVisual.accentText,
+                          }}
                         >
                           <Sparkles size={10} className='mr-1' />
-                          {t(isPremium ? '旗舰' : '推荐')}
+                          {t('旗舰')}
+                        </span>
+                      ) : isRecommended ? (
+                        <Tag color='blue' shape='circle' size='small'>
+                          <Sparkles size={10} className='mr-1' />
+                          {t('推荐')}
                         </Tag>
-                      )}
+                      ) : null}
                     </div>
 
                     <div className='mt-5 flex items-end gap-1'>
@@ -360,7 +411,7 @@ const SubscriptionPlanCatalog = ({
                         className='text-lg font-semibold'
                         style={{
                           color: isPremium
-                            ? 'rgba(248, 250, 252, 1)'
+                            ? premiumBlackPlanVisual.accent
                             : 'var(--semi-color-primary)',
                         }}
                       >
@@ -370,7 +421,7 @@ const SubscriptionPlanCatalog = ({
                         className='text-4xl font-semibold leading-none'
                         style={{
                           color: isPremium
-                            ? 'rgba(248, 250, 252, 1)'
+                            ? premiumBlackPlanVisual.accent
                             : 'var(--semi-color-primary)',
                         }}
                       >
@@ -381,7 +432,7 @@ const SubscriptionPlanCatalog = ({
                         size='small'
                         style={{
                           color: isPremium
-                            ? 'rgba(203, 213, 225, 1)'
+                            ? premiumBlackPlanVisual.muted
                             : undefined,
                         }}
                       >
@@ -396,7 +447,7 @@ const SubscriptionPlanCatalog = ({
                           className='flex items-center gap-2 text-sm'
                           style={{
                             color: isPremium
-                              ? 'rgba(226, 232, 240, 1)'
+                              ? 'rgba(255, 251, 235, 0.92)'
                               : 'var(--semi-color-text-1)',
                           }}
                         >
@@ -404,7 +455,7 @@ const SubscriptionPlanCatalog = ({
                             size={14}
                             color={
                               isPremium
-                                ? 'rgba(248, 250, 252, 0.92)'
+                                ? premiumBlackPlanVisual.accent
                                 : 'rgba(5, 150, 105, 1)'
                             }
                           />
@@ -414,17 +465,37 @@ const SubscriptionPlanCatalog = ({
                     </div>
 
                     <div className='mt-auto pt-4'>
-                      <Divider margin={12} />
+                      <Divider
+                        margin={12}
+                        style={
+                          isPremium
+                            ? { borderColor: 'rgba(245, 199, 108, 0.18)' }
+                            : undefined
+                        }
+                      />
                       {(() => {
                         const tip = reachedLimit
                           ? t('已达到购买上限') + ` (${purchaseCount}/${limit})`
                           : '';
                         const subscribeButton = (
                           <Button
-                            theme={isRecommended ? 'solid' : 'outline'}
-                            type='primary'
+                            theme={
+                              isRecommended || isPremium ? 'solid' : 'outline'
+                            }
+                            type={isPremium ? 'warning' : 'primary'}
                             className='flex-1'
                             disabled={reachedLimit}
+                            style={
+                              isPremium && !reachedLimit
+                                ? {
+                                    background:
+                                      'linear-gradient(180deg, rgba(245, 199, 108, 1), rgba(214, 158, 46, 1))',
+                                    borderColor: 'rgba(245, 199, 108, 0.9)',
+                                    color: 'rgba(15, 23, 42, 1)',
+                                    fontWeight: 600,
+                                  }
+                                : undefined
+                            }
                             onClick={() => {
                               if (!reachedLimit) {
                                 openBuy(item);
@@ -440,6 +511,15 @@ const SubscriptionPlanCatalog = ({
                             type='warning'
                             className='flex-1'
                             icon={<ExternalLink size={14} />}
+                            style={
+                              isPremium
+                                ? {
+                                    background: 'rgba(255, 255, 255, 0.055)',
+                                    borderColor: 'rgba(245, 199, 108, 0.32)',
+                                    color: premiumBlackPlanVisual.accentText,
+                                  }
+                                : undefined
+                            }
                             onClick={() => openRechargeLink(topUpLink)}
                           >
                             {t('淘宝购买')}

@@ -3721,6 +3721,12 @@
     "创建令牌": "Create Token",
     "在控制台一键创建令牌，支持多密钥管理，创建后即可作为 API Key 使用。": "Create a token in the console. Multiple keys are supported, and the token can be used as your API key.",
     "导入 CC Switch": "Import to CC Switch",
-    "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。": "Click the CC Switch import button on the token page to auto-fill the Base URL, model, and API key."
+    "点击令牌页的 CC Switch 导入按钮，自动填入 Base URL、模型和 API Key。": "Click the CC Switch import button on the token page to auto-fill the Base URL, model, and API key.",
+    "约等于 1.4 个 Plus 账号": "About 1.4 Plus accounts",
+    "约等于 4 个 Plus 账号": "About 4 Plus accounts",
+    "约等于 7 个 Plus 账号": "About 7 Plus accounts",
+    "约等于 14 个 Plus 账号": "About 14 Plus accounts",
+    "约等于 1 个 Pro 20x": "About 1 Pro 20x",
+    "等于 2.5 个 Pro 20x": "Equals 2.5 Pro 20x"
   }
 }
