@@ -171,6 +171,39 @@ const renderPeriodCell = (summary, t) => {
   );
 };
 
+const renderActualUsageCell = (summary, t) => {
+  if (!summary?.active_count) {
+    return <Text type='tertiary'>-</Text>;
+  }
+  if (Number(summary?.period_total || 0) <= 0) {
+    return <Text type='tertiary'>{t('不限')}</Text>;
+  }
+  const used = Number(summary?.period_elapsed_used || 0);
+  const theoretical = Number(summary?.period_elapsed_quota || 0);
+  if (theoretical <= 0) {
+    return (
+      <div>
+        <Text type='tertiary'>-</Text>
+        <div className='text-xs text-[var(--semi-color-text-2)]'>
+          {t('理论')}: {renderQuota(0)}
+        </div>
+      </div>
+    );
+  }
+  const percent = Number(summary?.actual_usage_percent || 0);
+  const color = percent >= 100 ? 'red' : percent >= 80 ? 'orange' : 'green';
+  return (
+    <div>
+      <Tag color={color} shape='circle'>
+        {percent.toFixed(0)}%
+      </Tag>
+      <div className='mt-1 text-xs text-[var(--semi-color-text-2)] whitespace-nowrap'>
+        {renderQuota(used)} / {renderQuota(theoretical)}
+      </div>
+    </div>
+  );
+};
+
 const buildColumns = ({ t, openSubscriptions }) => [
   {
     title: t('用户'),
@@ -229,6 +262,13 @@ const buildColumns = ({ t, openSubscriptions }) => [
     render: (_, record) => renderPeriodCell(record.subscription_summary, t),
   },
   {
+    title: t('实际使用率'),
+    key: 'actual_usage_percent',
+    width: 150,
+    render: (_, record) =>
+      renderActualUsageCell(record.subscription_summary, t),
+  },
+  {
     title: t('累计套餐用量'),
     key: 'lifetime_used',
     width: 150,
@@ -269,6 +309,10 @@ const UserSubscriptionFilters = ({
 }) => {
   const formApiRef = useRef(null);
   const submit = () => {
+    const values = formApiRef.current?.getValues?.() || {};
+    if (values.keyword?.trim() && values.status === 'active') {
+      formApiRef.current?.setValue?.('status', 'all');
+    }
     loadData(1, pageSize);
   };
   const reset = () => {
@@ -321,8 +365,8 @@ const UserSubscriptionFilters = ({
           field='status'
           placeholder={t('套餐状态')}
           optionList={[
-            { label: t('全部'), value: 'all' },
             { label: t('有生效套餐'), value: 'active' },
+            { label: t('全部'), value: 'all' },
             { label: t('无生效套餐'), value: 'none' },
             { label: t('已过期套餐'), value: 'expired' },
             { label: t('即将到期'), value: 'expiring' },
@@ -361,7 +405,8 @@ const UserSubscriptionFilters = ({
             { label: t('剩余天数'), value: 'remaining_days' },
             { label: t('今日套餐用量'), value: 'today_used' },
             { label: t('累计套餐用量'), value: 'lifetime_used' },
-            { label: t('使用率'), value: 'usage_percent' },
+            { label: t('周期使用率'), value: 'usage_percent' },
+            { label: t('实际使用率'), value: 'actual_usage_percent' },
           ]}
           pure
           size='small'
@@ -413,7 +458,7 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
     keyword: '',
     group: '',
     plan_id: undefined,
-    status: 'all',
+    status: 'active',
     expire_days: 7,
     usage_filter: '',
     sort: 'id',
@@ -429,7 +474,10 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
     if (values.keyword) params.set('keyword', values.keyword);
     if (values.group) params.set('group', values.group);
     if (values.plan_id) params.set('plan_id', values.plan_id);
-    params.set('status', values.status || 'all');
+    const keyword = values.keyword?.trim();
+    const status =
+      keyword && values.status === 'active' ? 'all' : values.status;
+    params.set('status', status || 'active');
     params.set('expire_days', values.expire_days || 7);
     if (values.usage_filter === 'today_gt_zero') {
       params.set('min_today_used', 1);

@@ -27,6 +27,9 @@ type subscriptionSummaryAPIResponse struct {
 				TodayUsed        int64   `json:"today_used"`
 				LifetimeUsed     int64   `json:"lifetime_used"`
 				UsagePercent     float64 `json:"usage_percent"`
+				ActualPercent    float64 `json:"actual_usage_percent"`
+				ElapsedUsed      int64   `json:"period_elapsed_used"`
+				ElapsedQuota     int64   `json:"period_elapsed_quota"`
 			} `json:"subscription_summary"`
 		} `json:"items"`
 	} `json:"data"`
@@ -63,25 +66,35 @@ func TestAdminListUserSubscriptionSummariesFiltersAndSorts(t *testing.T) {
 	now := common.GetTimestamp()
 	require.NoError(t, model.DB.Create(&model.User{Id: 1, Username: "alpha", Group: "default", Status: common.UserStatusEnabled, AffCode: "summary-alpha"}).Error)
 	require.NoError(t, model.DB.Create(&model.User{Id: 2, Username: "beta", Group: "default", Status: common.UserStatusEnabled, AffCode: "summary-beta"}).Error)
-	plan := &model.SubscriptionPlan{Title: "Pro", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 1000}
+	plan := &model.SubscriptionPlan{Title: "Pro", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 3000}
 	require.NoError(t, model.DB.Create(plan).Error)
 	require.NoError(t, model.DB.Create(&model.UserSubscription{
 		Id:              11,
 		UserId:          1,
 		PlanId:          plan.Id,
-		AmountTotal:     1000,
+		AmountTotal:     3000,
 		AmountUsed:      900,
 		AmountUsedTotal: 1500,
-		StartTime:       now - 3600,
-		EndTime:         now + int64(3*24*time.Hour/time.Second),
+		StartTime:       now - int64(3*24*time.Hour/time.Second),
+		EndTime:         now + int64(27*24*time.Hour/time.Second),
 		Status:          "active",
 	}).Error)
+	for i := 0; i < 3; i++ {
+		require.NoError(t, model.DB.Create(&model.SubscriptionUsageDaily{
+			UserId:             1,
+			UserSubscriptionId: 11,
+			PlanId:             plan.Id,
+			DayStart:           model.SubscriptionUsageDayStart(now - int64(time.Duration(i)*24*time.Hour/time.Second)),
+			Quota:              50,
+			RequestCount:       1,
+		}).Error)
+	}
 	require.NoError(t, model.DB.Create(&model.SubscriptionUsageDaily{
 		UserId:             1,
 		UserSubscriptionId: 11,
 		PlanId:             plan.Id,
-		DayStart:           model.SubscriptionUsageDayStart(now),
-		Quota:              300,
+		DayStart:           model.SubscriptionUsageDayStart(now - int64(20*24*time.Hour/time.Second)),
+		Quota:              999,
 		RequestCount:       2,
 	}).Error)
 
@@ -98,7 +111,10 @@ func TestAdminListUserSubscriptionSummariesFiltersAndSorts(t *testing.T) {
 	require.Len(t, body.Data.Items, 1)
 	assert.Equal(t, "alpha", body.Data.Items[0].Username)
 	assert.Equal(t, "Pro", body.Data.Items[0].SubscriptionSummary.PrimaryPlanTitle)
-	assert.Equal(t, int64(300), body.Data.Items[0].SubscriptionSummary.TodayUsed)
+	assert.Equal(t, int64(50), body.Data.Items[0].SubscriptionSummary.TodayUsed)
 	assert.Equal(t, int64(1500), body.Data.Items[0].SubscriptionSummary.LifetimeUsed)
-	assert.Equal(t, 90.0, body.Data.Items[0].SubscriptionSummary.UsagePercent)
+	assert.Equal(t, 30.0, body.Data.Items[0].SubscriptionSummary.UsagePercent)
+	assert.Equal(t, int64(150), body.Data.Items[0].SubscriptionSummary.ElapsedUsed)
+	assert.InDelta(t, int64(300), body.Data.Items[0].SubscriptionSummary.ElapsedQuota, 2)
+	assert.InDelta(t, 50.0, body.Data.Items[0].SubscriptionSummary.ActualPercent, 1)
 }

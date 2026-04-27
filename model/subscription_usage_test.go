@@ -113,6 +113,24 @@ func TestSubscriptionUsageRefundPreconsumeIsIdempotent(t *testing.T) {
 	assert.Equal(t, 1, dailyCount)
 }
 
+func TestSubscriptionActualUsageWindowForSub(t *testing.T) {
+	now := int64(1700864000)
+	sub := UserSubscription{
+		AmountTotal:   3000,
+		AmountUsed:    1200,
+		StartTime:     now - 3*86400,
+		EndTime:       now + 27*86400,
+		LastResetTime: now - 3*86400,
+		NextResetTime: now + 27*86400,
+	}
+
+	window := subscriptionActualUsageWindowForSub(sub, now)
+
+	assert.Equal(t, SubscriptionUsageDayStart(sub.StartTime), window.StartDay)
+	assert.Equal(t, SubscriptionUsageDayStart(now), window.EndDay)
+	assert.Equal(t, int64(300), window.TheoreticalQuota)
+}
+
 func TestBackfillSubscriptionUsageFromLogsIsIdempotent(t *testing.T) {
 	truncateTables(t)
 	_, subId := seedSubscriptionUsagePlanAndSub(t, 9103)

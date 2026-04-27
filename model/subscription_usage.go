@@ -129,6 +129,9 @@ type AdminUserSubscriptionSummary struct {
 	PeriodTotal           int64   `json:"period_total"`
 	PeriodRemain          int64   `json:"period_remain"`
 	UsagePercent          float64 `json:"usage_percent"`
+	PeriodElapsedUsed     int64   `json:"period_elapsed_used"`
+	PeriodElapsedQuota    int64   `json:"period_elapsed_quota"`
+	ActualUsagePercent    float64 `json:"actual_usage_percent"`
 	LifetimeUsed          int64   `json:"lifetime_used"`
 }
 
@@ -168,7 +171,7 @@ func normalizeAdminUserSubscriptionSummaryQuery(query AdminUserSubscriptionSumma
 	}
 	query.Sort = strings.TrimSpace(query.Sort)
 	switch query.Sort {
-	case "remaining_days", "end_time", "today_used", "lifetime_used", "usage_percent", "period_used":
+	case "remaining_days", "end_time", "today_used", "lifetime_used", "usage_percent", "actual_usage_percent", "period_used":
 	default:
 		query.Sort = "id"
 	}
@@ -273,6 +276,17 @@ func ListAdminUserSubscriptionSummaries(query AdminUserSubscriptionSummaryQuery)
 		todayUsageByUser[row.UserId] = row.Quota
 	}
 
+	primaryActiveSubByUser := make(map[int]UserSubscription)
+	for userId, activeSubs := range activeSubsByUser {
+		if primary, ok := primaryActiveSubscription(activeSubs); ok {
+			primaryActiveSubByUser[userId] = primary
+		}
+	}
+	actualUsageStatsBySub, err := loadSubscriptionActualUsageStats(primaryActiveSubByUser, now)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	items := make([]AdminUserSubscriptionSummaryItem, 0, len(users))
 	expireBefore := now + int64(query.ExpireDays)*86400
 	for _, user := range users {
@@ -297,13 +311,7 @@ func ListAdminUserSubscriptionSummaries(query AdminUserSubscriptionSummaryQuery)
 			LifetimeUsed: sumSubscriptionLifetimeUsage(allSubs),
 		}
 		if len(activeSubs) > 0 {
-			sort.SliceStable(activeSubs, func(i, j int) bool {
-				if activeSubs[i].EndTime == activeSubs[j].EndTime {
-					return activeSubs[i].Id < activeSubs[j].Id
-				}
-				return activeSubs[i].EndTime < activeSubs[j].EndTime
-			})
-			primary := activeSubs[0]
+			primary := primaryActiveSubByUser[user.Id]
 			summary.PrimarySubscriptionId = primary.Id
 			summary.PrimaryPlanId = primary.PlanId
 			summary.PrimaryPlanTitle = planTitleById[primary.PlanId]
@@ -321,6 +329,11 @@ func ListAdminUserSubscriptionSummaries(query AdminUserSubscriptionSummaryQuery)
 					summary.PeriodRemain = 0
 				}
 				summary.UsagePercent = math.Round(float64(primary.AmountUsed)/float64(primary.AmountTotal)*10000) / 100
+				if actualStats, ok := actualUsageStatsBySub[primary.Id]; ok {
+					summary.PeriodElapsedUsed = actualStats.Used
+					summary.PeriodElapsedQuota = actualStats.TheoreticalQuota
+					summary.ActualUsagePercent = actualStats.ActualUsagePercent
+				}
 			}
 		}
 
@@ -389,6 +402,124 @@ func sumSubscriptionLifetimeUsage(subs []UserSubscription) int64 {
 	return total
 }
 
+func primaryActiveSubscription(activeSubs []UserSubscription) (UserSubscription, bool) {
+	if len(activeSubs) == 0 {
+		return UserSubscription{}, false
+	}
+	sort.SliceStable(activeSubs, func(i, j int) bool {
+		if activeSubs[i].EndTime == activeSubs[j].EndTime {
+			return activeSubs[i].Id < activeSubs[j].Id
+		}
+		return activeSubs[i].EndTime < activeSubs[j].EndTime
+	})
+	return activeSubs[0], true
+}
+
+type subscriptionActualUsageStats struct {
+	Used               int64
+	TheoreticalQuota   int64
+	ActualUsagePercent float64
+}
+
+type subscriptionActualUsageWindow struct {
+	StartDay         int64
+	EndDay           int64
+	TheoreticalQuota int64
+}
+
+func loadSubscriptionActualUsageStats(primarySubs map[int]UserSubscription, now int64) (map[int]subscriptionActualUsageStats, error) {
+	stats := make(map[int]subscriptionActualUsageStats, len(primarySubs))
+	if len(primarySubs) == 0 {
+		return stats, nil
+	}
+
+	windows := make(map[int]subscriptionActualUsageWindow, len(primarySubs))
+	subIds := make([]int, 0, len(primarySubs))
+	minDay := int64(0)
+	maxDay := int64(0)
+	for _, sub := range primarySubs {
+		window := subscriptionActualUsageWindowForSub(sub, now)
+		if window.TheoreticalQuota <= 0 {
+			stats[sub.Id] = subscriptionActualUsageStats{}
+			continue
+		}
+		windows[sub.Id] = window
+		stats[sub.Id] = subscriptionActualUsageStats{
+			TheoreticalQuota: window.TheoreticalQuota,
+		}
+		subIds = append(subIds, sub.Id)
+		if minDay == 0 || window.StartDay < minDay {
+			minDay = window.StartDay
+		}
+		if window.EndDay > maxDay {
+			maxDay = window.EndDay
+		}
+	}
+	if len(subIds) == 0 {
+		return stats, nil
+	}
+
+	var rows []struct {
+		UserSubscriptionId int   `gorm:"column:user_subscription_id"`
+		DayStart           int64 `gorm:"column:day_start"`
+		Quota              int64 `gorm:"column:quota"`
+	}
+	if err := DB.Model(&SubscriptionUsageDaily{}).
+		Select("user_subscription_id, day_start, quota").
+		Where("user_subscription_id IN ? AND day_start >= ? AND day_start <= ?", subIds, minDay, maxDay).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		window, ok := windows[row.UserSubscriptionId]
+		if !ok || row.DayStart < window.StartDay || row.DayStart > window.EndDay {
+			continue
+		}
+		stat := stats[row.UserSubscriptionId]
+		stat.Used += row.Quota
+		stats[row.UserSubscriptionId] = stat
+	}
+	for subId, stat := range stats {
+		if stat.TheoreticalQuota <= 0 {
+			continue
+		}
+		stat.ActualUsagePercent = math.Round(float64(stat.Used)/float64(stat.TheoreticalQuota)*10000) / 100
+		stats[subId] = stat
+	}
+	return stats, nil
+}
+
+func subscriptionActualUsageWindowForSub(sub UserSubscription, now int64) subscriptionActualUsageWindow {
+	if sub.AmountTotal <= 0 {
+		return subscriptionActualUsageWindow{}
+	}
+	start := sub.LastResetTime
+	if start <= 0 || (sub.StartTime > 0 && start < sub.StartTime) {
+		start = sub.StartTime
+	}
+	end := sub.NextResetTime
+	if end <= 0 || (sub.EndTime > 0 && end > sub.EndTime) {
+		end = sub.EndTime
+	}
+	if start <= 0 || end <= start || now <= start {
+		return subscriptionActualUsageWindow{}
+	}
+	elapsed := now - start
+	period := end - start
+	if elapsed > period {
+		elapsed = period
+	}
+	expected := float64(sub.AmountTotal) * float64(elapsed) / float64(period)
+	if expected <= 0 {
+		return subscriptionActualUsageWindow{}
+	}
+	return subscriptionActualUsageWindow{
+		StartDay:         SubscriptionUsageDayStart(start),
+		EndDay:           SubscriptionUsageDayStart(start + elapsed),
+		TheoreticalQuota: int64(math.Round(expected)),
+	}
+}
+
 func summaryMatchesSubscriptionStatus(summary AdminUserSubscriptionSummary, hasAnySubscription bool, status string, expireBefore int64) bool {
 	hasActive := summary.ActiveCount > 0
 	switch status {
@@ -439,6 +570,8 @@ func adminUserSubscriptionSortValue(item AdminUserSubscriptionSummaryItem, sortK
 		return float64(summary.LifetimeUsed)
 	case "usage_percent":
 		return summary.UsagePercent
+	case "actual_usage_percent":
+		return summary.ActualUsagePercent
 	case "period_used":
 		return float64(summary.PeriodUsed)
 	default:
