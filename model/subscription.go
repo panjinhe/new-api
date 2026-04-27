@@ -797,6 +797,32 @@ func AdminInvalidateUserSubscription(userSubscriptionId int) (string, error) {
 	return "", nil
 }
 
+// AdminResetUserSubscriptionCurrentUsage clears the current-period used amount.
+func AdminResetUserSubscriptionCurrentUsage(userSubscriptionId int) (string, error) {
+	if userSubscriptionId <= 0 {
+		return "", errors.New("invalid userSubscriptionId")
+	}
+	now := common.GetTimestamp()
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var sub UserSubscription
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ?", userSubscriptionId).First(&sub).Error; err != nil {
+			return err
+		}
+		if sub.Status != "active" || (sub.EndTime > 0 && sub.EndTime <= now) {
+			return errors.New("subscription is not active")
+		}
+		return tx.Model(&sub).Updates(map[string]interface{}{
+			"amount_used": 0,
+			"updated_at":  now,
+		}).Error
+	})
+	if err != nil {
+		return "", err
+	}
+	return "已重置当前周期已用额度", nil
+}
+
 // AdminDeleteUserSubscription hard-deletes a user subscription.
 func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 	if userSubscriptionId <= 0 {

@@ -97,6 +97,33 @@ func TestSubscriptionUsageTracksPreconsumeDeltaRefundAndReset(t *testing.T) {
 	assert.Equal(t, 1, dailyCount)
 }
 
+func TestAdminResetUserSubscriptionCurrentUsageKeepsUsageStats(t *testing.T) {
+	truncateTables(t)
+	planId, subId := seedSubscriptionUsagePlanAndSub(t, 9104)
+	require.NoError(t, DB.Model(&UserSubscription{}).Where("id = ?", subId).Updates(map[string]interface{}{
+		"amount_used":       800,
+		"amount_used_total": 1200,
+	}).Error)
+	require.NoError(t, DB.Create(&SubscriptionUsageDaily{
+		UserId:             9104,
+		UserSubscriptionId: subId,
+		PlanId:             planId,
+		DayStart:           SubscriptionUsageDayStart(common.GetTimestamp()),
+		Quota:              800,
+		RequestCount:       3,
+	}).Error)
+
+	msg, err := AdminResetUserSubscriptionCurrentUsage(subId)
+	require.NoError(t, err)
+	assert.NotEmpty(t, msg)
+
+	amountUsed, amountUsedTotal, dailyQuota, dailyCount := readSubscriptionUsageState(t, subId)
+	assert.Equal(t, int64(0), amountUsed)
+	assert.Equal(t, int64(1200), amountUsedTotal)
+	assert.Equal(t, int64(800), dailyQuota)
+	assert.Equal(t, 3, dailyCount)
+}
+
 func TestSubscriptionUsageRefundPreconsumeIsIdempotent(t *testing.T) {
 	truncateTables(t)
 	_, subId := seedSubscriptionUsagePlanAndSub(t, 9102)

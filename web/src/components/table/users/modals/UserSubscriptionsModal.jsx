@@ -219,6 +219,33 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
     });
   };
 
+  const resetSubscriptionUsage = (subId) => {
+    Modal.confirm({
+      title: t('确认重置额度'),
+      content: t(
+        '将清零该订阅当前周期已用额度，恢复当前周期可用额度；历史累计用量和每日统计不会清除。是否继续？',
+      ),
+      centered: true,
+      onOk: async () => {
+        try {
+          const res = await API.post(
+            `/api/subscription/admin/user_subscriptions/${subId}/reset_usage`,
+          );
+          if (res.data?.success) {
+            const msg = res.data?.data?.message;
+            showSuccess(msg ? msg : t('已重置'));
+            await loadUserSubscriptions();
+            onSuccess?.();
+          } else {
+            showError(res.data?.message || t('操作失败'));
+          }
+        } catch (e) {
+          showError(t('请求失败'));
+        }
+      },
+    });
+  };
+
   const deleteSubscription = (subId) => {
     Modal.confirm({
       title: t('确认删除'),
@@ -325,7 +352,7 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
       {
         title: '',
         key: 'operate',
-        width: 140,
+        width: 230,
         fixed: 'right',
         render: (_, record) => {
           const sub = record?.subscription;
@@ -334,8 +361,18 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
             (sub?.end_time || 0) > 0 && (sub?.end_time || 0) < now;
           const isActive = sub?.status === 'active' && !isExpired;
           const isCancelled = sub?.status === 'cancelled';
+          const hasUsed = Number(sub?.amount_used || 0) > 0;
           return (
-            <Space>
+            <Space wrap>
+              <Button
+                size='small'
+                type='tertiary'
+                theme='light'
+                disabled={!isActive || isCancelled || !hasUsed}
+                onClick={() => resetSubscriptionUsage(sub?.id)}
+              >
+                {t('重置额度')}
+              </Button>
               <Button
                 size='small'
                 type='warning'

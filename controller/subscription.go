@@ -393,6 +393,25 @@ func AdminInvalidateUserSubscription(c *gin.Context) {
 	common.ApiSuccess(c, nil)
 }
 
+// AdminResetUserSubscriptionCurrentUsage clears current-period used amount.
+func AdminResetUserSubscriptionCurrentUsage(c *gin.Context) {
+	subId, _ := strconv.Atoi(c.Param("id"))
+	if subId <= 0 {
+		common.ApiErrorMsg(c, "无效的订阅ID")
+		return
+	}
+	msg, err := model.AdminResetUserSubscriptionCurrentUsage(subId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if msg != "" {
+		common.ApiSuccess(c, gin.H{"message": msg})
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
 // AdminDeleteUserSubscription hard-deletes a user subscription.
 func AdminDeleteUserSubscription(c *gin.Context) {
 	subId, _ := strconv.Atoi(c.Param("id"))
