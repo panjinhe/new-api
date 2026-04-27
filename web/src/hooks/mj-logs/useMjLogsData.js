@@ -28,7 +28,7 @@ import {
   showSuccess,
   timestamp2string,
 } from '../../helpers';
-import { ITEMS_PER_PAGE } from '../../constants';
+import { ADMIN_ITEMS_PER_PAGE, ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
 
 export const useMjLogsData = () => {
@@ -51,15 +51,19 @@ export const useMjLogsData = () => {
   };
 
   // Basic state
+  const isAdminUser = isAdmin();
+  const defaultPageSize = isAdminUser ? ADMIN_ITEMS_PER_PAGE : ITEMS_PER_PAGE;
+  const PAGE_SIZE_STORAGE_KEY = isAdminUser
+    ? 'mj-page-size-admin'
+    : 'mj-page-size-user';
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
   const [logCount, setLogCount] = useState(0);
-  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
   const [showBanner, setShowBanner] = useState(false);
 
   // User and admin
-  const isAdminUser = isAdmin();
   // Role-specific storage key to prevent different roles from overwriting each other
   const STORAGE_KEY = isAdminUser
     ? 'mj-logs-table-columns-admin'
@@ -247,7 +251,7 @@ export const useMjLogsData = () => {
   };
 
   const handlePageSizeChange = async (size) => {
-    localStorage.setItem('mj-page-size', size + '');
+    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, size + '');
     await loadLogs(1, size);
   };
 
@@ -279,7 +283,7 @@ export const useMjLogsData = () => {
   // Initialize data
   useEffect(() => {
     const localPageSize =
-      parseInt(localStorage.getItem('mj-page-size')) || ITEMS_PER_PAGE;
+      parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY)) || defaultPageSize;
     setPageSize(localPageSize);
     loadLogs(1, localPageSize).then();
   }, []);

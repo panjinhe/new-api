@@ -35,6 +35,7 @@ import {
 } from '@douyinfe/semi-illustrations';
 import { API, renderQuota, showError, showSuccess } from '../../../../helpers';
 import { convertUSDToCurrency } from '../../../../helpers/render';
+import { ADMIN_ITEMS_PER_PAGE } from '../../../../constants';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import CardTable from '../../../common/ui/CardTable';
 
@@ -84,7 +85,7 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
 
   const [subs, setSubs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = ADMIN_ITEMS_PER_PAGE;
 
   const planTitleMap = useMemo(() => {
     const map = new Map();
@@ -456,7 +457,7 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
             currentPage,
             pageSize,
             total: subs.length,
-            pageSizeOpts: [10, 20, 50],
+            pageSizeOpts: [10, 20, 50, 100],
             showSizeChanger: false,
             onPageChange: handlePageChange,
           }}

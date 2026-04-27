@@ -9,8 +9,6 @@ import {
 } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 import {
-  CalendarClock,
-  CheckCircle2,
   CircleDollarSign,
   ExternalLink,
   Gift,
@@ -22,10 +20,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { openRechargeLink, renderQuota } from '../../helpers';
-import {
-  formatSubscriptionDuration,
-  formatSubscriptionResetPeriod,
-} from '../../helpers/subscriptionFormat';
+import { formatSubscriptionResetPeriod } from '../../helpers/subscriptionFormat';
 
 const { Text, Paragraph } = Typography;
 
@@ -276,12 +271,21 @@ const getPlanResetLabel = (plan, t) => {
 const getPlanComparisonLabel = (plan) => {
   const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
   if (/pro\s*50x|pro50x|黑卡/i.test(text)) return '等于 2.5 个 Pro 20x';
-  if (text.includes('光速跃迁')) return '约等于 1 个 Pro 20x';
-  if (text.includes('加速')) return '约等于 14 个 Plus 账号';
-  if (text.includes('巡航')) return '约等于 7 个 Plus 账号';
+  if (text.includes('光速跃迁')) return '约等于 1.5个 Pro 20x';
+  if (text.includes('加速')) return '约等于3个 pro 5x';
+  if (text.includes('巡航')) return '约等于1.5个 pro5x';
   if (text.includes('启航')) return '约等于 4 个 Plus 账号';
   if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
   return '';
+};
+
+const getPlanSubtitleLabel = (plan) => {
+  const subtitle = plan?.subtitle || '';
+  const text = `${plan?.title || ''} ${subtitle}`;
+  if (/pro\s*50x|pro50x|黑卡/i.test(text)) {
+    return subtitle.replace(/[，,]\s*比.*$/, '');
+  }
+  return subtitle;
 };
 
 const RechargeSupportCard = ({
@@ -652,11 +656,11 @@ const RechargeSupportCard = ({
             </div>
           ) : subscriptionPlanItems.length > 0 ? (
             <>
-              <div className='mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2'>
+              <div className='mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2'>
                 {subscriptionPlanItems.map((plan, index) => {
                   const displayPrice = getPlanPriceLabel(plan);
+                  const subtitleLabel = getPlanSubtitleLabel(plan);
                   const totalAmount = Number(plan?.total_amount || 0);
-                  const limit = Number(plan?.max_purchase_per_user || 0);
                   const isRecommended =
                     (plan?.title || '').trim() === '前进三：巡航';
                   const visual = getSubscriptionPlanVisual(plan, index);
@@ -666,7 +670,7 @@ const RechargeSupportCard = ({
                   return (
                     <div
                       key={plan?.id || plan?.title}
-                      className='group relative overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5'
+                      className='group relative flex min-h-[244px] flex-col overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 lg:aspect-[1.08/1]'
                       style={{
                         background: visual.background,
                         border: `1px solid ${visual.border}`,
@@ -684,56 +688,76 @@ const RechargeSupportCard = ({
                           opacity: isPremium ? 0.72 : 0.6,
                         }}
                       />
-                      <div className='relative flex items-start justify-between gap-3'>
-                        <div className='min-w-0'>
-                          <div className='flex items-center gap-2 flex-wrap'>
+                      <div className='relative flex flex-1 flex-col'>
+                        <div className='flex flex-wrap items-center gap-2'>
+                          <span
+                            className='rounded-full px-2.5 py-1 text-xs font-semibold'
+                            style={{
+                              background: getPlanVisualSurface(visual),
+                              border: `1px solid ${visual.border}`,
+                              color: visual.accent,
+                            }}
+                          >
+                            {visual.code}
+                          </span>
+                          {isPremium ? (
                             <span
-                              className='rounded-full px-2 py-0.5 text-[10px] font-semibold'
+                              className='inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium'
                               style={{
-                                background: getPlanVisualSurface(visual),
-                                border: `1px solid ${visual.border}`,
-                                color: visual.accent,
+                                background: 'rgba(245, 199, 108, 0.14)',
+                                border: '1px solid rgba(245, 199, 108, 0.32)',
+                                color: 'rgba(255, 244, 214, 0.94)',
                               }}
                             >
-                              {visual.code}
+                              {t('旗舰')}
                             </span>
-                            <Text
-                              strong
-                              ellipsis={{ showTooltip: true }}
+                          ) : isRecommended ? (
+                            <Tag color='blue' shape='circle' size='small'>
+                              {t('推荐')}
+                            </Tag>
+                          ) : null}
+                        </div>
+
+                        <div className='mt-3 flex items-start justify-between gap-3'>
+                          <div className='min-w-0'>
+                            <div
+                              className='line-clamp-1 break-words text-lg font-semibold leading-snug'
                               style={{
-                                display: 'block',
                                 color: getPlanVisualHeadingText(visual),
                               }}
                             >
                               {plan?.title || t('订阅套餐')}
-                            </Text>
-                            {isPremium ? (
-                              <span
-                                className='inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium'
+                            </div>
+                            {subtitleLabel && (
+                              <div
+                                className='mt-1 line-clamp-1 break-words text-sm leading-5'
                                 style={{
-                                  background: 'rgba(245, 199, 108, 0.14)',
-                                  border: '1px solid rgba(245, 199, 108, 0.32)',
-                                  color: 'rgba(255, 244, 214, 0.94)',
+                                  color: getPlanVisualMutedText(visual),
                                 }}
                               >
-                                {t('旗舰')}
-                              </span>
-                            ) : isRecommended ? (
-                              <Tag color='blue' shape='circle' size='small'>
-                                {t('推荐')}
-                              </Tag>
-                            ) : null}
+                                {subtitleLabel}
+                              </div>
+                            )}
                           </div>
-                          {plan?.subtitle && (
+                          <div className='shrink-0 text-right'>
                             <div
-                              className='mt-1 text-xs leading-5'
+                              className='text-xs font-medium'
                               style={{ color: getPlanVisualMutedText(visual) }}
                             >
-                              {plan.subtitle}
+                              {t('月价')}
                             </div>
-                          )}
+                            <div
+                              className='mt-1 text-[26px] font-semibold leading-none'
+                              style={{ color: visual.accent }}
+                            >
+                              {displayPrice}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className='mt-2 flex flex-wrap gap-2'>
                           <div
-                            className='mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium'
+                            className='inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium leading-none'
                             style={{
                               background: getPlanVisualSurface(
                                 visual,
@@ -745,104 +769,69 @@ const RechargeSupportCard = ({
                             <Sparkles size={12} />
                             {t(visual.label)}
                           </div>
-                          {comparisonLabel && (
-                            <div
-                              className='mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium'
-                              style={{
-                                background: getPlanVisualSurface(
-                                  visual,
-                                  'rgba(255, 255, 255, 0.72)',
-                                ),
-                                border: `1px solid ${visual.border}`,
-                                color: isPremium
-                                  ? 'rgba(255, 244, 214, 0.94)'
-                                  : visual.accent,
-                              }}
-                            >
-                              <CircleDollarSign size={12} />
-                              {t(comparisonLabel)}
-                            </div>
-                          )}
                         </div>
-                        <div className='shrink-0 text-right'>
+
+                        {comparisonLabel && (
                           <div
-                            className='text-[11px]'
-                            style={{ color: getPlanVisualMutedText(visual) }}
-                          >
-                            {t('月价')}
-                          </div>
-                          <div
-                            className='mt-1 text-2xl font-semibold leading-none'
+                            className='mt-3 flex items-center gap-2 rounded-xl px-3 py-2'
                             style={{
-                              color: visual.accent,
+                              background: getPlanVisualSurface(
+                                visual,
+                                'rgba(255, 255, 255, 0.82)',
+                              ),
+                              border: `1px solid ${visual.border}`,
+                              color: isPremium
+                                ? 'rgba(255, 244, 214, 0.98)'
+                                : visual.accent,
                             }}
                           >
-                            {displayPrice}
+                            <CircleDollarSign size={17} className='shrink-0' />
+                            <span className='min-w-0 break-words text-base font-semibold leading-snug'>
+                              {t(comparisonLabel)}
+                            </span>
                           </div>
-                        </div>
-                      </div>
+                        )}
 
-                      <div className='relative mt-4 grid grid-cols-2 gap-2'>
-                        <div
-                          className='rounded-xl px-3 py-2'
-                          style={{ background: getPlanVisualPanel(visual) }}
-                        >
+                        <div className='mt-3 grid grid-cols-2 gap-2'>
                           <div
-                            className='flex items-center gap-1 text-[11px]'
-                            style={{ color: getPlanVisualMutedText(visual) }}
+                            className='rounded-xl px-2.5 py-2'
+                            style={{ background: getPlanVisualPanel(visual) }}
                           >
-                            <Gauge size={12} />
-                            {t('每日额度')}
+                            <div
+                              className='flex items-center gap-1.5 text-xs'
+                              style={{ color: getPlanVisualMutedText(visual) }}
+                            >
+                              <Gauge size={13} />
+                              {t('每日额度')}
+                            </div>
+                            <div
+                              className='mt-1 break-words text-base font-semibold leading-tight'
+                              style={{ color: getPlanVisualText(visual) }}
+                            >
+                              {totalAmount > 0
+                                ? renderQuota(totalAmount)
+                                : t('不限')}
+                            </div>
                           </div>
                           <div
-                            className='mt-1 text-sm font-semibold'
-                            style={{ color: getPlanVisualText(visual) }}
+                            className='rounded-xl px-2.5 py-2'
+                            style={{ background: getPlanVisualPanel(visual) }}
                           >
-                            {totalAmount > 0
-                              ? renderQuota(totalAmount)
-                              : t('不限')}
+                            <div
+                              className='flex items-center gap-1.5 text-xs'
+                              style={{ color: getPlanVisualMutedText(visual) }}
+                            >
+                              <RefreshCw size={13} />
+                              {t('重置')}
+                            </div>
+                            <div
+                              className='mt-1 break-words text-sm font-semibold leading-tight'
+                              style={{ color: getPlanVisualText(visual) }}
+                            >
+                              {getPlanResetLabel(plan, t)}
+                            </div>
                           </div>
                         </div>
-                        <div
-                          className='rounded-xl px-3 py-2'
-                          style={{ background: getPlanVisualPanel(visual) }}
-                        >
-                          <div
-                            className='flex items-center gap-1 text-[11px]'
-                            style={{ color: getPlanVisualMutedText(visual) }}
-                          >
-                            <RefreshCw size={12} />
-                            {t('重置')}
-                          </div>
-                          <div
-                            className='mt-1 text-sm font-semibold'
-                            style={{ color: getPlanVisualText(visual) }}
-                          >
-                            {getPlanResetLabel(plan, t)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className='relative mt-3 flex flex-wrap items-center justify-between gap-2 text-xs'
-                        style={{ color: getPlanVisualMutedText(visual) }}
-                      >
-                        <div className='flex flex-wrap gap-2'>
-                          <span className='inline-flex items-center gap-1'>
-                            <CalendarClock size={12} />
-                            {formatSubscriptionDuration(plan, t)}
-                          </span>
-                          <span className='inline-flex items-center gap-1'>
-                            <CheckCircle2 size={12} />
-                            {limit > 0
-                              ? `${t('每档')} ${limit} ${t('次')}`
-                              : t('不限购')}
-                          </span>
-                        </div>
-                        <span
-                          className='h-1.5 w-16 rounded-full'
-                          style={{ background: visual.rail }}
-                        />
                       </div>
                     </div>
                   );

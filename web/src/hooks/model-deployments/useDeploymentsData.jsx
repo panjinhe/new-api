@@ -20,7 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { API, showError, showSuccess } from '../../helpers';
-import { ITEMS_PER_PAGE } from '../../constants';
+import { ADMIN_ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
 
 export const useDeploymentsData = () => {
@@ -32,7 +32,7 @@ export const useDeploymentsData = () => {
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
-  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
+  const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
   const [searching, setSearching] = useState(false);
   const [deploymentCount, setDeploymentCount] = useState(0);
   const [query, setQuery] = useState({ keyword: '', status: '' });

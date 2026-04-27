@@ -47,6 +47,7 @@ import {
   showSuccess,
   timestamp2string,
 } from '../../../../helpers';
+import { ADMIN_ITEMS_PER_PAGE } from '../../../../constants';
 
 const { Text } = Typography;
 
@@ -58,7 +59,7 @@ const MultiKeyManageModal = ({ visible, onCancel, channel, onRefresh }) => {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
@@ -99,7 +100,7 @@ const MultiKeyManageModal = ({ visible, onCancel, channel, onRefresh }) => {
         setKeyStatusList(data.keys || []);
         setTotal(data.total || 0);
         setCurrentPage(data.page || 1);
-        setPageSize(data.page_size || 10);
+        setPageSize(data.page_size || ADMIN_ITEMS_PER_PAGE);
         setTotalPages(data.total_pages || 0);
 
         // Update statistics (these are always the overall statistics)

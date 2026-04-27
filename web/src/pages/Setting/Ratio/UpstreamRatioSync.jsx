@@ -45,7 +45,7 @@ import {
   stringToColor,
 } from '../../../helpers';
 import { useIsMobile } from '../../../hooks/common/useIsMobile';
-import { DEFAULT_ENDPOINT } from '../../../constants';
+import { ADMIN_ITEMS_PER_PAGE, DEFAULT_ENDPOINT } from '../../../constants';
 import { useTranslation } from 'react-i18next';
 import {
   IllustrationNoResult,
@@ -121,7 +121,7 @@ export default function UpstreamRatioSync(props) {
 
   // 分页相关状态
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
 
   // 搜索相关状态
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -823,7 +823,7 @@ export default function UpstreamRatioSync(props) {
           total: filteredDataSource.length,
           showSizeChanger: true,
           showQuickJumper: true,
-          pageSizeOptions: ['5', '10', '20', '50'],
+          pageSizeOptions: ['5', '10', '20', '50', '100'],
           onChange: (page, size) => {
             setCurrentPage(page);
             setPageSize(size);

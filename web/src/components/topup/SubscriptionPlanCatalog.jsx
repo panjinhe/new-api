@@ -93,12 +93,21 @@ const isPremiumBlackPlan = (plan) => {
 const getPlanComparisonLabel = (plan) => {
   const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
   if (/pro\s*50x|pro50x|黑卡/i.test(text)) return '等于 2.5 个 Pro 20x';
-  if (text.includes('光速跃迁')) return '约等于 1 个 Pro 20x';
-  if (text.includes('加速')) return '约等于 14 个 Plus 账号';
-  if (text.includes('巡航')) return '约等于 7 个 Plus 账号';
+  if (text.includes('光速跃迁')) return '约等于 1.5个 Pro 20x';
+  if (text.includes('加速')) return '约等于3个 pro 5x';
+  if (text.includes('巡航')) return '约等于1.5个 pro5x';
   if (text.includes('启航')) return '约等于 4 个 Plus 账号';
   if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
   return '';
+};
+
+const getPlanSubtitleLabel = (plan) => {
+  const subtitle = plan?.subtitle || '';
+  const text = `${plan?.title || ''} ${subtitle}`;
+  if (/pro\s*50x|pro50x|黑卡/i.test(text)) {
+    return subtitle.replace(/[，,]\s*比.*$/, '');
+  }
+  return subtitle;
 };
 
 const premiumBlackPlanVisual = {
@@ -296,6 +305,7 @@ const SubscriptionPlanCatalog = ({
               const plan = item?.plan;
               const totalAmount = Number(plan?.total_amount || 0);
               const { symbol, displayPrice } = getDisplayPrice(plan);
+              const subtitleLabel = getPlanSubtitleLabel(plan);
               const isRecommended =
                 (plan?.title || '').trim() === '前进三：巡航';
               const isPremium = isPremiumBlackPlan(plan);
@@ -370,7 +380,7 @@ const SubscriptionPlanCatalog = ({
                         >
                           {plan?.title || t('订阅套餐')}
                         </Typography.Title>
-                        {plan?.subtitle && (
+                        {subtitleLabel && (
                           <Text
                             type='tertiary'
                             size='small'
@@ -382,7 +392,7 @@ const SubscriptionPlanCatalog = ({
                                 : undefined,
                             }}
                           >
-                            {plan.subtitle}
+                            {subtitleLabel}
                           </Text>
                         )}
                       </div>

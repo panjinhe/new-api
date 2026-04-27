@@ -38,7 +38,7 @@ import {
   renderModelPrice,
   renderTaskBillingProcess,
 } from '../../helpers';
-import { ITEMS_PER_PAGE } from '../../constants';
+import { ADMIN_ITEMS_PER_PAGE, ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
 import ParamOverrideEntry from '../../components/table/usage-logs/components/ParamOverrideEntry';
 
@@ -64,6 +64,11 @@ export const useLogsData = () => {
   };
 
   // Basic state
+  const isAdminUser = isAdmin();
+  const defaultPageSize = isAdminUser ? ADMIN_ITEMS_PER_PAGE : ITEMS_PER_PAGE;
+  const PAGE_SIZE_STORAGE_KEY = isAdminUser
+    ? 'logs-page-size-admin'
+    : 'logs-page-size-user';
   const [logs, setLogs] = useState([]);
   const [expandData, setExpandData] = useState({});
   const [showStat, setShowStat] = useState(false);
@@ -71,11 +76,10 @@ export const useLogsData = () => {
   const [loadingStat, setLoadingStat] = useState(false);
   const [activePage, setActivePage] = useState(1);
   const [logCount, setLogCount] = useState(0);
-  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
   const [logType, setLogType] = useState(0);
 
   // User and admin
-  const isAdminUser = isAdmin();
   // Role-specific storage key to prevent different roles from overwriting each other
   const STORAGE_KEY = isAdminUser
     ? 'logs-table-columns-admin'
@@ -163,7 +167,9 @@ export const useLogsData = () => {
   };
 
   // Column visibility state
-  const [visibleColumns, setVisibleColumns] = useState(getInitialVisibleColumns);
+  const [visibleColumns, setVisibleColumns] = useState(
+    getInitialVisibleColumns,
+  );
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [billingDisplayMode, setBillingDisplayMode] = useState(
     getInitialBillingDisplayMode,
@@ -382,7 +388,10 @@ export const useLogsData = () => {
       let other = getLogOther(logs[i].other);
       let expandDataLocal = [];
 
-      if (isAdminUser && (logs[i].type === 0 || logs[i].type === 2 || logs[i].type === 6)) {
+      if (
+        isAdminUser &&
+        (logs[i].type === 0 || logs[i].type === 2 || logs[i].type === 6)
+      ) {
         expandDataLocal.push({
           key: t('渠道信息'),
           value: `${logs[i].channel} - ${logs[i].channel_name || '[未知]'}`,
@@ -592,7 +601,14 @@ export const useLogsData = () => {
           expandDataLocal.push({
             key: t('失败原因'),
             value: (
-              <div style={{ maxWidth: 600, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6 }}>
+              <div
+                style={{
+                  maxWidth: 600,
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.6,
+                }}
+              >
                 {other.reason}
               </div>
             ),
@@ -609,7 +625,8 @@ export const useLogsData = () => {
         const ss = other.stream_status;
         const isOk = ss.status === 'ok';
         const statusLabel = isOk ? '✓ ' + t('正常') : '✗ ' + t('异常');
-        let streamValue = statusLabel + ' (' + (ss.end_reason || 'unknown') + ')';
+        let streamValue =
+          statusLabel + ' (' + (ss.end_reason || 'unknown') + ')';
         if (ss.error_count > 0) {
           streamValue += ` [${t('软错误')}: ${ss.error_count}]`;
         }
@@ -624,7 +641,14 @@ export const useLogsData = () => {
           expandDataLocal.push({
             key: t('流错误详情'),
             value: (
-              <div style={{ maxWidth: 600, whiteSpace: 'pre-line', wordBreak: 'break-word', lineHeight: 1.6 }}>
+              <div
+                style={{
+                  maxWidth: 600,
+                  whiteSpace: 'pre-line',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.6,
+                }}
+              >
                 {ss.errors.join('\n')}
               </div>
             ),
@@ -851,10 +875,10 @@ export const useLogsData = () => {
   };
 
   const handlePageSizeChange = async (size) => {
-    localStorage.setItem('page-size', size + '');
+    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, size + '');
     setPageSize(size);
     setActivePage(1);
-    loadLogs(activePage, size)
+    loadLogs(1, size)
       .then()
       .catch((reason) => {
         showError(reason);
@@ -881,7 +905,7 @@ export const useLogsData = () => {
   // Initialize data
   useEffect(() => {
     const localPageSize =
-      parseInt(localStorage.getItem('page-size')) || ITEMS_PER_PAGE;
+      parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY)) || defaultPageSize;
     setPageSize(localPageSize);
     loadLogs(activePage, localPageSize)
       .then()

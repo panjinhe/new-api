@@ -20,8 +20,10 @@ For commercial licensing, please contact support@quantumnous.com
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { API, showError, showSuccess } from '../../helpers';
-import { ITEMS_PER_PAGE } from '../../constants';
+import { ADMIN_ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
+
+const USERS_PAGE_SIZE_STORAGE_KEY = 'admin-users-page-size';
 
 export const useUsersData = () => {
   const { t } = useTranslation();
@@ -31,7 +33,7 @@ export const useUsersData = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
-  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
+  const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
   const [searching, setSearching] = useState(false);
   const [groupOptions, setGroupOptions] = useState([]);
   const [userCount, setUserCount] = useState(0);
@@ -201,14 +203,19 @@ export const useUsersData = () => {
 
   // Handle page size change
   const handlePageSizeChange = async (size) => {
-    localStorage.setItem('page-size', size + '');
+    localStorage.setItem(USERS_PAGE_SIZE_STORAGE_KEY, size + '');
     setPageSize(size);
     setActivePage(1);
-    loadUsers(activePage, size)
-      .then()
-      .catch((reason) => {
-        showError(reason);
-      });
+    const { searchKeyword, searchGroup } = getFormValues();
+    try {
+      if (searchKeyword === '' && searchGroup === '') {
+        await loadUsers(1, size);
+      } else {
+        await searchUsers(1, size, searchKeyword, searchGroup);
+      }
+    } catch (reason) {
+      showError(reason);
+    }
   };
 
   // Handle table row styling for disabled/deleted users
@@ -266,7 +273,11 @@ export const useUsersData = () => {
 
   // Initialize data on component mount
   useEffect(() => {
-    loadUsers(0, pageSize)
+    const localPageSize =
+      parseInt(localStorage.getItem(USERS_PAGE_SIZE_STORAGE_KEY)) ||
+      ADMIN_ITEMS_PER_PAGE;
+    setPageSize(localPageSize);
+    loadUsers(1, localPageSize)
       .then()
       .catch((reason) => {
         showError(reason);

@@ -29,8 +29,8 @@ import {
   toBoolean,
 } from '../../helpers';
 import {
+  ADMIN_ITEMS_PER_PAGE,
   CHANNEL_OPTIONS,
-  ITEMS_PER_PAGE,
   MODEL_TABLE_PAGE_SIZE,
 } from '../../constants';
 import { useIsMobile } from '../common/useIsMobile';
@@ -46,6 +46,7 @@ import {
 
 const CODEX_USAGE_CACHE_TTL_MS = 60 * 1000;
 const CODEX_USAGE_BATCH_CONCURRENCY = 4;
+const CHANNELS_PAGE_SIZE_STORAGE_KEY = 'admin-channels-page-size';
 
 export const useChannelsData = () => {
   const { t } = useTranslation();
@@ -57,7 +58,7 @@ export const useChannelsData = () => {
   const [activePage, setActivePage] = useState(1);
   const [idSort, setIdSort] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
+  const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
   const [channelCount, setChannelCount] = useState(0);
   const [groupOptions, setGroupOptions] = useState([]);
 
@@ -160,7 +161,8 @@ export const useChannelsData = () => {
   useEffect(() => {
     const localIdSort = localStorage.getItem('id-sort') === 'true';
     const localPageSize =
-      parseInt(localStorage.getItem('page-size')) || ITEMS_PER_PAGE;
+      parseInt(localStorage.getItem(CHANNELS_PAGE_SIZE_STORAGE_KEY)) ||
+      ADMIN_ITEMS_PER_PAGE;
     const localEnableTagMode =
       localStorage.getItem('enable-tag-mode') === 'true';
     const localEnableBatchDelete =
@@ -647,7 +649,7 @@ export const useChannelsData = () => {
   };
 
   const handlePageSizeChange = async (size) => {
-    localStorage.setItem('page-size', size + '');
+    localStorage.setItem(CHANNELS_PAGE_SIZE_STORAGE_KEY, size + '');
     setPageSize(size);
     setActivePage(1);
     const { searchKeyword, searchGroup, searchModel } = getFormValues();

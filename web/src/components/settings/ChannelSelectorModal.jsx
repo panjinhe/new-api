@@ -34,6 +34,7 @@ import {
   Tag,
 } from '@douyinfe/semi-ui';
 import { IconSearch } from '@douyinfe/semi-icons';
+import { ADMIN_ITEMS_PER_PAGE } from '../../constants';
 
 const OFFICIAL_RATIO_PRESET_ID = -100;
 const MODELS_DEV_PRESET_ID = -101;
@@ -59,7 +60,7 @@ const ChannelSelectorModal = forwardRef(
   ) => {
     const [searchText, setSearchText] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
     const isMobile = useIsMobile();
 
     const [filteredData, setFilteredData] = useState([]);

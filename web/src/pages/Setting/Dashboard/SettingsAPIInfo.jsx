@@ -38,6 +38,7 @@ import {
 import { Plus, Edit, Trash2, Save, Settings } from 'lucide-react';
 import { API, showError, showSuccess } from '../../../helpers';
 import { useTranslation } from 'react-i18next';
+import { ADMIN_ITEMS_PER_PAGE } from '../../../constants';
 
 const { Text } = Typography;
 
@@ -59,7 +60,7 @@ const SettingsAPIInfo = ({ options, refresh }) => {
     color: 'blue',
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
   // 面板启用状态 state
@@ -411,7 +412,7 @@ const SettingsAPIInfo = ({ options, refresh }) => {
             total: apiInfoList.length,
             showSizeChanger: true,
             showQuickJumper: true,
-            pageSizeOptions: ['5', '10', '20', '50'],
+            pageSizeOptions: ['5', '10', '20', '50', '100'],
             onChange: (page, size) => {
               setCurrentPage(page);
               setPageSize(size);

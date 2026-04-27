@@ -49,11 +49,14 @@ import {
   createCardProPagination,
   timestamp2string,
 } from '../../../helpers/utils';
+import { ADMIN_ITEMS_PER_PAGE } from '../../../constants';
 import { useIsMobile } from '../../../hooks/common/useIsMobile';
 import { useTableCompactMode } from '../../../hooks/common/useTableCompactMode';
 import UserSubscriptionsModal from './modals/UserSubscriptionsModal';
 
 const { Text } = Typography;
+const USER_SUBSCRIPTIONS_PAGE_SIZE_STORAGE_KEY =
+  'admin-user-subscriptions-page-size';
 
 const formatTs = (timestamp) => {
   const value = Number(timestamp || 0);
@@ -444,7 +447,8 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
   const [loading, setLoading] = useState(false);
   const [activePage, setActivePage] = useState(1);
   const [pageSize, setPageSize] = useState(
-    parseInt(localStorage.getItem('page-size')) || 10,
+    parseInt(localStorage.getItem(USER_SUBSCRIPTIONS_PAGE_SIZE_STORAGE_KEY)) ||
+      ADMIN_ITEMS_PER_PAGE,
   );
   const [total, setTotal] = useState(0);
   const [formApi, setFormApi] = useState(null);
@@ -564,7 +568,7 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
   };
 
   const handlePageSizeChange = (size) => {
-    localStorage.setItem('page-size', `${size}`);
+    localStorage.setItem(USER_SUBSCRIPTIONS_PAGE_SIZE_STORAGE_KEY, `${size}`);
     setPageSize(size);
     loadData(1, size);
   };
