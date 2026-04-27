@@ -200,6 +200,32 @@ function TokensPage() {
   }
   openCCSwitchModalRef.current = openCCSwitchModal;
 
+  const openCCSwitchFallback = async () => {
+    const {
+      tokens,
+      selectedKeys: selected,
+      t: translate,
+      fetchTokenKey,
+    } = latestRef.current;
+
+    const fallbackToken =
+      (!selected || selected.length === 0) && tokens?.length === 1
+        ? tokens[0]
+        : null;
+    const targetToken =
+      selected && selected.length === 1 ? selected[0] : fallbackToken;
+
+    if (!targetToken) {
+      Toast.warning(translate('请选择一个令牌用于 CC Switch 配置'));
+      return;
+    }
+
+    try {
+      const fullKey = await fetchTokenKey(targetToken);
+      openCCSwitchModal(fullKey);
+    } catch (_) {}
+  };
+
   // Prefill to Fluent handler
   const handlePrefillToFluent = async () => {
     const {
@@ -408,6 +434,7 @@ function TokensPage() {
               setShowEdit={setShowEdit}
               batchCopyTokens={batchCopyTokens}
               batchDeleteTokens={batchDeleteTokens}
+              openCCSwitchFallback={openCCSwitchFallback}
               t={t}
             />
 

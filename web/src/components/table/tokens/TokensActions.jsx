@@ -29,6 +29,7 @@ const TokensActions = ({
   setShowEdit,
   batchCopyTokens,
   batchDeleteTokens,
+  openCCSwitchFallback,
   t,
 }) => {
   // Modal states
@@ -74,6 +75,15 @@ const TokensActions = ({
           size='small'
         >
           {t('添加令牌')}
+        </Button>
+
+        <Button
+          type='tertiary'
+          className='flex-1 md:flex-initial'
+          onClick={openCCSwitchFallback}
+          size='small'
+        >
+          {t('CC Switch 备用配置')}
         </Button>
 
         <Button

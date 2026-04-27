@@ -233,6 +233,11 @@ const Home = () => {
                     >
                       {t('查看 GitHub 仓库')}
                     </Button>
+                    <span className='w-full text-xs leading-5 text-semi-color-text-2 md:w-auto md:text-sm'>
+                      {t(
+                        '如果 GitHub 打不开或下载失败，请加入 QQ 群，在群文件中下载 CC Switch 安装包。',
+                      )}
+                    </span>
                   </div>
                   <div className='mt-4 rounded-2xl border border-cyan-200/70 bg-white/70 p-4 dark:border-cyan-500/20 dark:bg-black/20'>
                     <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
@@ -248,7 +253,7 @@ const Home = () => {
                         {t('复制 Base URL')}
                       </Button>
                     </div>
-                    <Input readonly value={serverAddress} />
+                    <Input readOnly value={serverAddress} />
                   </div>
                 </div>
 

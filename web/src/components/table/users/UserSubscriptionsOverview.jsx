@@ -70,7 +70,7 @@ const renderUserCell = (record, t) => {
           {record.username || '-'}
         </Text>
         <Tag color='white' shape='circle' size='small'>
-          ID {record.id}
+          {t('ID')} {record.id}
         </Tag>
       </div>
       <div className='text-xs text-[var(--semi-color-text-2)]'>

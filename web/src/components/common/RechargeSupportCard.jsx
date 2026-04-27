@@ -38,10 +38,10 @@ const toolTags = ['Codex', 'CLI', 'VSCode', 'OpenClaw', '小龙虾', 'AstrBot'];
 const modelTags = ['5.4', '5.3codex', '5.4mini', '5.2'];
 
 const pricingItems = [
-  { quota: '50 刀', quotaValue: 50, price: '10 元', priceValue: 10 },
-  { quota: '100 刀', quotaValue: 100, price: '18 元', priceValue: 18 },
-  { quota: '200 刀', quotaValue: 200, price: '35 元', priceValue: 35 },
-  { quota: '500 刀', quotaValue: 500, price: '80 元', priceValue: 80 },
+  { quota: '50 刀', quotaValue: 50, price: '12 元', priceValue: 12 },
+  { quota: '100 刀', quotaValue: 100, price: '22 元', priceValue: 22 },
+  { quota: '200 刀', quotaValue: 200, price: '42 元', priceValue: 42 },
+  { quota: '500 刀', quotaValue: 500, price: '99 元', priceValue: 99 },
 ];
 const starterUnitPrice =
   pricingItems[0].priceValue / pricingItems[0].quotaValue;
@@ -272,7 +272,7 @@ const RechargeSupportCard = ({
               <Text strong style={{ fontSize: 16 }}>
                 {t('Codex API 接入服务')}
               </Text>
-              <Tag color='orange'>{t('0.16元每刀')}</Tag>
+              <Tag color='orange'>{t('0.198元每刀起')}</Tag>
               <Tag color='green'>{t('超值倍率')}</Tag>
             </div>
             <div className='mt-2 text-sm text-[var(--semi-color-text-1)]'>

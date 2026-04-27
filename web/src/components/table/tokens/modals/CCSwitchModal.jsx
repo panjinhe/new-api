@@ -16,22 +16,38 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Modal,
   RadioGroup,
   Radio,
   Select,
   Input,
+  TextArea,
+  Button,
+  Space,
+  Banner,
   Toast,
   Typography,
 } from '@douyinfe/semi-ui';
+import { IconCopy, IconExternalOpen } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
-import { encodeToBase64, selectFilter } from '../../../../helpers';
+import {
+  copy,
+  encodeToBase64,
+  selectFilter,
+  showError,
+  showSuccess,
+} from '../../../../helpers';
 
 const CLAUDE_CODE_COMPAT_MODEL = 'claude-opus-4-6';
 
 const APP_CONFIGS = {
+  codex: {
+    label: 'Codex',
+    defaultName: 'aheapi',
+    modelFields: [{ key: 'model', label: '主模型' }],
+  },
   claude: {
     label: 'Claude',
     defaultName: 'aheapi',
@@ -42,16 +58,6 @@ const APP_CONFIGS = {
       { key: 'opusModel', label: 'Opus 模型', fixed: true },
       { key: 'reasoningModel', label: 'Reasoning 模型', fixed: true },
     ],
-  },
-  codex: {
-    label: 'Codex',
-    defaultName: 'aheapi',
-    modelFields: [{ key: 'model', label: '主模型' }],
-  },
-  gemini: {
-    label: 'Gemini',
-    defaultName: 'My Gemini',
-    modelFields: [{ key: 'model', label: '主模型' }],
   },
 };
 
@@ -67,6 +73,11 @@ function getServerAddress() {
 }
 
 function getDefaultModels(app) {
+  if (app === 'codex') {
+    return {
+      model: 'gpt-5.5',
+    };
+  }
   if (app !== 'claude') return {};
   return {
     model: CLAUDE_CODE_COMPAT_MODEL,
@@ -92,10 +103,15 @@ function buildCodexImportConfig(endpoint, model, apiKey) {
   ].join('\n');
 
   return {
-    auth: {
-      OPENAI_API_KEY: apiKey,
-    },
+    auth: buildCodexAuthConfig(apiKey),
     config,
+  };
+}
+
+function buildCodexAuthConfig(apiKey) {
+  return {
+    auth_mode: 'apikey',
+    OPENAI_API_KEY: apiKey,
   };
 }
 
@@ -148,6 +164,40 @@ function buildCCSwitchURL(app, name, models, apiKey) {
   return `ccswitch://v1/import?${params.toString()}`;
 }
 
+function buildManualConfig(app, name, models, apiKey) {
+  const serverAddress = getServerAddress();
+  const endpoint = app === 'codex' ? serverAddress + '/v1' : serverAddress;
+
+  if (app === 'codex') {
+    return [
+      '文件目录（Codex 配置目录，不是安装目录）：',
+      'Windows: %USERPROFILE%\\.codex',
+      'macOS / Linux: ~/.codex',
+      '',
+      'config.toml 文件内容：',
+      buildCodexImportConfig(endpoint, models.model, apiKey).config,
+      '',
+      'auth.json 文件内容：',
+      JSON.stringify(buildCodexAuthConfig(apiKey), null, 2),
+    ].join('\n');
+  }
+
+  if (app === 'claude') {
+    return JSON.stringify(
+      buildClaudeImportConfig(endpoint, models, apiKey),
+      null,
+      2,
+    );
+  }
+
+  return JSON.stringify({
+    name,
+    endpoint,
+    apiKey,
+    model: models.model || '',
+  }, null, 2);
+}
+
 export default function CCSwitchModal({
   visible,
   onClose,
@@ -155,19 +205,52 @@ export default function CCSwitchModal({
   modelOptions,
 }) {
   const { t } = useTranslation();
-  const [app, setApp] = useState('claude');
-  const [name, setName] = useState(APP_CONFIGS.claude.defaultName);
+  const [app, setApp] = useState('codex');
+  const [name, setName] = useState(APP_CONFIGS.codex.defaultName);
   const [models, setModels] = useState({});
+  const autoOpenKeyRef = useRef('');
 
   const currentConfig = APP_CONFIGS[app];
+  const finalModels = useMemo(
+    () => ({ ...getDefaultModels(app), ...models }),
+    [app, models],
+  );
+  const apiKey = tokenKey ? 'sk-' + tokenKey : '';
+  const importURL = useMemo(
+    () => buildCCSwitchURL(app, name, finalModels, apiKey),
+    [app, name, finalModels, apiKey],
+  );
+  const manualConfig = useMemo(
+    () => buildManualConfig(app, name, finalModels, apiKey),
+    [app, name, finalModels, apiKey],
+  );
 
   useEffect(() => {
     if (visible) {
-      setApp('claude');
-      setName(APP_CONFIGS.claude.defaultName);
-      setModels(getDefaultModels('claude'));
+      setApp('codex');
+      setName(APP_CONFIGS.codex.defaultName);
+      setModels(getDefaultModels('codex'));
+    } else {
+      autoOpenKeyRef.current = '';
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (!visible || app !== 'codex' || !apiKey || !finalModels.model) {
+      return;
+    }
+
+    const autoOpenKey = `${app}:${apiKey}:${finalModels.model}`;
+    if (autoOpenKeyRef.current === autoOpenKey) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      autoOpenKeyRef.current = autoOpenKey;
+      window.location.href = importURL;
+    }, 100);
+
+    return () => window.clearTimeout(timer);
+  }, [visible, app, apiKey, finalModels.model, importURL]);
 
   const handleAppChange = (val) => {
     setApp(val);
@@ -179,15 +262,30 @@ export default function CCSwitchModal({
     setModels((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
-    const finalModels = { ...getDefaultModels(app), ...models };
+  const validateConfig = () => {
     if (!finalModels.model) {
       Toast.warning(t('请选择主模型'));
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = () => {
+    if (!validateConfig()) {
       return;
     }
-    const url = buildCCSwitchURL(app, name, finalModels, 'sk-' + tokenKey);
-    window.open(url, '_blank');
-    onClose();
+    window.location.href = importURL;
+  };
+
+  const copyText = async (text, successMessage) => {
+    if (!validateConfig()) {
+      return;
+    }
+    if (await copy(text)) {
+      showSuccess(t(successMessage));
+      return;
+    }
+    showError(t('无法复制到剪贴板，请手动复制'));
   };
 
   const fieldLabelStyle = useMemo(
@@ -204,13 +302,45 @@ export default function CCSwitchModal({
       title={t('填入 CC Switch')}
       visible={visible}
       onCancel={onClose}
-      onOk={handleSubmit}
-      okText={t('打开 CC Switch')}
-      cancelText={t('取消')}
+      footer={
+        <Space wrap>
+          <Button theme='borderless' onClick={onClose}>
+            {t('取消')}
+          </Button>
+          <Button
+            theme='outline'
+            icon={<IconCopy />}
+            onClick={() => copyText(importURL, '导入链接已复制')}
+          >
+            {t('复制导入链接')}
+          </Button>
+          <Button
+            theme='outline'
+            icon={<IconCopy />}
+            onClick={() => copyText(manualConfig, '手动配置已复制')}
+          >
+            {t('复制手动配置')}
+          </Button>
+          <Button
+            type='primary'
+            icon={<IconExternalOpen />}
+            onClick={handleSubmit}
+          >
+            {t('打开 CC Switch')}
+          </Button>
+        </Space>
+      }
       maskClosable={false}
-      width={480}
+      width={640}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Banner
+          type='info'
+          description={t(
+            '正在尝试打开 CC Switch。如果没有拉起，请复制导入链接或手动配置继续使用。',
+          )}
+        />
+
         <div>
           <div style={fieldLabelStyle}>{t('应用')}</div>
           <RadioGroup
@@ -245,7 +375,10 @@ export default function CCSwitchModal({
               )}
             </div>
             {field.fixed ? (
-              <Input value={models[field.key] || CLAUDE_CODE_COMPAT_MODEL} disabled />
+              <Input
+                value={models[field.key] || CLAUDE_CODE_COMPAT_MODEL}
+                disabled
+              />
             ) : (
               <Select
                 placeholder={t('请选择模型')}
@@ -261,6 +394,20 @@ export default function CCSwitchModal({
             )}
           </div>
         ))}
+
+        <div>
+          <div style={fieldLabelStyle}>{t('手动配置')}</div>
+          <TextArea
+            value={manualConfig}
+            readOnly
+            autosize={{ minRows: 6, maxRows: 10 }}
+            style={{
+              fontFamily:
+                'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace',
+              fontSize: 12,
+            }}
+          />
+        </div>
       </div>
     </Modal>
   );
