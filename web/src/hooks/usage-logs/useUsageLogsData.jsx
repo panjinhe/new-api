@@ -74,6 +74,7 @@ export const useLogsData = () => {
   const [showStat, setShowStat] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingStat, setLoadingStat] = useState(false);
+  const [initialLogsLoaded, setInitialLogsLoaded] = useState(false);
   const [activePage, setActivePage] = useState(1);
   const [logCount, setLogCount] = useState(0);
   const [pageSize, setPageSize] = useState(defaultPageSize);
@@ -320,13 +321,18 @@ export const useLogsData = () => {
       return;
     }
     setLoadingStat(true);
-    if (isAdminUser) {
-      await getLogStat();
-    } else {
-      await getLogSelfStat();
+    try {
+      if (isAdminUser) {
+        await getLogStat();
+      } else {
+        await getLogSelfStat();
+      }
+      setShowStat(true);
+    } catch (reason) {
+      showError(reason?.message || reason);
+    } finally {
+      setLoadingStat(false);
     }
-    setShowStat(true);
-    setLoadingStat(false);
   };
 
   // User info function
@@ -825,47 +831,50 @@ export const useLogsData = () => {
   const loadLogs = async (startIdx, pageSize, customLogType = null) => {
     setLoading(true);
 
-    let url = '';
-    const {
-      username,
-      token_name,
-      model_name,
-      start_timestamp,
-      end_timestamp,
-      channel,
-      group,
-      request_id,
-      logType: formLogType,
-    } = getFormValues();
+    try {
+      let url = '';
+      const {
+        username,
+        token_name,
+        model_name,
+        start_timestamp,
+        end_timestamp,
+        channel,
+        group,
+        request_id,
+        logType: formLogType,
+      } = getFormValues();
 
-    const currentLogType =
-      customLogType !== null
-        ? customLogType
-        : formLogType !== undefined
-          ? formLogType
-          : logType;
+      const currentLogType =
+        customLogType !== null
+          ? customLogType
+          : formLogType !== undefined
+            ? formLogType
+            : logType;
 
-    let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-    let localEndTimestamp = Date.parse(end_timestamp) / 1000;
-    if (isAdminUser) {
-      url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&request_id=${request_id}`;
-    } else {
-      url = `/api/log/self/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}&request_id=${request_id}`;
+      let localStartTimestamp = Date.parse(start_timestamp) / 1000;
+      let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+      if (isAdminUser) {
+        url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&request_id=${request_id}`;
+      } else {
+        url = `/api/log/self/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}&request_id=${request_id}`;
+      }
+      url = encodeURI(url);
+      const res = await API.get(url);
+      const { success, message, data } = res.data;
+      if (success) {
+        const newPageData = data.items;
+        setActivePage(data.page);
+        setPageSize(data.page_size);
+        setLogCount(data.total);
+
+        setLogsFormat(newPageData);
+      } else {
+        showError(message);
+      }
+    } finally {
+      setLoading(false);
     }
-    url = encodeURI(url);
-    const res = await API.get(url);
-    const { success, message, data } = res.data;
-    if (success) {
-      const newPageData = data.items;
-      setActivePage(data.page);
-      setPageSize(data.page_size);
-      setLogCount(data.total);
-
-      setLogsFormat(newPageData);
-    } else {
-      showError(message);
-    }
-    setLoading(false);
   };
 
   // Page handlers
@@ -888,8 +897,8 @@ export const useLogsData = () => {
   // Refresh function
   const refresh = async () => {
     setActivePage(1);
-    handleEyeClick();
     await loadLogs(1, pageSize);
+    handleEyeClick();
   };
 
   // Copy text function
@@ -907,19 +916,29 @@ export const useLogsData = () => {
     const localPageSize =
       parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY)) || defaultPageSize;
     setPageSize(localPageSize);
+    setInitialLogsLoaded(false);
     loadLogs(activePage, localPageSize)
       .then()
       .catch((reason) => {
         showError(reason);
+      })
+      .finally(() => {
+        setInitialLogsLoaded(true);
       });
   }, []);
 
-  // Initialize statistics when formApi is available
+  // Initialize statistics after the first page of logs is visible.
   useEffect(() => {
-    if (formApi) {
-      handleEyeClick();
+    if (!formApi || !initialLogsLoaded) {
+      return;
     }
-  }, [formApi]);
+
+    const timer = setTimeout(() => {
+      handleEyeClick();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formApi, initialLogsLoaded]);
 
   // Check if any record has expandable content
   const hasExpandableRows = () => {
