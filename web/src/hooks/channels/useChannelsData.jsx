@@ -45,8 +45,64 @@ import {
 } from '../../components/table/channels/codexUsageUtils';
 
 const CODEX_USAGE_CACHE_TTL_MS = 5 * 60 * 1000;
+const CODEX_USAGE_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+const CODEX_USAGE_CACHE_STORAGE_KEY = 'channels-codex-usage-cache';
 const CODEX_USAGE_BATCH_CONCURRENCY = 4;
 const CHANNELS_PAGE_SIZE_STORAGE_KEY = 'admin-channels-page-size';
+const codexUsageCacheStore = new Map();
+const codexUsageInflightStore = new Map();
+
+const loadCodexUsageCacheStore = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = window.sessionStorage?.getItem(CODEX_USAGE_CACHE_STORAGE_KEY);
+    if (!raw) return;
+    const entries = JSON.parse(raw);
+    if (!Array.isArray(entries)) return;
+    const now = Date.now();
+    entries.forEach(([channelId, cached]) => {
+      if (
+        channelId == null ||
+        !cached?.payload ||
+        now - Number(cached.fetchedAt || 0) > CODEX_USAGE_CACHE_MAX_AGE_MS
+      ) {
+        return;
+      }
+      codexUsageCacheStore.set(String(channelId), {
+        payload: cached.payload,
+        fetchedAt: Number(cached.fetchedAt || 0),
+      });
+    });
+  } catch (error) {
+    // sessionStorage is an optional optimization; ignore unavailable storage.
+  }
+};
+
+const persistCodexUsageCacheStore = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const now = Date.now();
+    const entries = [];
+    codexUsageCacheStore.forEach((cached, channelId) => {
+      if (
+        !cached?.payload ||
+        now - Number(cached.fetchedAt || 0) > CODEX_USAGE_CACHE_MAX_AGE_MS
+      ) {
+        codexUsageCacheStore.delete(channelId);
+        return;
+      }
+      entries.push([channelId, cached]);
+    });
+    window.sessionStorage?.setItem(
+      CODEX_USAGE_CACHE_STORAGE_KEY,
+      JSON.stringify(entries),
+    );
+  } catch (error) {
+    // Ignore quota or privacy-mode failures.
+  }
+};
+
+loadCodexUsageCacheStore();
 
 export const useChannelsData = () => {
   const { t } = useTranslation();
@@ -131,8 +187,8 @@ export const useChannelsData = () => {
   const requestCounter = useRef(0);
   const allSelectingRef = useRef(false);
   const [formApi, setFormApi] = useState(null);
-  const codexUsageCacheRef = useRef(new Map());
-  const codexUsageInflightRef = useRef(new Map());
+  const codexUsageCacheRef = useRef(codexUsageCacheStore);
+  const codexUsageInflightRef = useRef(codexUsageInflightStore);
 
   const formInitValues = {
     searchKeyword: '',
@@ -250,8 +306,17 @@ export const useChannelsData = () => {
   };
 
   const getCachedCodexUsage = (channelId) => {
-    const cached = codexUsageCacheRef.current.get(channelId);
+    const cacheKey = String(channelId);
+    const cached = codexUsageCacheRef.current.get(cacheKey);
     if (!cached?.payload) {
+      return null;
+    }
+    if (
+      Date.now() - Number(cached.fetchedAt || 0) >
+      CODEX_USAGE_CACHE_MAX_AGE_MS
+    ) {
+      codexUsageCacheRef.current.delete(cacheKey);
+      persistCodexUsageCacheStore();
       return null;
     }
     return {
@@ -354,7 +419,8 @@ export const useChannelsData = () => {
   };
 
   const fetchCodexUsageForChannel = async (channelId) => {
-    const inflight = codexUsageInflightRef.current.get(channelId);
+    const cacheKey = String(channelId);
+    const inflight = codexUsageInflightRef.current.get(cacheKey);
     if (inflight) {
       return inflight;
     }
@@ -371,19 +437,20 @@ export const useChannelsData = () => {
           error?.response?.data?.message || error?.message || t('获取用量失败'),
       }))
       .finally(() => {
-        codexUsageInflightRef.current.delete(channelId);
+        codexUsageInflightRef.current.delete(cacheKey);
       });
 
-    codexUsageInflightRef.current.set(channelId, request);
+    codexUsageInflightRef.current.set(cacheKey, request);
     return request;
   };
 
   const applyCodexUsagePayload = (channelId, payload) => {
     const fetchedAt = Date.now();
-    codexUsageCacheRef.current.set(channelId, {
+    codexUsageCacheRef.current.set(String(channelId), {
       payload,
       fetchedAt,
     });
+    persistCodexUsageCacheStore();
 
     updateChannelProperty(channelId, (currentChannel) => {
       currentChannel.codex_usage = {
@@ -397,7 +464,7 @@ export const useChannelsData = () => {
   };
 
   const markCodexUsageLoading = (channelId) => {
-    const cached = codexUsageCacheRef.current.get(channelId);
+    const cached = codexUsageCacheRef.current.get(String(channelId));
     updateChannelProperty(channelId, (currentChannel) => {
       const currentUsage = currentChannel.codex_usage || {};
       currentChannel.codex_usage = {
@@ -961,7 +1028,9 @@ export const useChannelsData = () => {
       const hasPayload = !!recordPayload;
       const hasFreshPayload =
         hasPayload && Date.now() - recordFetchedAt < CODEX_USAGE_CACHE_TTL_MS;
-      const cached = recordId ? codexUsageCacheRef.current.get(recordId) : null;
+      const cached = recordId
+        ? codexUsageCacheRef.current.get(String(recordId))
+        : null;
       const cachedPayload = cached?.payload ?? null;
       const hasFreshCachedPayload =
         !!cachedPayload &&
