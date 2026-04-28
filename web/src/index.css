@@ -827,6 +827,453 @@ html:not(.dark) .blur-ball-teal {
   opacity: 0.2;
 }
 
+/* ==================== 首页服务优势首屏 ==================== */
+.home-service-hero {
+  isolation: isolate;
+  background: radial-gradient(
+      circle at 15% 18%,
+      rgba(14, 165, 233, 0.12),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 90% 72%,
+      rgba(16, 185, 129, 0.16),
+      transparent 34%
+    ),
+    linear-gradient(135deg, #f8fbff 0%, #ffffff 48%, #f1fbf8 100%);
+}
+
+html.dark .home-service-hero {
+  background: radial-gradient(
+      circle at 15% 18%,
+      rgba(14, 165, 233, 0.16),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 90% 72%,
+      rgba(16, 185, 129, 0.12),
+      transparent 34%
+    ),
+    linear-gradient(135deg, #050812 0%, #0b1018 52%, #07130f 100%);
+}
+
+.home-hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.68;
+  background-image: linear-gradient(
+      rgba(15, 23, 42, 0.055) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.055) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+html.dark .home-hero-grid {
+  background-image: linear-gradient(
+      rgba(148, 163, 184, 0.09) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.09) 1px, transparent 1px);
+}
+
+.home-hero-copy {
+  animation: home-hero-rise 520ms ease-out both;
+}
+
+.home-service-card,
+.home-flow-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 272px;
+  padding: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.94),
+      rgba(248, 250, 252, 0.8)
+    ),
+    rgba(255, 255, 255, 0.76);
+  box-shadow:
+    0 20px 54px rgba(15, 23, 42, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  animation: home-hero-rise 560ms ease-out both;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.home-service-card::before,
+.home-flow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+      rgba(14, 165, 233, 0.06) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(14, 165, 233, 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(to bottom, black, transparent 64%);
+}
+
+.home-service-card::after,
+.home-flow-card::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(14, 165, 233, 0),
+    rgba(14, 165, 233, 0.75),
+    rgba(16, 185, 129, 0.62),
+    rgba(14, 165, 233, 0)
+  );
+  opacity: 0.72;
+}
+
+.home-service-card:hover,
+.home-flow-card:hover {
+  border-color: rgba(14, 165, 233, 0.26);
+  box-shadow:
+    0 24px 64px rgba(8, 145, 178, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateY(-3px);
+}
+
+.home-flow-card {
+  min-height: 220px;
+}
+
+html.dark .home-service-card,
+html.dark .home-flow-card {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.9),
+      rgba(2, 6, 23, 0.76)
+    ),
+    rgba(2, 6, 23, 0.72);
+  box-shadow:
+    0 22px 62px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+html.dark .home-service-card::before,
+html.dark .home-flow-card::before {
+  background-image: linear-gradient(
+      rgba(148, 163, 184, 0.08) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+}
+
+.home-service-card-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.home-service-card-top span,
+.home-flow-card > div:first-child {
+  color: #0891b2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.18em;
+}
+
+html.dark .home-service-card-top span,
+html.dark .home-flow-card > div:first-child {
+  color: #67e8f9;
+}
+
+.home-service-card-top strong {
+  color: var(--semi-color-text-0);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.home-service-card-visual {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  min-height: 82px;
+  margin-top: 18px;
+  padding: 12px;
+  border: 1px solid rgba(14, 165, 233, 0.14);
+  border-radius: 8px;
+  background: linear-gradient(
+      135deg,
+      rgba(240, 249, 255, 0.76),
+      rgba(236, 253, 245, 0.48)
+    ),
+    rgba(255, 255, 255, 0.56);
+}
+
+html.dark .home-service-card-visual {
+  border-color: rgba(14, 165, 233, 0.18);
+  background: linear-gradient(
+      135deg,
+      rgba(14, 165, 233, 0.1),
+      rgba(16, 185, 129, 0.07)
+    ),
+    rgba(15, 23, 42, 0.34);
+}
+
+.home-card-latency {
+  position: relative;
+  width: 100%;
+  height: 42px;
+}
+
+.home-card-latency::before,
+.home-card-latency::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 1px;
+  background: rgba(14, 165, 233, 0.2);
+}
+
+.home-card-latency::after {
+  height: 2px;
+  background: linear-gradient(90deg, #0ea5e9, #10b981);
+  transform-origin: left center;
+  animation: home-latency-fill 2.4s ease-in-out infinite;
+}
+
+.home-card-latency span {
+  position: absolute;
+  top: calc(50% - 5px);
+  z-index: 1;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #0ea5e9;
+  box-shadow: 0 0 0 6px rgba(14, 165, 233, 0.12);
+}
+
+.home-card-latency span:nth-child(1) {
+  left: 6px;
+}
+
+.home-card-latency span:nth-child(2) {
+  left: calc(50% - 5px);
+  background: #06b6d4;
+}
+
+.home-card-latency span:nth-child(3) {
+  right: 6px;
+  background: #10b981;
+}
+
+.home-card-pool {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 8px;
+}
+
+.home-card-pool div {
+  min-width: 0;
+  padding: 13px 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  color: var(--semi-color-text-2);
+  background: rgba(255, 255, 255, 0.62);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.home-card-pool .home-card-pool-active {
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+html.dark .home-card-pool div {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.38);
+}
+
+html.dark .home-card-pool .home-card-pool-active {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.home-card-setup {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.home-card-setup span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 11px 7px;
+  border: 1px solid rgba(14, 165, 233, 0.16);
+  border-radius: 8px;
+  color: var(--semi-color-text-0);
+  background: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+html.dark .home-card-setup span {
+  background: rgba(2, 6, 23, 0.38);
+}
+
+.home-card-setup i {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.18), #0ea5e9);
+}
+
+.home-card-setup i::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: 0;
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid #0ea5e9;
+  border-right: 1px solid #0ea5e9;
+  transform: rotate(45deg);
+}
+
+.home-service-card h2 {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  color: var(--semi-color-text-0);
+  font-size: 24px;
+  font-weight: 850;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.home-service-card p {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  color: var(--semi-color-text-1);
+  font-size: 14px;
+  line-height: 1.85;
+}
+
+.home-flow-card > div,
+.home-flow-card > p {
+  position: relative;
+  z-index: 1;
+}
+
+.home-flow-card > div:nth-child(2) {
+  margin-top: 24px;
+  color: var(--semi-color-text-0);
+  font-size: 24px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.home-flow-card > p {
+  margin-top: 12px;
+  color: var(--semi-color-text-1);
+  font-size: 14px;
+  line-height: 1.85;
+}
+
+@media (max-width: 767px) {
+  .home-service-card,
+  .home-flow-card {
+    min-height: auto;
+    padding: 18px;
+  }
+
+  .home-service-card-visual {
+    min-height: 70px;
+    margin-top: 14px;
+    padding: 10px;
+  }
+
+  .home-service-card h2,
+  .home-flow-card > div:nth-child(2) {
+    margin-top: 16px;
+    font-size: 21px;
+  }
+
+  .home-card-pool {
+    gap: 6px;
+  }
+
+  .home-card-pool div {
+    padding: 11px 6px;
+    font-size: 11px;
+  }
+
+  .home-card-setup {
+    grid-template-columns: minmax(0, 1fr) 14px minmax(0, 1fr) 14px minmax(
+        0,
+        1fr
+      );
+    gap: 5px;
+  }
+
+  .home-card-setup span {
+    padding: 10px 5px;
+    font-size: 11px;
+  }
+}
+
+@keyframes home-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes home-latency-fill {
+  0% {
+    transform: scaleX(0.08);
+    opacity: 0.35;
+  }
+  55% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0.5;
+  }
+}
+
 /* ==================== 卡片马卡龙模糊球（类封装） ==================== */
 /* 使用方式：给容器加上 with-pastel-balls 类即可，无需在 JSX 中插入额外节点 */
 .with-pastel-balls {

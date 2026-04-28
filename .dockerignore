@@ -1,5 +1,7 @@
 .github
 .git
+.codex-chrome-profile
+.codex-tmp
 *.md
 .vscode
 .gitignore

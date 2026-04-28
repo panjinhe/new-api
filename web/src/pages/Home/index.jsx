@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect, useState } from 'react';
-import { Button, Input, Tag } from '@douyinfe/semi-ui';
+import { Button, Input } from '@douyinfe/semi-ui';
 import { API, showError, copy, showSuccess } from '../../helpers';
 import { useIsMobile } from '../../hooks/common/useIsMobile';
 import { StatusContext } from '../../context/Status';
@@ -32,8 +32,6 @@ import {
   IconGithubLogo,
 } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
-import NoticeModal from '../../components/layout/NoticeModal';
-import { featuredBuiltInDocs } from '../../constants/docs.constants';
 
 const Home = () => {
   const { t, i18n } = useTranslation();
@@ -46,20 +44,43 @@ const Home = () => {
   const ccSwitchRepoUrl = 'https://github.com/farion1231/cc-switch';
   const [homePageContentLoaded, setHomePageContentLoaded] = useState(false);
   const [homePageContent, setHomePageContent] = useState('');
-  const [noticeVisible, setNoticeVisible] = useState(false);
   const isMobile = useIsMobile();
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
-  const featuredTutorials = featuredBuiltInDocs;
-  const announcements = statusState?.status?.announcements || [];
+  const systemName = statusState?.status?.system_name || 'aheapi';
+  const serviceAdvantageCards = [
+    {
+      code: t('01'),
+      label: t('快响应'),
+      title: t('90% 请求 2 秒内返回首字'),
+      description: t('优化入口访问与上游调度，减少等待，降低日常调用延迟。'),
+      visual: 'latency',
+    },
+    {
+      code: t('02'),
+      label: t('Pro 号池'),
+      title: t('无 Free / 无 Team 号'),
+      description: t('优先使用 Pro 资源池，减少低权益账号带来的排队和波动。'),
+      visual: 'pool',
+    },
+    {
+      code: t('03'),
+      label: t('配置简单'),
+      title: t('几分钟完成接入'),
+      description: t(
+        '创建令牌、复制 Base URL 或一键导入 CC Switch，路径清晰。',
+      ),
+      visual: 'setup',
+    },
+  ];
 
   const quickStartSteps = [
     {
       number: '01',
       title: t('注册账号'),
       description: t(
-        '完成注册或登录后即可进入控制台，开始配置你的专属 Codex 接入环境。',
+        '完成注册或登录后即可进入控制台，开始配置你的专属 API 接入环境。',
       ),
     },
     {
@@ -119,32 +140,97 @@ const Home = () => {
   };
 
   useEffect(() => {
-    const lastCloseDate = localStorage.getItem('notice_close_date');
-    const today = new Date().toDateString();
-    if (lastCloseDate !== today) {
-      if (announcements.length > 0) {
-        setNoticeVisible(true);
-      }
-    }
-  }, [announcements.length]);
-
-  useEffect(() => {
     displayHomePageContent().then();
   }, []);
 
   return (
     <div className='w-full overflow-x-hidden'>
-      <NoticeModal
-        visible={noticeVisible}
-        onClose={() => setNoticeVisible(false)}
-        isMobile={isMobile}
-      />
       {homePageContentLoaded && homePageContent === '' ? (
-        <div className='w-full overflow-x-hidden'>
-          <div className='relative w-full overflow-x-hidden border-b border-semi-color-border min-h-[calc(100svh-64px)]'>
-            <div className='blur-ball blur-ball-indigo' />
-            <div className='blur-ball blur-ball-teal' />
-            <div className='mx-auto flex min-h-[calc(100svh-64px)] max-w-6xl items-center justify-center px-4 py-16 md:px-8 md:py-20'>
+        <div className='w-full overflow-x-hidden pt-16'>
+          <section className='home-service-hero relative w-full overflow-hidden border-b border-semi-color-border'>
+            <div className='home-hero-grid' />
+            <div className='mx-auto max-w-6xl px-4 py-9 md:px-8 md:py-11 lg:min-h-[540px] lg:py-12'>
+              <div className='home-hero-copy mx-auto max-w-4xl text-center'>
+                <div className='inline-flex items-center border-b border-semi-color-border pb-2 text-sm font-semibold text-semi-color-text-1'>
+                  {t('API 稳定接入服务')}
+                </div>
+                <h1 className='mx-auto mt-6 max-w-3xl text-5xl font-bold leading-tight text-semi-color-text-0 md:text-6xl lg:text-7xl'>
+                  {systemName}
+                </h1>
+                <div className='mt-4 text-2xl font-bold leading-tight text-semi-color-text-0 md:text-3xl'>
+                  {t('稳定快速的 API 服务')}
+                </div>
+                <p className='mx-auto mt-5 max-w-2xl text-base leading-8 text-semi-color-text-1 md:text-lg'>
+                  {t(
+                    '快响应、Pro 号池、配置简单，打开网站就能清楚知道怎么接入，日常调用更省心。',
+                  )}
+                </p>
+                <div className='mt-8 flex flex-col justify-center gap-3 sm:flex-row sm:items-center'>
+                  <Link to='/console/token'>
+                    <Button
+                      theme='solid'
+                      type='primary'
+                      size={isMobile ? 'default' : 'large'}
+                      className='!h-12 !w-full !rounded-full px-7 sm:!w-auto'
+                      icon={<IconPlay />}
+                    >
+                      {t('立即开始配置')}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              <div
+                className='mt-8 grid gap-5 text-left md:mt-10 md:grid-cols-3'
+                aria-label={t('核心优势')}
+              >
+                {serviceAdvantageCards.map((advantage, index) => (
+                  <article
+                    key={advantage.label}
+                    className='home-service-card'
+                    style={{ animationDelay: `${index * 90 + 120}ms` }}
+                  >
+                    <div className='home-service-card-top'>
+                      <span>{advantage.code}</span>
+                      <strong>{advantage.label}</strong>
+                    </div>
+                    <div className='home-service-card-visual'>
+                      {advantage.visual === 'latency' && (
+                        <div className='home-card-latency'>
+                          <span />
+                          <span />
+                          <span />
+                        </div>
+                      )}
+                      {advantage.visual === 'pool' && (
+                        <div className='home-card-pool'>
+                          <div className='home-card-pool-active'>
+                            {t('PRO')}
+                          </div>
+                          <div>{t('FREE')} 0</div>
+                          <div>{t('TEAM')} 0</div>
+                        </div>
+                      )}
+                      {advantage.visual === 'setup' && (
+                        <div className='home-card-setup'>
+                          <span>{t('Base URL')}</span>
+                          <i />
+                          <span>{t('Token')}</span>
+                          <i />
+                          <span>{t('CC Switch')}</span>
+                        </div>
+                      )}
+                    </div>
+                    <h2>{advantage.title}</h2>
+                    <p>{advantage.description}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className='relative w-full overflow-x-hidden border-b border-semi-color-border bg-semi-color-bg-0'>
+            <div className='mx-auto flex max-w-6xl items-center justify-center px-4 py-10 md:px-8 md:py-12'>
               <div className='w-full text-center'>
                 <div className='mx-auto max-w-3xl'>
                   <div className='inline-flex items-center rounded-full border border-semi-color-border bg-white/75 px-4 py-1 text-sm text-semi-color-text-1 shadow-sm backdrop-blur dark:bg-black/20'>
@@ -155,17 +241,14 @@ const Home = () => {
                   </h1>
                   <p className='mx-auto mt-4 max-w-2xl text-base leading-7 text-semi-color-text-1 md:text-lg'>
                     {t(
-                      '接入你的 Codex API 极其简单，打开网站后完成配置，最快 3 分钟即可开始编码。',
+                      '接入 API 极其简单，打开网站后完成配置，最快 3 分钟即可开始使用。',
                     )}
                   </p>
                 </div>
 
-                <div className='mt-10 grid gap-5 text-left md:mt-12 md:grid-cols-3'>
+                <div className='mt-8 grid gap-5 text-left md:mt-10 md:grid-cols-3'>
                   {quickStartSteps.map((step) => (
-                    <div
-                      key={step.number}
-                      className='rounded-[28px] border border-semi-color-border bg-white/80 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur dark:bg-black/20'
-                    >
+                    <div key={step.number} className='home-flow-card'>
                       <div className='text-sm font-semibold tracking-[0.22em] text-cyan-500'>
                         {step.number}
                       </div>
@@ -287,86 +370,9 @@ const Home = () => {
                     </div>
                   </div>
                 </div>
-
-                {featuredTutorials.length > 0 && (
-                  <section className='mx-auto mt-6 max-w-4xl rounded-[32px] border border-semi-color-border bg-white/85 p-5 text-left shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-black/25 md:p-6'>
-                    <div className='flex flex-col gap-4 border-b border-semi-color-border pb-6 md:flex-row md:items-start md:justify-between'>
-                      <div className='max-w-2xl'>
-                        <div className='inline-flex items-center rounded-full border border-semi-color-border bg-semi-color-fill-0 px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-semi-color-text-2'>
-                          {t('精选教程')}
-                        </div>
-                        <div className='mt-4 text-2xl font-bold text-semi-color-text-0 md:text-3xl'>
-                          {t('教程及文档')}
-                        </div>
-                        <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
-                          {t(
-                            '这里会持续整理接入教程、兼容方案和真实排障复盘。',
-                          )}
-                        </p>
-                      </div>
-                      <div className='flex shrink-0'>
-                        <Link to='/docs'>
-                          <Button
-                            size={isMobile ? 'default' : 'large'}
-                            className='!h-11 !rounded-full px-6'
-                          >
-                            {t('查看全部文档')}
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-
-                    <div className='mt-5 space-y-4'>
-                      {featuredTutorials.map((tutorial, index) => (
-                        <article
-                          key={tutorial.slug}
-                          className='group rounded-[28px] border border-semi-color-border bg-semi-color-fill-0 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-white hover:shadow-[0_18px_48px_rgba(8,145,178,0.10)] dark:hover:border-cyan-500/50 dark:hover:bg-black/30'
-                        >
-                          <div className='flex flex-col gap-4 md:flex-row md:items-start md:justify-between'>
-                            <div className='min-w-0 flex-1'>
-                              <div className='flex flex-wrap items-center gap-3'>
-                                <span className='text-xs font-semibold uppercase tracking-[0.24em] text-cyan-600 dark:text-cyan-300'>
-                                  {String(index + 1).padStart(2, '0')}
-                                </span>
-                                <span className='text-sm text-semi-color-text-2'>
-                                  {tutorial.updatedAt}
-                                </span>
-                              </div>
-                              <h3 className='mt-3 text-xl font-bold leading-8 text-semi-color-text-0 md:text-2xl'>
-                                {tutorial.title}
-                              </h3>
-                              <p className='mt-3 text-sm leading-7 text-semi-color-text-1 md:text-base'>
-                                {tutorial.summary}
-                              </p>
-                              <div className='mt-4 flex flex-wrap gap-2'>
-                                {tutorial.tags.map((tag) => (
-                                  <Tag key={tag} color='cyan' shape='circle'>
-                                    {tag}
-                                  </Tag>
-                                ))}
-                              </div>
-                            </div>
-                            <div className='shrink-0 md:pt-8'>
-                              <Link to={`/docs/${tutorial.slug}`}>
-                                <Button
-                                  theme={index === 0 ? 'solid' : 'light'}
-                                  type='primary'
-                                  size={isMobile ? 'default' : 'large'}
-                                  className='!h-11 !w-full !rounded-full px-6 md:!w-auto'
-                                >
-                                  {t('查看详情')}
-                                </Button>
-                              </Link>
-                            </div>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                )}
               </div>
             </div>
-          </div>
+          </section>
         </div>
       ) : (
         <div className='overflow-x-hidden w-full'>
