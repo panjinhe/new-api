@@ -20,7 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import React, { useContext, useMemo } from 'react';
 import { Button, Modal, Empty, Timeline } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
-import { getRelativeTime } from '../../helpers';
+import { getRelativeTime } from '../../helpers/utils';
 import { marked } from 'marked';
 import {
   IllustrationNoContent,
