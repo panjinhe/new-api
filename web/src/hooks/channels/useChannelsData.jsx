@@ -44,7 +44,7 @@ import {
   extractCodexUsageSummary,
 } from '../../components/table/channels/codexUsageUtils';
 
-const CODEX_USAGE_CACHE_TTL_MS = 60 * 1000;
+const CODEX_USAGE_CACHE_TTL_MS = 5 * 60 * 1000;
 const CODEX_USAGE_BATCH_CONCURRENCY = 4;
 const CHANNELS_PAGE_SIZE_STORAGE_KEY = 'admin-channels-page-size';
 
@@ -957,14 +957,20 @@ export const useChannelsData = () => {
     if (record?.type === CODEX_CHANNEL_TYPE) {
       const recordId = record?.id;
       const recordFetchedAt = Number(record?.codex_usage?.fetched_at || 0);
+      const recordPayload = record?.codex_usage?.payload ?? null;
+      const hasPayload = !!recordPayload;
       const hasFreshPayload =
-        !!record?.codex_usage?.payload &&
-        Date.now() - recordFetchedAt < CODEX_USAGE_CACHE_TTL_MS;
+        hasPayload && Date.now() - recordFetchedAt < CODEX_USAGE_CACHE_TTL_MS;
+      const cached = recordId ? codexUsageCacheRef.current.get(recordId) : null;
+      const cachedPayload = cached?.payload ?? null;
+      const hasFreshCachedPayload =
+        !!cachedPayload &&
+        Date.now() - cached.fetchedAt < CODEX_USAGE_CACHE_TTL_MS;
+      const initialPayload = recordPayload || cachedPayload || null;
+      const shouldRefreshOnOpen =
+        !!recordId && !hasFreshPayload && !hasFreshCachedPayload;
       if (recordId) {
-        const cached = codexUsageCacheRef.current.get(recordId);
-        const isFresh =
-          !!cached && Date.now() - cached.fetchedAt < CODEX_USAGE_CACHE_TTL_MS;
-        if (!hasFreshPayload && !isFresh) {
+        if (shouldRefreshOnOpen) {
           markCodexUsageLoading(recordId);
         }
       }
@@ -972,9 +978,8 @@ export const useChannelsData = () => {
       openCodexUsageModal({
         t,
         record,
-        payload: hasFreshPayload
-          ? (record?.codex_usage?.payload ?? null)
-          : null,
+        payload: initialPayload,
+        refreshOnOpen: shouldRefreshOnOpen,
         onFetchStart: () => {
           if (recordId) {
             markCodexUsageLoading(recordId);

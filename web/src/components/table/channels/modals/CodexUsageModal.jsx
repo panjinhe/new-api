@@ -29,10 +29,7 @@ import {
   Collapse,
 } from '@douyinfe/semi-ui';
 import { API, showError } from '../../../../helpers';
-import {
-  clampPercent,
-  resolveRateLimitWindows,
-} from '../codexUsageUtils';
+import { clampPercent, resolveRateLimitWindows } from '../codexUsageUtils';
 
 const { Text } = Typography;
 
@@ -203,7 +200,15 @@ const RateLimitWindowCard = ({ t, title, windowData }) => {
   );
 };
 
-const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
+const CodexUsageView = ({
+  t,
+  record,
+  payload,
+  onCopy,
+  onRefresh,
+  loading = false,
+  refreshError = '',
+}) => {
   const tt = typeof t === 'function' ? t : (v) => v;
   const [showRawJson, setShowRawJson] = useState(false);
   const data = payload?.data ?? null;
@@ -218,7 +223,9 @@ const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
   const email = data?.email;
   const accountId = data?.account_id;
   const errorMessage =
-    payload?.success === false ? getDisplayText(payload?.message) || tt('获取用量失败') : '';
+    payload?.success === false
+      ? getDisplayText(payload?.message) || tt('获取用量失败')
+      : '';
 
   const rawText =
     typeof data === 'string' ? data : JSON.stringify(data ?? payload, null, 2);
@@ -228,6 +235,11 @@ const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
       {errorMessage && (
         <div className='rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
           {errorMessage}
+        </div>
+      )}
+      {refreshError && !errorMessage && (
+        <div className='rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700'>
+          {refreshError}
         </div>
       )}
 
@@ -254,8 +266,14 @@ const CodexUsageView = ({ t, record, payload, onCopy, onRefresh }) => {
               </Tag>
             </div>
           </div>
-          <Button size='small' type='tertiary' theme='outline' onClick={onRefresh}>
-            {tt('刷新')}
+          <Button
+            size='small'
+            type='tertiary'
+            theme='outline'
+            loading={loading}
+            onClick={onRefresh}
+          >
+            {loading ? tt('刷新中') : tt('刷新')}
           </Button>
         </div>
 
@@ -346,14 +364,17 @@ const CodexUsageLoader = ({
   t,
   record,
   initialPayload,
+  refreshOnOpen = false,
   onCopy,
   onFetchStart,
   onFetched,
 }) => {
   const tt = typeof t === 'function' ? t : (v) => v;
-  const [loading, setLoading] = useState(!initialPayload);
+  const [loading, setLoading] = useState(!initialPayload || refreshOnOpen);
   const [payload, setPayload] = useState(initialPayload ?? null);
+  const [refreshError, setRefreshError] = useState('');
   const hasShownErrorRef = useRef(false);
+  const initialFetchStartedRef = useRef(false);
   const mountedRef = useRef(true);
   const recordId = record?.id;
 
@@ -366,6 +387,7 @@ const CodexUsageLoader = ({
     if (mountedRef.current) setLoading(true);
     onFetchStart?.();
     try {
+      if (mountedRef.current) setRefreshError('');
       const res = await API.get(`/api/channel/${recordId}/codex/usage`, {
         skipErrorHandler: true,
       });
@@ -380,16 +402,22 @@ const CodexUsageLoader = ({
     } catch (error) {
       if (!mountedRef.current) return;
       const nextPayload = { success: false, message: String(error) };
+      const message =
+        error?.response?.data?.message || error?.message || tt('获取用量失败');
       if (!hasShownErrorRef.current) {
         hasShownErrorRef.current = true;
         showError(tt('获取用量失败'));
       }
-      setPayload(nextPayload);
-      onFetched?.(nextPayload);
+      if (payload) {
+        setRefreshError(message);
+      } else {
+        setPayload(nextPayload);
+        onFetched?.(nextPayload);
+      }
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [recordId, onFetchStart, onFetched, tt]);
+  }, [recordId, onFetchStart, onFetched, payload, tt]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -399,11 +427,13 @@ const CodexUsageLoader = ({
   }, []);
 
   useEffect(() => {
-    if (initialPayload) return;
+    if (initialPayload && !refreshOnOpen) return;
+    if (initialFetchStartedRef.current) return;
+    initialFetchStartedRef.current = true;
     fetchUsage().catch(() => {});
-  }, [fetchUsage, initialPayload]);
+  }, [fetchUsage, initialPayload, refreshOnOpen]);
 
-  if (loading) {
+  if (loading && !payload) {
     return (
       <div className='flex items-center justify-center py-10'>
         <Spin spinning={true} size='large' tip={tt('加载中...')} />
@@ -436,6 +466,8 @@ const CodexUsageLoader = ({
       payload={payload}
       onCopy={onCopy}
       onRefresh={fetchUsage}
+      loading={loading}
+      refreshError={refreshError}
     />
   );
 };
@@ -444,6 +476,7 @@ export const openCodexUsageModal = ({
   t,
   record,
   payload,
+  refreshOnOpen,
   onCopy,
   onFetchStart,
   onFetched,
@@ -460,6 +493,7 @@ export const openCodexUsageModal = ({
         t={tt}
         record={record}
         initialPayload={payload}
+        refreshOnOpen={refreshOnOpen}
         onCopy={onCopy}
         onFetchStart={onFetchStart}
         onFetched={onFetched}
