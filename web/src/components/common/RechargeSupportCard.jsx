@@ -25,7 +25,7 @@ import { formatSubscriptionResetPeriod } from '../../helpers/subscriptionFormat'
 const { Text, Paragraph } = Typography;
 
 const QQ_GROUP = '217637139';
-const OFFICIAL_SITE = 'https://pbroe.com/';
+const OFFICIAL_SITE = 'https://aheapi.com/';
 const FALLBACK_OFFICIAL_USD_RATE = 7.3;
 
 const toolTags = ['Codex', 'CLI', 'VSCode', 'OpenClaw', '小龙虾', 'AstrBot'];

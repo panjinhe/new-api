@@ -228,17 +228,19 @@ codex channel: /v1/chat/completions endpoint not supported
 
 ## Nginx 源站收口经验
 
+> 历史记录：本节记录迁移前 `pbroe.com` 在阿里云源站上的 Nginx 收口方式。当前生产主域名已切换为 `aheapi.com`，`pbroe.com` 仅作为旧域名兼容与跳转入口保留。
+
 ### 为什么要做
 
 - 只有安全组放行 `80/443` 还不够。
 - 如果 Nginx 仍然接受 IP 直连、兜底 `server_name _;` 也正常转发，别人只要扫到源站 IP，就可以绕过域名直接打到站。
-- 对当前站点来说，至少要先做到：
+- 对生产站点来说，至少要先做到：
   - 拒绝 IP 直连
   - 只响应正式域名
   - 加一层基础限流
   - 隐藏 Nginx 版本和不必要的上游响应头
 
-### 这次线上实际做了什么
+### 这次线上实际做了什么（旧阿里云 `pbroe.com`）
 
 - 域名只保留：
   - `pbroe.com`
@@ -271,7 +273,7 @@ sudo nginx -t && sudo systemctl reload nginx
 - 验证正式域名仍然可用：
 
 ```bash
-curl -I https://pbroe.com
+curl -I https://aheapi.com
 ```
 
 - 验证 HTTP IP 直连被拒绝：
@@ -297,9 +299,11 @@ curl -vkI https://47.111.11.175
 ### 仍然要注意的一点
 
 - 现在只是把“HTTP 层的裸奔”先收住了，不代表源站 IP 已完全隐藏。
-- 只要公网 DNS 还直接把：
+- 如果公网 DNS 直接把域名解析到源站 IP：
   - `pbroe.com`
   - `www.pbroe.com`
+  - `aheapi.com`
+  - `api.aheapi.com`
   解析到源站 IP
 - 那么源站 IP 依然能被公开看到。
 - 如果后面要继续增强防护，正确方向是：

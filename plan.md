@@ -1,5 +1,20 @@
 # 计划清单
 
+## 服务器迁移后收尾计划
+
+### 背景
+
+- 生产服务已从阿里云迁移到新服务器。
+- 当前主站与正式 API 地址为 `https://aheapi.com/v1`。
+- `pbroe.com/v1` 暂时保留兼容，避免旧客户端配置立即失效。
+
+### 待办事项
+
+1. 观察 1-2 天，看用户调用、订单、余额、渠道日志是否稳定。
+2. 之后决定是否关闭 `pbroe.com/v1` 兼容。
+3. 确认没问题后，再考虑释放或降配阿里云，避免继续付固定服务器费用。
+4. 定期备份新服务器 PostgreSQL。
+
 ## 无中断部署改造计划
 
 ### 目标
@@ -160,10 +175,10 @@
 
 后续如需启用，优先使用独立环境部署 Uptime Kuma，并只监控 2-4 个核心公开地址：
 
-1. `https://pbroe.com/`
-2. `https://pbroe.com/api/status`
-3. `https://pbroe.com/v1/models`
-4. `https://pbroe.com/qq-group-qr.png`（可选）
+1. `https://aheapi.com/`
+2. `https://aheapi.com/api/status`
+3. `https://aheapi.com/v1/models`
+4. `https://aheapi.com/logo-001.jpg`（可选）
 
 建议监控间隔设置为 60-120 秒，失败重试 2-3 次，避免网络抖动造成误报。
 
@@ -178,6 +193,6 @@
 1. 在 Uptime Kuma 中创建公开 Status Page，例如 slug：`aheapi`。
 2. 在后台 `系统设置 -> 数据看板 -> Uptime Kuma` 添加分类：
    - 分类名称：`服务状态`
-   - Uptime Kuma 地址：`https://status.pbroe.com`
+   - Uptime Kuma 地址：`https://status.aheapi.com`
    - 状态页面 Slug：`aheapi`
 3. 确认 `/api/uptime/status` 能返回监控数据后，再启用控制台面板。
