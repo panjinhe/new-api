@@ -55,6 +55,8 @@ import {
 } from '@douyinfe/semi-icons';
 
 const { Text, Title } = Typography;
+const DEFAULT_REDEMPTION_AMOUNT = 20;
+const REDEMPTION_AMOUNT_PRESETS = [20, 30, 50, 100, 200];
 
 const EditRedemptionModal = (props) => {
   const { t } = useTranslation();
@@ -66,8 +68,8 @@ const EditRedemptionModal = (props) => {
 
   const getInitValues = () => ({
     name: '',
-    quota: 100000,
-    amount: Number(quotaToDisplayAmount(100000).toFixed(6)),
+    quota: displayAmountToQuota(DEFAULT_REDEMPTION_AMOUNT),
+    amount: DEFAULT_REDEMPTION_AMOUNT,
     count: 1,
     expired_time: null,
   });
@@ -86,7 +88,7 @@ const EditRedemptionModal = (props) => {
       } else {
         data.expired_time = new Date(data.expired_time * 1000);
       }
-      data.amount = Number(quotaToDisplayAmount(data.quota || 0).toFixed(6));
+      data.amount = Math.round(quotaToDisplayAmount(data.quota || 0));
       formApiRef.current?.setValues({ ...getInitValues(), ...data });
     } else {
       showError(message);
@@ -171,6 +173,21 @@ const EditRedemptionModal = (props) => {
       });
     }
     setLoading(false);
+  };
+
+  const setAmountValue = (val) => {
+    const amount = val === '' || val == null ? 0 : val;
+    formApiRef.current?.setValue('amount', amount);
+    formApiRef.current?.setValue('quota', displayAmountToQuota(amount));
+  };
+
+  const setQuotaValue = (val) => {
+    const quota = val === '' || val == null ? 0 : val;
+    formApiRef.current?.setValue('quota', quota);
+    formApiRef.current?.setValue(
+      'amount',
+      Math.round(quotaToDisplayAmount(quota)),
+    );
   };
 
   return (
@@ -304,20 +321,33 @@ const EditRedemptionModal = (props) => {
                         label={t('金额')}
                         prefix={getCurrencyConfig().symbol}
                         placeholder={t('输入金额')}
-                        precision={6}
+                        precision={0}
                         min={0}
-                        step={0.000001}
+                        step={1}
                         style={{ width: '100%' }}
-                        onChange={(val) => {
-                          const amount = val === '' || val == null ? 0 : val;
-                          formApiRef.current?.setValue('amount', amount);
-                          formApiRef.current?.setValue(
-                            'quota',
-                            displayAmountToQuota(amount),
-                          );
-                        }}
+                        onChange={setAmountValue}
                         showClear
                       />
+                      <div className='mt-2'>
+                        <Space wrap>
+                          {REDEMPTION_AMOUNT_PRESETS.map((amount) => (
+                            <Button
+                              key={amount}
+                              size='small'
+                              theme={
+                                Number(values.amount) === amount
+                                  ? 'solid'
+                                  : 'light'
+                              }
+                              type='primary'
+                              onClick={() => setAmountValue(amount)}
+                            >
+                              {getCurrencyConfig().symbol}
+                              {amount}
+                            </Button>
+                          ))}
+                        </Space>
+                      </div>
                       <div
                         className='text-xs cursor-pointer mt-1'
                         style={{ color: 'var(--semi-color-text-2)' }}
@@ -327,11 +357,17 @@ const EditRedemptionModal = (props) => {
                           ? `▾ ${t('收起原生额度输入')}`
                           : `▸ ${t('使用原生额度输入')}`}
                       </div>
-                      <div style={{ display: showQuotaInput ? 'block' : 'none' }} className='mt-2'>
+                      <div
+                        style={{ display: showQuotaInput ? 'block' : 'none' }}
+                        className='mt-2'
+                      >
                         <Form.InputNumber
                           field='quota'
                           label={t('额度')}
                           placeholder={t('输入额度')}
+                          precision={0}
+                          min={0}
+                          step={1}
                           rules={[
                             { required: true, message: t('请输入额度') },
                             {
@@ -343,14 +379,7 @@ const EditRedemptionModal = (props) => {
                               },
                             },
                           ]}
-                          onChange={(val) => {
-                            const quota = val === '' || val == null ? 0 : val;
-                            formApiRef.current?.setValue('quota', quota);
-                            formApiRef.current?.setValue(
-                              'amount',
-                              Number(quotaToDisplayAmount(quota).toFixed(6)),
-                            );
-                          }}
+                          onChange={setQuotaValue}
                           style={{ width: '100%' }}
                           showClear
                         />
