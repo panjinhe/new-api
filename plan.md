@@ -127,8 +127,9 @@
 
 ### 当前判断依据
 
-- 现有前端已经做了部分路由懒加载，但仍有不少控制台页面在 `web/src/App.jsx` 中直接静态导入。
-- 当前构建结果里最大的主包 chunk 仍明显偏大，说明首屏和公共包还有继续瘦身空间。
+- 已完成控制台主要页面的路由级懒加载，`Token`、`Log`、`Setting`、`Playground`、`Channel` 等页面不再直接进入主入口包。
+- 最新构建中主入口包已从约 6.86MB 降至约 4.55MB，gzip 后从约 1.61MB 降至约 0.97MB。
+- 构建仍有大 chunk 警告，主要集中在 `Semi UI`、Markdown/Mermaid/KaTeX 渲染链，以及一个共享业务 chunk。
 - `lottie-web` 不是业务代码直接引入，而是通过 `@douyinfe/semi-ui` 依赖链带入。
 
 ### 建议目标
@@ -139,21 +140,23 @@
 
 ### 推荐后续动作
 
-1. 优先梳理 `web/src/App.jsx` 中仍然直接静态导入的页面，补齐路由级懒加载。
-2. 对重依赖模块做按需延迟加载，优先关注：
+1. 暂不继续拆大 chunk，除非真实用户加载瀑布图或生产访问数据证明它仍是主要瓶颈。
+2. 后续如继续优化，优先对重依赖模块做按需延迟加载，关注：
    - Markdown / Mermaid / KaTeX 渲染链
    - Dashboard 图表相关依赖
    - `react-fireworks` 这类低频特效依赖
-3. 每轮优化后重新执行 `bun run build`，记录主包和首屏相关 chunk 体积变化。
-4. 在下一次前端依赖升级时顺手更新 Browserslist 数据。
-5. `lottie-web` 仅在以下场景再单独处理：
+3. 对共享业务 chunk 先做构成分析，再决定是否拆分，避免为了消除 warning 增加过多请求和维护复杂度。
+4. 每轮优化后重新执行 `bun run build`，记录主包和首屏相关 chunk 体积变化。
+5. 在下一次前端依赖升级时顺手更新 Browserslist 数据。
+6. `lottie-web` 仅在以下场景再单独处理：
    - 需要收紧 CSP
    - 安全扫描要求清理 `eval`
    - 上游 `Semi UI` 提供更干净的替代版本
 
 ### 暂定优先级
 
-- P1：首屏 / 路由拆包优化
+- Done：首屏 / 路由拆包优化
+- P2：真实加载瀑布图分析后，再决定是否继续拆 Markdown/Mermaid 和共享业务 chunk
 - P3：Browserslist 例行更新
 - P3：`lottie-web` 告警跟踪，不主动投入专项时间
 
