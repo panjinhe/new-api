@@ -143,6 +143,7 @@ func TestSubscriptionUsageRefundPreconsumeIsIdempotent(t *testing.T) {
 func TestSubscriptionActualUsageWindowForSub(t *testing.T) {
 	now := int64(1700864000)
 	startDay := SubscriptionUsageDayStart(now) - 2*86400
+	plan := &SubscriptionPlan{QuotaResetPeriod: SubscriptionResetDaily}
 	sub := UserSubscription{
 		AmountTotal:   3000,
 		AmountUsed:    1200,
@@ -152,16 +153,17 @@ func TestSubscriptionActualUsageWindowForSub(t *testing.T) {
 		NextResetTime: startDay + 30*86400,
 	}
 
-	window := subscriptionActualUsageWindowForSub(sub, now)
+	window := subscriptionActualUsageWindowForSub(sub, plan, now)
 
 	assert.Equal(t, startDay, window.StartDay)
 	assert.Equal(t, SubscriptionUsageDayStart(now), window.EndDay)
-	assert.Equal(t, int64(300), window.TheoreticalQuota)
+	assert.Equal(t, int64(9000), window.TheoreticalQuota)
 }
 
 func TestSubscriptionActualUsageWindowCountsTodayAsFullDay(t *testing.T) {
 	dayStart := SubscriptionUsageDayStart(1700864000)
 	now := dayStart + 13*3600
+	plan := &SubscriptionPlan{QuotaResetPeriod: SubscriptionResetDaily}
 	sub := UserSubscription{
 		AmountTotal:   10000,
 		AmountUsed:    9984,
@@ -171,11 +173,28 @@ func TestSubscriptionActualUsageWindowCountsTodayAsFullDay(t *testing.T) {
 		NextResetTime: dayStart + 86400,
 	}
 
-	window := subscriptionActualUsageWindowForSub(sub, now)
+	window := subscriptionActualUsageWindowForSub(sub, plan, now)
 
 	assert.Equal(t, dayStart, window.StartDay)
 	assert.Equal(t, dayStart, window.EndDay)
 	assert.Equal(t, int64(10000), window.TheoreticalQuota)
+}
+
+func TestSubscriptionActualUsageWindowKeepsTotalPlanQuotaProrated(t *testing.T) {
+	now := int64(1700864000)
+	startDay := SubscriptionUsageDayStart(now) - 2*86400
+	plan := &SubscriptionPlan{QuotaResetPeriod: SubscriptionResetNever}
+	sub := UserSubscription{
+		AmountTotal: 3000,
+		StartTime:   startDay,
+		EndTime:     startDay + 30*86400,
+	}
+
+	window := subscriptionActualUsageWindowForSub(sub, plan, now)
+
+	assert.Equal(t, startDay, window.StartDay)
+	assert.Equal(t, SubscriptionUsageDayStart(now), window.EndDay)
+	assert.Equal(t, int64(300), window.TheoreticalQuota)
 }
 
 func TestBackfillSubscriptionUsageFromLogsIsIdempotent(t *testing.T) {

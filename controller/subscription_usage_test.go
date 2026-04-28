@@ -67,7 +67,7 @@ func TestAdminListUserSubscriptionSummariesFiltersAndSorts(t *testing.T) {
 	startDay := model.SubscriptionUsageDayStart(now) - int64(2*24*time.Hour/time.Second)
 	require.NoError(t, model.DB.Create(&model.User{Id: 1, Username: "alpha", Group: "default", Status: common.UserStatusEnabled, AffCode: "summary-alpha"}).Error)
 	require.NoError(t, model.DB.Create(&model.User{Id: 2, Username: "beta", Group: "default", Status: common.UserStatusEnabled, AffCode: "summary-beta"}).Error)
-	plan := &model.SubscriptionPlan{Title: "Pro", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 3000}
+	plan := &model.SubscriptionPlan{Title: "Pro", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, TotalAmount: 3000, QuotaResetPeriod: model.SubscriptionResetDaily}
 	require.NoError(t, model.DB.Create(plan).Error)
 	require.NoError(t, model.DB.Create(&model.UserSubscription{
 		Id:              11,
@@ -115,7 +115,7 @@ func TestAdminListUserSubscriptionSummariesFiltersAndSorts(t *testing.T) {
 	assert.Equal(t, int64(50), body.Data.Items[0].SubscriptionSummary.TodayUsed)
 	assert.Equal(t, int64(1500), body.Data.Items[0].SubscriptionSummary.LifetimeUsed)
 	assert.Equal(t, 30.0, body.Data.Items[0].SubscriptionSummary.UsagePercent)
-	assert.Equal(t, int64(150), body.Data.Items[0].SubscriptionSummary.ElapsedUsed)
-	assert.InDelta(t, int64(300), body.Data.Items[0].SubscriptionSummary.ElapsedQuota, 2)
-	assert.InDelta(t, 50.0, body.Data.Items[0].SubscriptionSummary.ActualPercent, 1)
+	assert.Equal(t, int64(1500), body.Data.Items[0].SubscriptionSummary.ElapsedUsed)
+	assert.Equal(t, int64(9000), body.Data.Items[0].SubscriptionSummary.ElapsedQuota)
+	assert.InDelta(t, 16.67, body.Data.Items[0].SubscriptionSummary.ActualPercent, 0.01)
 }

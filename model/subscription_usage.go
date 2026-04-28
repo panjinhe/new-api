@@ -440,51 +440,44 @@ func loadSubscriptionActualUsageStats(primarySubs map[int]UserSubscription, now 
 		return stats, nil
 	}
 
-	windows := make(map[int]subscriptionActualUsageWindow, len(primarySubs))
-	subIds := make([]int, 0, len(primarySubs))
-	minDay := int64(0)
-	maxDay := int64(0)
+	planIds := make([]int, 0, len(primarySubs))
+	seenPlanIds := make(map[int]struct{}, len(primarySubs))
 	for _, sub := range primarySubs {
-		window := subscriptionActualUsageWindowForSub(sub, now)
+		if sub.PlanId <= 0 {
+			continue
+		}
+		if _, ok := seenPlanIds[sub.PlanId]; ok {
+			continue
+		}
+		seenPlanIds[sub.PlanId] = struct{}{}
+		planIds = append(planIds, sub.PlanId)
+	}
+	planById := make(map[int]SubscriptionPlan, len(planIds))
+	if len(planIds) > 0 {
+		var plans []SubscriptionPlan
+		if err := DB.Where("id IN ?", planIds).Find(&plans).Error; err != nil {
+			return nil, err
+		}
+		for _, plan := range plans {
+			planById[plan.Id] = plan
+		}
+	}
+
+	for _, sub := range primarySubs {
+		plan, ok := planById[sub.PlanId]
+		if !ok {
+			stats[sub.Id] = subscriptionActualUsageStats{}
+			continue
+		}
+		window := subscriptionActualUsageWindowForSub(sub, &plan, now)
 		if window.TheoreticalQuota <= 0 {
 			stats[sub.Id] = subscriptionActualUsageStats{}
 			continue
 		}
-		windows[sub.Id] = window
 		stats[sub.Id] = subscriptionActualUsageStats{
+			Used:             maxInt64(sub.AmountUsedTotal, 0),
 			TheoreticalQuota: window.TheoreticalQuota,
 		}
-		subIds = append(subIds, sub.Id)
-		if minDay == 0 || window.StartDay < minDay {
-			minDay = window.StartDay
-		}
-		if window.EndDay > maxDay {
-			maxDay = window.EndDay
-		}
-	}
-	if len(subIds) == 0 {
-		return stats, nil
-	}
-
-	var rows []struct {
-		UserSubscriptionId int   `gorm:"column:user_subscription_id"`
-		DayStart           int64 `gorm:"column:day_start"`
-		Quota              int64 `gorm:"column:quota"`
-	}
-	if err := DB.Model(&SubscriptionUsageDaily{}).
-		Select("user_subscription_id, day_start, quota").
-		Where("user_subscription_id IN ? AND day_start >= ? AND day_start <= ?", subIds, minDay, maxDay).
-		Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	for _, row := range rows {
-		window, ok := windows[row.UserSubscriptionId]
-		if !ok || row.DayStart < window.StartDay || row.DayStart > window.EndDay {
-			continue
-		}
-		stat := stats[row.UserSubscriptionId]
-		stat.Used += row.Quota
-		stats[row.UserSubscriptionId] = stat
 	}
 	for subId, stat := range stats {
 		if stat.TheoreticalQuota <= 0 {
@@ -496,24 +489,13 @@ func loadSubscriptionActualUsageStats(primarySubs map[int]UserSubscription, now 
 	return stats, nil
 }
 
-func subscriptionActualUsageWindowForSub(sub UserSubscription, now int64) subscriptionActualUsageWindow {
+func subscriptionActualUsageWindowForSub(sub UserSubscription, plan *SubscriptionPlan, now int64) subscriptionActualUsageWindow {
 	if sub.AmountTotal <= 0 {
 		return subscriptionActualUsageWindow{}
 	}
-	start := sub.LastResetTime
-	if start <= 0 || (sub.StartTime > 0 && start < sub.StartTime) {
-		start = sub.StartTime
-	}
-	end := sub.NextResetTime
-	if end <= 0 || (sub.EndTime > 0 && end > sub.EndTime) {
-		end = sub.EndTime
-	}
+	start := sub.StartTime
+	end := sub.EndTime
 	if start <= 0 || end <= start || now <= start {
-		return subscriptionActualUsageWindow{}
-	}
-	period := end - start
-	totalDays := int64(math.Ceil(float64(period) / 86400.0))
-	if totalDays <= 0 {
 		return subscriptionActualUsageWindow{}
 	}
 	startDay := SubscriptionUsageDayStart(start)
@@ -529,22 +511,36 @@ func subscriptionActualUsageWindowForSub(sub UserSubscription, now int64) subscr
 	if elapsedDays <= 0 {
 		return subscriptionActualUsageWindow{}
 	}
-	if elapsedDays > totalDays {
-		elapsedDays = totalDays
-	}
-	expected := float64(sub.AmountTotal) * float64(elapsedDays) / float64(totalDays)
-	if expected <= 0 {
-		return subscriptionActualUsageWindow{}
-	}
-	theoreticalQuota := int64(math.Round(expected))
-	if theoreticalQuota > sub.AmountTotal {
-		theoreticalQuota = sub.AmountTotal
+	theoreticalQuota := sub.AmountTotal * elapsedDays
+	if plan == nil || NormalizeResetPeriod(plan.QuotaResetPeriod) != SubscriptionResetDaily {
+		totalDays := int64(math.Ceil(float64(end-start) / 86400.0))
+		if totalDays <= 0 {
+			return subscriptionActualUsageWindow{}
+		}
+		if elapsedDays > totalDays {
+			elapsedDays = totalDays
+		}
+		expected := float64(sub.AmountTotal) * float64(elapsedDays) / float64(totalDays)
+		if expected <= 0 {
+			return subscriptionActualUsageWindow{}
+		}
+		theoreticalQuota = int64(math.Round(expected))
+		if theoreticalQuota > sub.AmountTotal {
+			theoreticalQuota = sub.AmountTotal
+		}
 	}
 	return subscriptionActualUsageWindow{
 		StartDay:         startDay,
 		EndDay:           endDay,
 		TheoreticalQuota: theoreticalQuota,
 	}
+}
+
+func maxInt64(value int64, floor int64) int64 {
+	if value < floor {
+		return floor
+	}
+	return value
 }
 
 func summaryMatchesSubscriptionStatus(summary AdminUserSubscriptionSummary, hasAnySubscription bool, status string, expireBefore int64) bool {
