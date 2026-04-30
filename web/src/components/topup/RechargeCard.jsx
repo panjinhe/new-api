@@ -1064,21 +1064,26 @@ const RechargeCard = ({
             initValues={{ redemptionCode: redemptionCode }}
           >
             <div>
-              <div className='grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start'>
+              <div className='grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center'>
                 <Form.Input
                   field='redemptionCode'
                   noLabel={true}
+                  fieldStyle={{
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                    overflow: 'visible',
+                  }}
                   placeholder={t('请输入兑换码')}
                   value={redemptionCode}
                   onChange={(value) => setRedemptionCode(value)}
                   prefix={<IconGift />}
                   showClear
-                  style={{ width: '100%' }}
+                  style={{ width: '100%', height: 32 }}
                 />
                 <Button
                   type='primary'
                   theme='solid'
-                  className='w-full md:w-auto md:min-w-[116px]'
+                  className='w-full md:w-auto md:min-w-[116px] md:self-center'
                   onClick={topUp}
                   loading={isSubmitting}
                   style={{ height: 32 }}
