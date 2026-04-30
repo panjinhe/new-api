@@ -1130,6 +1130,10 @@ func TopUp(c *gin.Context) {
 	}
 	result, err := model.Redeem(req.Key, id)
 	if err != nil {
+		if errors.Is(err, model.ErrRedemptionWelfareAlreadyRedeemed) {
+			common.ApiErrorI18n(c, i18n.MsgRedemptionWelfareAlreadyRedeemed)
+			return
+		}
 		if errors.Is(err, model.ErrRedeemFailed) {
 			common.ApiErrorI18n(c, i18n.MsgRedeemFailed)
 			return

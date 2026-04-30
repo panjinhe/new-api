@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,8 @@ import (
 const (
 	RedemptionTypeQuota = "quota"
 	RedemptionTypePlan  = "plan"
+
+	oneTimeWelfareRedemptionAmountUSD = 20.0
 )
 
 type Redemption struct {
@@ -87,6 +90,47 @@ func withUpdateLock(tx *gorm.DB) *gorm.DB {
 		return tx
 	}
 	return tx.Clauses(clause.Locking{Strength: "UPDATE"})
+}
+
+func oneTimeWelfareRedemptionQuota() int {
+	return int(math.Round(oneTimeWelfareRedemptionAmountUSD * common.QuotaPerUnit))
+}
+
+func isOneTimeWelfareRedemption(redemption *Redemption) bool {
+	if redemption == nil {
+		return false
+	}
+	return redemption.RedemptionType == RedemptionTypeQuota && redemption.Quota == oneTimeWelfareRedemptionQuota()
+}
+
+func lockUserForRedemptionTx(tx *gorm.DB, userId int) error {
+	var user User
+	return withUpdateLock(tx).Select("id").Where("id = ?", userId).First(&user).Error
+}
+
+func userHasRedeemedOneTimeWelfareTx(tx *gorm.DB, userId int) (bool, error) {
+	var count int64
+	err := tx.Unscoped().Model(&Redemption{}).
+		Where("used_user_id = ?", userId).
+		Where("status = ?", common.RedemptionCodeStatusUsed).
+		Where("redemption_type = ?", RedemptionTypeQuota).
+		Where("quota = ?", oneTimeWelfareRedemptionQuota()).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func ensureUserCanRedeemOneTimeWelfareTx(tx *gorm.DB, userId int) error {
+	if err := lockUserForRedemptionTx(tx, userId); err != nil {
+		return err
+	}
+	redeemed, err := userHasRedeemedOneTimeWelfareTx(tx, userId)
+	if err != nil {
+		return err
+	}
+	if redeemed {
+		return ErrRedemptionWelfareAlreadyRedeemed
+	}
+	return nil
 }
 
 func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total int64, err error) {
@@ -211,6 +255,11 @@ func Redeem(key string, userId int) (*RedemptionResult, error) {
 			}
 			result.Subscription = buildRedemptionSubscriptionResult(subscription, plan, redemption.Id, extended)
 		} else {
+			if isOneTimeWelfareRedemption(redemption) {
+				if err := ensureUserCanRedeemOneTimeWelfareTx(tx, userId); err != nil {
+					return err
+				}
+			}
 			err = tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
 			if err != nil {
 				return err

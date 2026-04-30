@@ -1,6 +1,8 @@
 package model
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -21,9 +23,10 @@ func seedRedemptionUser(t *testing.T, id int) {
 	t.Helper()
 	require.NoError(t, DB.Create(&User{
 		Id:       id,
-		Username: "redeem_user",
+		Username: fmt.Sprintf("redeem_user_%d", id),
 		Status:   common.UserStatusEnabled,
 		Group:    "default",
+		AffCode:  fmt.Sprintf("redeem_aff_%d", id),
 	}).Error)
 }
 
@@ -67,6 +70,13 @@ func getRedemptionStatus(t *testing.T, id int) int {
 	return redemption.Status
 }
 
+func getRedemptionUserQuota(t *testing.T, id int) int {
+	t.Helper()
+	var user User
+	require.NoError(t, DB.Select("quota").Where("id = ?", id).First(&user).Error)
+	return user.Quota
+}
+
 func TestRedeemQuotaCodeAddsWalletQuota(t *testing.T) {
 	truncateTables(t)
 	resetRedemptionTestTables(t)
@@ -83,6 +93,89 @@ func TestRedeemQuotaCodeAddsWalletQuota(t *testing.T) {
 	var user User
 	require.NoError(t, DB.Select("quota").Where("id = ?", 101).First(&user).Error)
 	assert.Equal(t, 5000, user.Quota)
+}
+
+func TestRedeemOneTimeWelfareCodeOnlyOncePerUser(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 105)
+	welfareQuota := oneTimeWelfareRedemptionQuota()
+	first := seedRedemptionCode(t, "welfare-code-first", RedemptionTypeQuota, welfareQuota, 0)
+	second := seedRedemptionCode(t, "welfare-code-second", RedemptionTypeQuota, welfareQuota, 0)
+
+	result, err := Redeem(first.Key, 105)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, welfareQuota, result.Quota)
+
+	result, err = Redeem(second.Key, 105)
+	require.Error(t, err)
+	require.Nil(t, result)
+	assert.True(t, errors.Is(err, ErrRedemptionWelfareAlreadyRedeemed))
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, first.Id))
+	assert.Equal(t, common.RedemptionCodeStatusEnabled, getRedemptionStatus(t, second.Id))
+	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 105))
+}
+
+func TestRedeemOneTimeWelfareCodeAllowsDifferentUsers(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 106)
+	seedRedemptionUser(t, 107)
+	welfareQuota := oneTimeWelfareRedemptionQuota()
+	first := seedRedemptionCode(t, "welfare-code-user-a", RedemptionTypeQuota, welfareQuota, 0)
+	second := seedRedemptionCode(t, "welfare-code-user-b", RedemptionTypeQuota, welfareQuota, 0)
+
+	_, err := Redeem(first.Key, 106)
+	require.NoError(t, err)
+	result, err := Redeem(second.Key, 107)
+	require.NoError(t, err)
+
+	require.NotNil(t, result)
+	assert.Equal(t, welfareQuota, result.Quota)
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, first.Id))
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, second.Id))
+	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 106))
+	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 107))
+}
+
+func TestRedeemNonWelfareQuotaCodeNotLimitedByWelfareHistory(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 108)
+	welfareQuota := oneTimeWelfareRedemptionQuota()
+	first := seedRedemptionCode(t, "welfare-code-history", RedemptionTypeQuota, welfareQuota, 0)
+	second := seedRedemptionCode(t, "non-welfare-code", RedemptionTypeQuota, welfareQuota+1, 0)
+
+	_, err := Redeem(first.Key, 108)
+	require.NoError(t, err)
+	result, err := Redeem(second.Key, 108)
+	require.NoError(t, err)
+
+	require.NotNil(t, result)
+	assert.Equal(t, welfareQuota+1, result.Quota)
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, second.Id))
+	assert.Equal(t, welfareQuota+welfareQuota+1, getRedemptionUserQuota(t, 108))
+}
+
+func TestRedeemOneTimeWelfareCodeCountsSoftDeletedHistory(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 109)
+	welfareQuota := oneTimeWelfareRedemptionQuota()
+	first := seedRedemptionCode(t, "welfare-code-deleted-history", RedemptionTypeQuota, welfareQuota, 0)
+	second := seedRedemptionCode(t, "welfare-code-after-deleted-history", RedemptionTypeQuota, welfareQuota, 0)
+
+	_, err := Redeem(first.Key, 109)
+	require.NoError(t, err)
+	require.NoError(t, DB.Delete(first).Error)
+	result, err := Redeem(second.Key, 109)
+	require.Error(t, err)
+
+	require.Nil(t, result)
+	assert.True(t, errors.Is(err, ErrRedemptionWelfareAlreadyRedeemed))
+	assert.Equal(t, common.RedemptionCodeStatusEnabled, getRedemptionStatus(t, second.Id))
+	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 109))
 }
 
 func TestRedeemPlanCodeCreatesSubscription(t *testing.T) {
