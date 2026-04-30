@@ -925,42 +925,44 @@ const RechargeCard = ({
             getFormApi={(api) => (redeemFormApiRef.current = api)}
             initValues={{ redemptionCode: redemptionCode }}
           >
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-start'>
-              <Form.Input
-                field='redemptionCode'
-                noLabel={true}
-                placeholder={t('请输入兑换码')}
-                value={redemptionCode}
-                onChange={(value) => setRedemptionCode(value)}
-                prefix={<IconGift />}
-                showClear
-                style={{ width: '100%' }}
-                extraText={
-                  !redemptionOnlyMode &&
-                  topUpLink && (
-                    <Text type='tertiary'>
-                      {t('在找兑换码？')}
-                      <Text
-                        type='secondary'
-                        underline
-                        className='cursor-pointer'
-                        onClick={openTopUpLink}
-                      >
-                        {t('购买兑换码')}
-                      </Text>
+            <div>
+              <div className='grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start'>
+                <Form.Input
+                  field='redemptionCode'
+                  noLabel={true}
+                  placeholder={t('请输入兑换码')}
+                  value={redemptionCode}
+                  onChange={(value) => setRedemptionCode(value)}
+                  prefix={<IconGift />}
+                  showClear
+                  style={{ width: '100%' }}
+                />
+                <Button
+                  type='primary'
+                  theme='solid'
+                  className='w-full md:w-auto md:min-w-[116px]'
+                  onClick={topUp}
+                  loading={isSubmitting}
+                  style={{ height: 32 }}
+                >
+                  {isSubmitting ? t('正在兑换') : t('立即兑换')}
+                </Button>
+              </div>
+              {!redemptionOnlyMode && topUpLink && (
+                <div className='mt-1.5 text-xs leading-5'>
+                  <Text type='tertiary'>
+                    {t('在找兑换码？')}
+                    <Text
+                      type='secondary'
+                      underline
+                      className='cursor-pointer'
+                      onClick={openTopUpLink}
+                    >
+                      {t('购买兑换码')}
                     </Text>
-                  )
-                }
-              />
-              <Button
-                type='primary'
-                theme='solid'
-                className='w-full md:w-auto md:min-w-[116px]'
-                onClick={topUp}
-                loading={isSubmitting}
-              >
-                {isSubmitting ? t('正在兑换') : t('立即兑换')}
-              </Button>
+                  </Text>
+                </div>
+              )}
             </div>
           </Form>
         </div>
