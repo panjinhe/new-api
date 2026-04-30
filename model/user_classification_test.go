@@ -36,6 +36,19 @@ func insertTopUpForClassificationTest(t *testing.T, userId int, money float64, s
 	}).Error)
 }
 
+func insertUsedRedemptionForClassificationTest(t *testing.T, userId int, quota int) {
+	t.Helper()
+	require.NoError(t, DB.Create(&Redemption{
+		UserId:         1,
+		Key:            fmt.Sprintf("classred%08d%08d", userId, quota),
+		Name:           "classification redemption",
+		Quota:          quota,
+		Status:         common.RedemptionCodeStatusUsed,
+		RedemptionType: RedemptionTypeQuota,
+		UsedUserId:     userId,
+	}).Error)
+}
+
 func getUserGroupForClassificationTest(t *testing.T, userId int) string {
 	t.Helper()
 	var group string
@@ -66,10 +79,13 @@ func TestClassifyUsersByPaymentAndUsage_AssignsPaidAndFreeGroups(t *testing.T) {
 	insertUserForClassificationTest(t, 903, "paid-subscription", "default", 0, common.RoleCommonUser)
 	require.NoError(t, DB.Create(&UserSubscription{UserId: 903, PlanId: 1, Status: "expired"}).Error)
 
-	insertUserForClassificationTest(t, 904, "free-user", "default", 0, common.RoleCommonUser)
-	insertTopUpForClassificationTest(t, 904, 100, common.TopUpStatusPending, "pending-topup")
+	insertUserForClassificationTest(t, 904, "paid-redemption", "default", 0, common.RoleCommonUser)
+	insertUsedRedemptionForClassificationTest(t, 904, redemptionQuotaThreshold(50))
 
-	insertUserForClassificationTest(t, 905, "admin-user", "default", 0, common.RoleAdminUser)
+	insertUserForClassificationTest(t, 905, "free-user", "default", 0, common.RoleCommonUser)
+	insertTopUpForClassificationTest(t, 905, 100, common.TopUpStatusPending, "pending-topup")
+
+	insertUserForClassificationTest(t, 906, "admin-user", "default", 0, common.RoleAdminUser)
 
 	result, err := ClassifyUsersByPaymentAndUsage(UserGroupClassificationOptions{
 		AmountThreshold: 50,
@@ -78,16 +94,17 @@ func TestClassifyUsersByPaymentAndUsage_AssignsPaidAndFreeGroups(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(4), result.TotalUsers)
-	assert.Equal(t, int64(3), result.PaidUsers)
+	assert.Equal(t, int64(5), result.TotalUsers)
+	assert.Equal(t, int64(4), result.PaidUsers)
 	assert.Equal(t, int64(1), result.FreeUsers)
-	assert.Equal(t, int64(4), result.UpdatedUsers)
+	assert.Equal(t, int64(5), result.UpdatedUsers)
 	assert.Equal(t, usedQuotaThreshold, result.UsedQuotaThreshold)
 	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 901))
 	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 902))
 	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 903))
-	assert.Equal(t, DefaultFreeloadingUserGroup, getUserGroupForClassificationTest(t, 904))
-	assert.Equal(t, "default", getUserGroupForClassificationTest(t, 905))
+	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 904))
+	assert.Equal(t, DefaultFreeloadingUserGroup, getUserGroupForClassificationTest(t, 905))
+	assert.Equal(t, "default", getUserGroupForClassificationTest(t, 906))
 }
 
 func TestClassifyUsersByPaymentAndUsage_RejectsSameGroups(t *testing.T) {
@@ -144,6 +161,19 @@ func TestPromoteUserToPaidGroupIfUsageQualified(t *testing.T) {
 
 	promoteUserToPaidGroupIfUsageQualified(907)
 	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 907))
+}
+
+func TestPromoteUserToPaidGroupIfRedemptionQualified(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForClassificationTest(t, 909, "redemption-promote", DefaultFreeloadingUserGroup, 0, common.RoleCommonUser)
+	insertUsedRedemptionForClassificationTest(t, 909, redemptionQuotaThreshold(49))
+	promoteUserToPaidGroupIfRedemptionQualified(909)
+	assert.Equal(t, DefaultFreeloadingUserGroup, getUserGroupForClassificationTest(t, 909))
+
+	insertUsedRedemptionForClassificationTest(t, 909, redemptionQuotaThreshold(50))
+	promoteUserToPaidGroupIfRedemptionQualified(909)
+	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 909))
 }
 
 func TestCreateUserSubscriptionPromotesPaidGroup(t *testing.T) {

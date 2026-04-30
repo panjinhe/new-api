@@ -232,6 +232,7 @@ func Redeem(key string, userId int) (*RedemptionResult, error) {
 		invalidateClassifiedUserCaches([]int{userId})
 	} else {
 		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
+		promoteUserToPaidGroupIfRedemptionQualified(userId)
 	}
 	return result, nil
 }

@@ -36,6 +36,7 @@ type UserGroupClassificationResult struct {
 	TopUpQualifiedUsers int64   `json:"topup_qualified_users"`
 	UsageQualifiedUsers int64   `json:"usage_qualified_users"`
 	SubscriptionUsers   int64   `json:"subscription_users"`
+	RedemptionUsers     int64   `json:"redemption_users"`
 }
 
 func normalizeUserGroupClassificationOptions(options UserGroupClassificationOptions) (UserGroupClassificationOptions, error) {
@@ -93,6 +94,23 @@ func successfulTopUpQualifiedUserQuery(tx *gorm.DB, threshold float64) *gorm.DB 
 		Where("status = ?", common.TopUpStatusSuccess).
 		Group("user_id").
 		Having("COALESCE(SUM(money), 0) >= ?", threshold)
+}
+
+func redemptionQuotaThreshold(amount float64) int {
+	if amount <= 0 {
+		return 0
+	}
+	return int(math.Ceil(amount * common.QuotaPerUnit))
+}
+
+func successfulRedemptionQualifiedUserQuery(tx *gorm.DB, threshold float64) *gorm.DB {
+	return tx.Model(&Redemption{}).
+		Select("used_user_id").
+		Where("status = ?", common.RedemptionCodeStatusUsed).
+		Where("redemption_type = ?", RedemptionTypeQuota).
+		Where("used_user_id > 0").
+		Where("quota >= ?", redemptionQuotaThreshold(threshold)).
+		Group("used_user_id")
 }
 
 func subscriptionUserQuery(tx *gorm.DB) *gorm.DB {
@@ -191,6 +209,37 @@ func promoteUserToPaidGroupIfTopUpQualified(userId int) {
 	}
 }
 
+func promoteUserToPaidGroupIfRedemptionQualified(userId int) {
+	if userId <= 0 {
+		return
+	}
+	var changed bool
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&Redemption{}).
+			Where("used_user_id = ?", userId).
+			Where("status = ?", common.RedemptionCodeStatusUsed).
+			Where("redemption_type = ?", RedemptionTypeQuota).
+			Where("quota >= ?", redemptionQuotaThreshold(DefaultPaidAmountThreshold)).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return nil
+		}
+		var err error
+		changed, err = promoteUserToPaidGroupTx(tx, userId)
+		return err
+	})
+	if err != nil {
+		common.SysLog("failed to classify user after redemption: " + err.Error())
+		return
+	}
+	if changed {
+		invalidateClassifiedUserCaches([]int{userId})
+	}
+}
+
 func promoteUserToPaidGroupIfUsageQualified(userId int) {
 	if userId <= 0 {
 		return
@@ -245,6 +294,7 @@ func ClassifyUsersByPaymentAndUsage(options UserGroupClassificationOptions) (*Us
 
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		paidTopUpUsers := successfulTopUpQualifiedUserQuery(tx, options.AmountThreshold)
+		redemptionUsers := successfulRedemptionQualifiedUserQuery(tx, options.AmountThreshold)
 		subscriptionUsers := subscriptionUserQuery(tx)
 
 		if err := commonUserQuery(tx).Count(&result.TotalUsers).Error; err != nil {
@@ -266,9 +316,18 @@ func ClassifyUsersByPaymentAndUsage(options UserGroupClassificationOptions) (*Us
 			Scan(&result.SubscriptionUsers).Error; err != nil {
 			return err
 		}
+		if err := tx.Model(&Redemption{}).
+			Select("COUNT(DISTINCT used_user_id)").
+			Where("status = ?", common.RedemptionCodeStatusUsed).
+			Where("redemption_type = ?", RedemptionTypeQuota).
+			Where("used_user_id > 0").
+			Where("quota >= ?", redemptionQuotaThreshold(options.AmountThreshold)).
+			Scan(&result.RedemptionUsers).Error; err != nil {
+			return err
+		}
 
 		err := commonUserQuery(tx).
-			Where("used_quota >= ? OR id IN (?) OR id IN (?)", usedQuotaThreshold, paidTopUpUsers, subscriptionUsers).
+			Where("used_quota >= ? OR id IN (?) OR id IN (?) OR id IN (?)", usedQuotaThreshold, paidTopUpUsers, redemptionUsers, subscriptionUsers).
 			Pluck("id", &paidIDs).Error
 		if err != nil {
 			return err
