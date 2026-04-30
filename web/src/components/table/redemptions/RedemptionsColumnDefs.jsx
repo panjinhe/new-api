@@ -73,6 +73,34 @@ const renderStatus = (status, record, t) => {
   );
 };
 
+const renderRedemptionType = (record, t) => {
+  const isPlan = record.redemption_type === 'plan';
+  return (
+    <Tag color={isPlan ? 'violet' : 'blue'} shape='circle'>
+      {isPlan ? t('套餐兑换码') : t('额度兑换码')}
+    </Tag>
+  );
+};
+
+const renderRedemptionValue = (record, t) => {
+  if (record.redemption_type === 'plan') {
+    return (
+      <div>
+        <Tag color='violet' shape='circle'>
+          {record.plan?.title || `${t('套餐')} #${record.plan_id || '-'}`}
+        </Tag>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <Tag color='grey' shape='circle'>
+        {renderQuota(parseInt(record.quota))}
+      </Tag>
+    </div>
+  );
+};
+
 /**
  * Get redemption code table column definitions
  */
@@ -105,17 +133,19 @@ export const getRedemptionsColumns = ({
       },
     },
     {
-      title: t('额度'),
+      title: t('类型'),
+      dataIndex: 'redemption_type',
+      render: (text, record) => renderRedemptionType(record, t),
+    },
+    {
+      title: t('内容'),
       dataIndex: 'quota',
-      render: (text) => {
-        return (
-          <div>
-            <Tag color='grey' shape='circle'>
-              {renderQuota(parseInt(text))}
-            </Tag>
-          </div>
-        );
-      },
+      render: (text, record) => renderRedemptionValue(record, t),
+    },
+    {
+      title: t('批次'),
+      dataIndex: 'batch_id',
+      render: (text) => <div>{text || '-'}</div>,
     },
     {
       title: t('创建时间'),

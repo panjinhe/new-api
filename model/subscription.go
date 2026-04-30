@@ -244,7 +244,8 @@ type UserSubscription struct {
 	EndTime   int64  `json:"end_time" gorm:"bigint;index;index:idx_user_sub_active,priority:3"`
 	Status    string `json:"status" gorm:"type:varchar(32);index;index:idx_user_sub_active,priority:2"` // active/expired/cancelled
 
-	Source string `json:"source" gorm:"type:varchar(32);default:'order'"` // order/admin
+	Source             string `json:"source" gorm:"type:varchar(32);default:'order'"` // order/admin/redemption
+	SourceRedemptionId int    `json:"source_redemption_id" gorm:"default:0;index"`
 
 	LastResetTime int64 `json:"last_reset_time" gorm:"type:bigint;default:0"`
 	NextResetTime int64 `json:"next_reset_time" gorm:"type:bigint;default:0;index"`
@@ -458,7 +459,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("已达到该套餐购买上限")
 		}
 	}
-	nowUnix := GetDBTimestamp()
+	nowUnix := common.GetTimestamp()
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -506,6 +507,115 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		return nil, err
 	}
 	return sub, nil
+}
+
+func RedeemSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, redemptionId int) (*UserSubscription, bool, error) {
+	if tx == nil {
+		return nil, false, errors.New("tx is nil")
+	}
+	if plan == nil || plan.Id <= 0 {
+		return nil, false, errors.New("invalid plan")
+	}
+	if userId <= 0 {
+		return nil, false, errors.New("invalid user id")
+	}
+	nowUnix := common.GetTimestamp()
+	var active UserSubscription
+	err := withUpdateLock(tx).
+		Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", nowUnix).
+		Order("end_time desc, id desc").
+		Limit(1).
+		Find(&active).Error
+	if err != nil {
+		return nil, false, err
+	}
+	if active.Id > 0 {
+		if active.PlanId != plan.Id {
+			return nil, false, errors.New("已有生效中的其他套餐，暂不支持同时兑换")
+		}
+		base := time.Unix(active.EndTime, 0)
+		nextEnd, err := calcPlanEndTime(base, plan)
+		if err != nil {
+			return nil, false, err
+		}
+		active.EndTime = nextEnd
+		active.Source = "redemption"
+		active.SourceRedemptionId = redemptionId
+		if NormalizeResetPeriod(plan.QuotaResetPeriod) == SubscriptionResetNever {
+			active.AmountTotal += plan.TotalAmount
+		} else if active.AmountTotal < plan.TotalAmount {
+			active.AmountTotal = plan.TotalAmount
+		}
+		if active.NextResetTime == 0 {
+			active.NextResetTime = calcNextResetTime(time.Unix(nowUnix, 0), plan, active.EndTime)
+			if active.NextResetTime > 0 && active.LastResetTime == 0 {
+				active.LastResetTime = nowUnix
+			}
+		}
+		if err := tx.Save(&active).Error; err != nil {
+			return nil, false, err
+		}
+		return &active, true, nil
+	}
+	if plan.MaxPurchasePerUser > 0 {
+		var count int64
+		if err := tx.Model(&UserSubscription{}).
+			Where("user_id = ? AND plan_id = ?", userId, plan.Id).
+			Count(&count).Error; err != nil {
+			return nil, false, err
+		}
+		if count >= int64(plan.MaxPurchasePerUser) {
+			return nil, false, errors.New("已达到该套餐购买上限")
+		}
+	}
+
+	now := time.Unix(nowUnix, 0)
+	endUnix, err := calcPlanEndTime(now, plan)
+	if err != nil {
+		return nil, false, err
+	}
+	nextReset := calcNextResetTime(now, plan, endUnix)
+	lastReset := int64(0)
+	if nextReset > 0 {
+		lastReset = nowUnix
+	}
+	upgradeGroup := strings.TrimSpace(plan.UpgradeGroup)
+	prevGroup := ""
+	if upgradeGroup != "" {
+		currentGroup, err := getUserGroupByIdTx(tx, userId)
+		if err != nil {
+			return nil, false, err
+		}
+		if currentGroup != upgradeGroup {
+			prevGroup = currentGroup
+			if err := tx.Model(&User{}).Where("id = ?", userId).
+				Update("group", upgradeGroup).Error; err != nil {
+				return nil, false, err
+			}
+		}
+	}
+	sub := &UserSubscription{
+		UserId:             userId,
+		PlanId:             plan.Id,
+		AmountTotal:        plan.TotalAmount,
+		AmountUsed:         0,
+		AmountUsedTotal:    0,
+		StartTime:          nowUnix,
+		EndTime:            endUnix,
+		Status:             "active",
+		Source:             "redemption",
+		SourceRedemptionId: redemptionId,
+		LastResetTime:      lastReset,
+		NextResetTime:      nextReset,
+		UpgradeGroup:       upgradeGroup,
+		PrevUserGroup:      prevGroup,
+		CreatedAt:          nowUnix,
+		UpdatedAt:          nowUnix,
+	}
+	if err := tx.Create(sub).Error; err != nil {
+		return nil, false, err
+	}
+	return sub, false, nil
 }
 
 // Complete a subscription order (idempotent). Creates a UserSubscription snapshot from the plan.

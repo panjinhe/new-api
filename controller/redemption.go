@@ -81,16 +81,35 @@ func AddRedemption(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 		return
 	}
+	redemption.Normalize()
+	if redemption.RedemptionType == model.RedemptionTypePlan {
+		if redemption.PlanId <= 0 {
+			common.ApiErrorMsg(c, "请选择套餐")
+			return
+		}
+		plan, err := model.GetSubscriptionPlanById(redemption.PlanId)
+		if err != nil || plan == nil || !plan.Enabled {
+			common.ApiErrorMsg(c, "套餐不存在或已下架")
+			return
+		}
+	} else if redemption.Quota <= 0 {
+		common.ApiErrorMsg(c, "额度必须大于0")
+		return
+	}
 	var keys []string
 	for i := 0; i < redemption.Count; i++ {
 		key := common.GetUUID()
 		cleanRedemption := model.Redemption{
-			UserId:      c.GetInt("id"),
-			Name:        redemption.Name,
-			Key:         key,
-			CreatedTime: common.GetTimestamp(),
-			Quota:       redemption.Quota,
-			ExpiredTime: redemption.ExpiredTime,
+			UserId:         c.GetInt("id"),
+			Name:           redemption.Name,
+			Key:            key,
+			CreatedTime:    common.GetTimestamp(),
+			Quota:          redemption.Quota,
+			RedemptionType: redemption.RedemptionType,
+			PlanId:         redemption.PlanId,
+			BatchId:        redemption.BatchId,
+			Source:         redemption.Source,
+			ExpiredTime:    redemption.ExpiredTime,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
@@ -144,10 +163,29 @@ func UpdateRedemption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 			return
 		}
+		redemption.Normalize()
+		if redemption.RedemptionType == model.RedemptionTypePlan {
+			if redemption.PlanId <= 0 {
+				common.ApiErrorMsg(c, "请选择套餐")
+				return
+			}
+			plan, err := model.GetSubscriptionPlanById(redemption.PlanId)
+			if err != nil || plan == nil || !plan.Enabled {
+				common.ApiErrorMsg(c, "套餐不存在或已下架")
+				return
+			}
+		} else if redemption.Quota <= 0 {
+			common.ApiErrorMsg(c, "额度必须大于0")
+			return
+		}
 		// If you add more fields, please also update redemption.Update()
 		cleanRedemption.Name = redemption.Name
 		cleanRedemption.Quota = redemption.Quota
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
+		cleanRedemption.RedemptionType = redemption.RedemptionType
+		cleanRedemption.PlanId = redemption.PlanId
+		cleanRedemption.BatchId = redemption.BatchId
+		cleanRedemption.Source = redemption.Source
 	}
 	if statusOnly != "" {
 		cleanRedemption.Status = redemption.Status

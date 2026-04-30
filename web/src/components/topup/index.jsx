@@ -26,6 +26,7 @@ import {
   showSuccess,
   renderQuota,
   renderQuotaWithAmount,
+  timestamp2string,
 } from '../../helpers';
 import { Modal, Toast } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
@@ -152,18 +153,55 @@ const TopUp = () => {
       });
       const { success, message, data } = res.data;
       if (success) {
+        const result =
+          data && typeof data === 'object'
+            ? data
+            : { type: 'quota', quota: data };
         showSuccess(t('兑换成功！'));
-        Modal.success({
-          title: t('兑换成功！'),
-          content: t('成功兑换额度：') + renderQuota(data),
-          centered: true,
-        });
-        if (userState.user) {
-          const updatedUser = {
-            ...userState.user,
-            quota: userState.user.quota + data,
-          };
-          userDispatch({ type: 'login', payload: updatedUser });
+        if (result.type === 'plan' && result.subscription) {
+          const subscription = result.subscription;
+          Modal.success({
+            title: t('成功开通套餐'),
+            content: (
+              <div>
+                <p>
+                  {t('套餐')}：{subscription.plan_title}
+                </p>
+                <p>
+                  {t('每日额度')}：
+                  {renderQuota(
+                    subscription.daily_quota || subscription.amount_total,
+                  )}
+                </p>
+                <p>
+                  {t('总额度')}：
+                  {renderQuota(
+                    subscription.total_quota || subscription.amount_total,
+                  )}
+                </p>
+                <p>
+                  {t('有效期')}：{timestamp2string(subscription.start_time)} -{' '}
+                  {timestamp2string(subscription.end_time)}
+                </p>
+              </div>
+            ),
+            centered: true,
+          });
+          await getSubscriptionSelf();
+        } else {
+          const quota = Number(result.quota || 0);
+          Modal.success({
+            title: t('兑换成功！'),
+            content: t('成功兑换额度：') + renderQuota(quota),
+            centered: true,
+          });
+          if (userState.user) {
+            const updatedUser = {
+              ...userState.user,
+              quota: userState.user.quota + quota,
+            };
+            userDispatch({ type: 'login', payload: updatedUser });
+          }
         }
         setRedemptionCode('');
       } else {
