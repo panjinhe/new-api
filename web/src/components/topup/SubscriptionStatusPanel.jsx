@@ -40,6 +40,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { renderQuota } from '../../helpers';
+import { useActualTheme } from '../../context/Theme';
 import {
   formatSubscriptionDuration,
   formatSubscriptionResetPeriod,
@@ -200,26 +201,51 @@ const getSubscriptionPlanVisual = (plan) => {
   );
 };
 
+const isPlanVisualDark = (visual) => visual?.dark || visual?.themeDark;
+
+const getThemeAwarePlanVisual = (visual, isDarkMode) => {
+  if (!isDarkMode || visual?.dark) return visual;
+
+  return {
+    ...visual,
+    themeDark: true,
+    muted: 'rgba(203, 213, 225, 0.78)',
+    background:
+      'linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(24, 24, 27, 0.98) 54%, rgba(30, 41, 59, 0.92))',
+    glow: '0 18px 42px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.055)',
+  };
+};
+
 const getPlanVisualTexture = (visual) =>
   visual?.dark
     ? 'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.08) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 26px)'
-    : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 1px, transparent 1px 24px)';
+    : visual?.themeDark
+      ? 'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.055) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 26px)'
+      : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 1px, transparent 1px 24px)';
 
 const getPlanVisualPanel = (visual) =>
   visual?.dark
     ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.055))'
-    : 'rgba(255,255,255,0.80)';
+    : visual?.themeDark
+      ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(30, 41, 59, 0.54))'
+      : 'rgba(255,255,255,0.80)';
 
 const getPlanVisualSurface = (visual) =>
   visual?.dark
     ? 'linear-gradient(180deg, rgba(245, 199, 108, 0.16), rgba(255, 255, 255, 0.07))'
-    : 'rgba(255, 255, 255, 0.68)';
+    : visual?.themeDark
+      ? 'rgba(15, 23, 42, 0.72)'
+      : 'rgba(255, 255, 255, 0.68)';
 
 const getPlanVisualText = (visual) =>
-  visual?.dark ? 'rgba(255, 251, 235, 0.96)' : 'var(--semi-color-text-0)';
+  isPlanVisualDark(visual)
+    ? 'rgba(248, 250, 252, 0.96)'
+    : 'var(--semi-color-text-0)';
 
 const getPlanVisualMutedText = (visual) =>
-  visual?.dark ? visual.muted : 'var(--semi-color-text-2)';
+  isPlanVisualDark(visual)
+    ? visual.muted || 'rgba(203, 213, 225, 0.78)'
+    : 'var(--semi-color-text-2)';
 
 const getPlanComparisonLabel = (plan) => {
   const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
@@ -227,8 +253,8 @@ const getPlanComparisonLabel = (plan) => {
   if (text.includes('光速跃迁')) return '约等于 1.5个 Pro 20x';
   if (text.includes('加速')) return '约等于3个 Pro 5x';
   if (text.includes('巡航')) return '约等于1.5个 Pro 5x';
-  if (text.includes('启航')) return '约等于 4 个 Plus 账号';
-  if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
+  if (text.includes('启航')) return '约等于 4 个 Plus';
+  if (text.includes('探测')) return '约等于 1.4 个 Plus';
   return '';
 };
 
@@ -266,8 +292,10 @@ const SubscriptionStatusPanel = ({
   catalogEnabled = false,
   onViewCatalog,
 }) => {
+  const actualTheme = useActualTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [animatedPercent, setAnimatedPercent] = useState(0);
+  const isDarkMode = actualTheme === 'dark';
 
   const planMap = useMemo(() => {
     const map = new Map();
@@ -313,8 +341,11 @@ const SubscriptionStatusPanel = ({
     primaryTotalAmount - primaryUsedAmount,
   );
   const hasLimitedPrimaryQuota = primaryTotalAmount > 0;
-  const primaryVisual = getSubscriptionPlanVisual(primaryPlan);
-  const primaryVisualDark = Boolean(primaryVisual?.dark);
+  const primaryVisual = getThemeAwarePlanVisual(
+    getSubscriptionPlanVisual(primaryPlan),
+    isDarkMode,
+  );
+  const primaryVisualDark = isPlanVisualDark(primaryVisual);
   const primaryComparisonLabel = getPlanComparisonLabel(primaryPlan);
   const primaryDailyQuota = Number(primaryPlan?.total_amount || 0);
   const primaryResetLabel = primaryPlan

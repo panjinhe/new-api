@@ -35,6 +35,7 @@ import {
   showError,
   showSuccess,
 } from '../../helpers';
+import { useActualTheme } from '../../context/Theme';
 import { getCurrencyConfig } from '../../helpers/render';
 import {
   formatSubscriptionDuration,
@@ -96,8 +97,8 @@ const getPlanComparisonLabel = (plan) => {
   if (text.includes('光速跃迁')) return '约等于 1.5个 Pro 20x';
   if (text.includes('加速')) return '约等于3个 Pro 5x';
   if (text.includes('巡航')) return '约等于1.5个 Pro 5x';
-  if (text.includes('启航')) return '约等于 4 个 Plus 账号';
-  if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
+  if (text.includes('启航')) return '约等于 4 个 Plus';
+  if (text.includes('探测')) return '约等于 1.4 个 Plus';
   return '';
 };
 
@@ -136,10 +137,12 @@ const SubscriptionPlanCatalog = ({
   allSubscriptions = [],
   topUpLink = '',
 }) => {
+  const actualTheme = useActualTheme();
   const [open, setOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [paying, setPaying] = useState(false);
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('');
+  const isDarkMode = actualTheme === 'dark';
 
   const epayMethods = useMemo(() => getEpayMethods(payMethods), [payMethods]);
 
@@ -339,15 +342,23 @@ const SubscriptionPlanCatalog = ({
                       ? `1px solid ${premiumBlackPlanVisual.border}`
                       : isRecommended
                         ? '1px solid rgba(37, 99, 235, 0.45)'
-                        : '1px solid var(--semi-color-border)',
+                        : isDarkMode
+                          ? '1px solid rgba(148, 163, 184, 0.24)'
+                          : '1px solid var(--semi-color-border)',
                     background: isPremium
                       ? premiumBlackPlanVisual.background
-                      : undefined,
+                      : isDarkMode
+                        ? 'linear-gradient(180deg, rgba(24, 24, 27, 0.96), rgba(15, 23, 42, 0.92))'
+                        : undefined,
                     boxShadow: isPremium
                       ? premiumBlackPlanVisual.shadow
                       : isRecommended
-                        ? '0 18px 40px rgba(37, 99, 235, 0.10)'
-                        : undefined,
+                        ? isDarkMode
+                          ? '0 18px 40px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.045)'
+                          : '0 18px 40px rgba(37, 99, 235, 0.10)'
+                        : isDarkMode
+                          ? 'inset 0 1px 0 rgba(255, 255, 255, 0.045)'
+                          : undefined,
                   }}
                 >
                   {isPremium && (

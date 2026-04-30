@@ -20,6 +20,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { openRechargeLink, renderQuota } from '../../helpers';
+import { useActualTheme } from '../../context/Theme';
 import { formatSubscriptionResetPeriod } from '../../helpers/subscriptionFormat';
 
 const { Text, Paragraph } = Typography;
@@ -149,6 +150,18 @@ const getRechargePackVisual = (item, index) =>
   rechargePackVisuals.find((visual) => visual.quota === item.quota) ||
   rechargePackVisuals[index % rechargePackVisuals.length];
 
+const getThemeAwareRechargeVisual = (visual, isDarkMode) => {
+  if (!isDarkMode) return visual;
+
+  return {
+    ...visual,
+    themeDark: true,
+    background:
+      'linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(24, 24, 27, 0.98) 54%, rgba(30, 41, 59, 0.92))',
+    glow: '0 16px 36px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.045)',
+  };
+};
+
 const subscriptionPlanVisuals = [
   {
     titleKeyword: 'Pro 50x',
@@ -228,32 +241,57 @@ const getSubscriptionPlanVisual = (plan, index) => {
   );
 };
 
+const isPlanVisualDark = (visual) => visual?.dark || visual?.themeDark;
+
+const getThemeAwareSubscriptionVisual = (visual, isDarkMode) => {
+  if (!isDarkMode || visual?.dark) return visual;
+
+  return {
+    ...visual,
+    themeDark: true,
+    muted: 'rgba(203, 213, 225, 0.78)',
+    background:
+      'linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(24, 24, 27, 0.98) 54%, rgba(30, 41, 59, 0.92))',
+    glow: '0 18px 42px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.055)',
+  };
+};
+
 const getPlanVisualSurface = (
   visual,
   fallback = 'rgba(255, 255, 255, 0.72)',
 ) =>
   visual?.dark
     ? 'linear-gradient(180deg, rgba(245, 199, 108, 0.16), rgba(255, 255, 255, 0.07))'
-    : fallback;
+    : visual?.themeDark
+      ? 'rgba(15, 23, 42, 0.72)'
+      : fallback;
 
 const getPlanVisualPanel = (visual) =>
   visual?.dark
     ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.055))'
-    : 'rgba(255,255,255,0.80)';
+    : visual?.themeDark
+      ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(30, 41, 59, 0.54))'
+      : 'rgba(255,255,255,0.80)';
 
 const getPlanVisualText = (visual) =>
-  visual?.dark ? 'rgba(255, 251, 235, 0.96)' : 'var(--semi-color-text-0)';
+  isPlanVisualDark(visual)
+    ? 'rgba(248, 250, 252, 0.96)'
+    : 'var(--semi-color-text-0)';
 
 const getPlanVisualHeadingText = (visual) =>
-  visual?.dark ? 'rgba(255, 255, 255, 0.96)' : visual.accent;
+  isPlanVisualDark(visual) ? 'rgba(248, 250, 252, 0.96)' : visual.accent;
 
 const getPlanVisualMutedText = (visual) =>
-  visual?.dark ? visual.muted : 'var(--semi-color-text-2)';
+  isPlanVisualDark(visual)
+    ? visual.muted || 'rgba(203, 213, 225, 0.78)'
+    : 'var(--semi-color-text-2)';
 
 const getPlanVisualTexture = (visual) =>
   visual?.dark
     ? 'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.08) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 26px)'
-    : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.26) 0 1px, transparent 1px 24px)';
+    : visual?.themeDark
+      ? 'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.055) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 26px)'
+      : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.26) 0 1px, transparent 1px 24px)';
 
 const getPlanPriceLabel = (plan) => {
   const price = Number(plan?.price_amount || 0);
@@ -274,8 +312,8 @@ const getPlanComparisonLabel = (plan) => {
   if (text.includes('光速跃迁')) return '约等于 1.5个 Pro 20x';
   if (text.includes('加速')) return '约等于3个 Pro 5x';
   if (text.includes('巡航')) return '约等于1.5个 Pro 5x';
-  if (text.includes('启航')) return '约等于 4 个 Plus 账号';
-  if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
+  if (text.includes('启航')) return '约等于 4 个 Plus';
+  if (text.includes('探测')) return '约等于 1.4 个 Plus';
   return '';
 };
 
@@ -296,6 +334,8 @@ const RechargeSupportCard = ({
   subscriptionPlansLoading = false,
 }) => {
   const { t } = useTranslation();
+  const actualTheme = useActualTheme();
+  const isDarkMode = actualTheme === 'dark';
   const openOfficialSite = () => {
     window.open(OFFICIAL_SITE, '_blank', 'noopener,noreferrer');
   };
@@ -456,7 +496,10 @@ const RechargeSupportCard = ({
 
           <div className='mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2'>
             {normalizedPricingPlans.map((item, index) => {
-              const visual = getRechargePackVisual(item, index);
+              const visual = getThemeAwareRechargeVisual(
+                getRechargePackVisual(item, index),
+                isDarkMode,
+              );
 
               return (
                 <div
@@ -485,7 +528,10 @@ const RechargeSupportCard = ({
                         <span
                           className='rounded-full px-2 py-0.5 text-[10px] font-semibold'
                           style={{
-                            background: 'rgba(255,255,255,0.72)',
+                            background: getPlanVisualSurface(
+                              visual,
+                              'rgba(255,255,255,0.72)',
+                            ),
                             border: `1px solid ${visual.border}`,
                             color: visual.accent,
                           }}
@@ -502,7 +548,10 @@ const RechargeSupportCard = ({
                       <div
                         className='mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium'
                         style={{
-                          background: 'rgba(255, 255, 255, 0.66)',
+                          background: getPlanVisualSurface(
+                            visual,
+                            'rgba(255, 255, 255, 0.66)',
+                          ),
                           color: visual.accent,
                         }}
                       >
@@ -514,8 +563,13 @@ const RechargeSupportCard = ({
                       className='shrink-0 rounded-full px-2.5 py-1 text-xs font-medium'
                       style={{
                         background: item.isBestValue
-                          ? 'rgba(220, 252, 231, 0.86)'
-                          : 'rgba(255, 255, 255, 0.76)',
+                          ? isDarkMode
+                            ? 'rgba(5, 150, 105, 0.18)'
+                            : 'rgba(220, 252, 231, 0.86)'
+                          : getPlanVisualSurface(
+                              visual,
+                              'rgba(255, 255, 255, 0.76)',
+                            ),
                         border: `1px solid ${visual.border}`,
                         color: visual.accent,
                       }}
@@ -541,8 +595,13 @@ const RechargeSupportCard = ({
                         {t('性价比')}
                       </div>
                       <div
-                        className='mt-2 h-1.5 w-20 overflow-hidden rounded-full bg-white/80'
-                        style={{ border: `1px solid ${visual.border}` }}
+                        className='mt-2 h-1.5 w-20 overflow-hidden rounded-full'
+                        style={{
+                          background: isDarkMode
+                            ? 'rgba(15, 23, 42, 0.72)'
+                            : 'rgba(255, 255, 255, 0.80)',
+                          border: `1px solid ${visual.border}`,
+                        }}
                       >
                         <div
                           className='h-full rounded-full'
@@ -560,7 +619,14 @@ const RechargeSupportCard = ({
                     </div>
                   </div>
 
-                  <div className='relative mt-4 rounded-xl bg-white/75 px-3 py-2'>
+                  <div
+                    className='relative mt-4 rounded-xl px-3 py-2'
+                    style={{
+                      background: isDarkMode
+                        ? 'rgba(15, 23, 42, 0.64)'
+                        : 'rgba(255, 255, 255, 0.75)',
+                    }}
+                  >
                     <div className='flex items-center justify-between gap-3 text-xs'>
                       <span className='truncate text-[var(--semi-color-text-2)]'>
                         {t(visual.usage)}
@@ -581,9 +647,12 @@ const RechargeSupportCard = ({
           <div
             className='mt-5 relative overflow-hidden rounded-2xl px-4 py-3'
             style={{
-              background:
-                'linear-gradient(135deg, rgba(240, 253, 250, 0.96), rgba(255, 255, 255, 1) 60%, rgba(239, 246, 255, 0.9))',
-              border: '1px solid rgba(5, 150, 105, 0.18)',
+              background: isDarkMode
+                ? 'linear-gradient(135deg, rgba(6, 78, 59, 0.24), rgba(15, 23, 42, 0.92) 60%, rgba(30, 41, 59, 0.86))'
+                : 'linear-gradient(135deg, rgba(240, 253, 250, 0.96), rgba(255, 255, 255, 1) 60%, rgba(239, 246, 255, 0.9))',
+              border: isDarkMode
+                ? '1px solid rgba(52, 211, 153, 0.20)'
+                : '1px solid rgba(5, 150, 105, 0.18)',
             }}
           >
             <div
@@ -616,7 +685,7 @@ const RechargeSupportCard = ({
           </div>
 
           <div className='mt-auto pt-4 flex flex-wrap items-center justify-between gap-3'>
-            <div className='flex items-center gap-2 text-sm text-sky-700'>
+            <div className='flex items-center gap-2 text-sm text-sky-700 dark:text-sky-300'>
               <MessageCircle size={16} />
               <span>
                 {t('Q群：')}
@@ -663,7 +732,10 @@ const RechargeSupportCard = ({
                   const totalAmount = Number(plan?.total_amount || 0);
                   const isRecommended =
                     (plan?.title || '').trim() === '前进三：巡航';
-                  const visual = getSubscriptionPlanVisual(plan, index);
+                  const visual = getThemeAwareSubscriptionVisual(
+                    getSubscriptionPlanVisual(plan, index),
+                    isDarkMode,
+                  );
                   const isPremium = Boolean(visual?.dark);
                   const comparisonLabel = getPlanComparisonLabel(plan);
 
@@ -855,14 +927,14 @@ const RechargeSupportCard = ({
             </div>
           )}
 
-          <div className='mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3'>
+          <div className='mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-500/30 dark:bg-sky-500/10'>
             <div className='flex flex-wrap items-center justify-between gap-3'>
               <div>
-                <div className='flex items-center gap-2 text-sm font-medium text-sky-800'>
+                <div className='flex items-center gap-2 text-sm font-medium text-sky-800 dark:text-sky-200'>
                   <MessageCircle size={16} />
                   {t('加群开通月卡')}
                 </div>
-                <div className='mt-1 text-xs text-sky-700'>
+                <div className='mt-1 text-xs text-sky-700 dark:text-sky-300'>
                   {t('进群发送套餐名，客服按对应月卡处理。')}
                 </div>
               </div>
@@ -879,7 +951,7 @@ const RechargeSupportCard = ({
                   copyable={{ content: QQ_GROUP }}
                   className='!mb-0 !mt-0'
                 >
-                  <span className='text-sm font-medium text-sky-800'>
+                  <span className='text-sm font-medium text-sky-800 dark:text-sky-200'>
                     {t('Q群：')}
                     {QQ_GROUP}
                   </span>

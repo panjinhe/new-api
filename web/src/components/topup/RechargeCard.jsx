@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { IconGift } from '@douyinfe/semi-icons';
 import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime';
+import { useActualTheme } from '../../context/Theme';
 import { getCurrencyConfig } from '../../helpers/render';
 import SubscriptionPlanCatalog from './SubscriptionPlanCatalog';
 import SubscriptionStatusPanel from './SubscriptionStatusPanel';
@@ -189,11 +190,13 @@ const RechargeCard = ({
   reloadSubscriptionSelf,
   redeemSuccessEffect = null,
 }) => {
+  const actualTheme = useActualTheme();
   const onlineFormApiRef = useRef(null);
   const redeemFormApiRef = useRef(null);
   const initialTabSetRef = useRef(false);
   const showAmountSkeleton = useMinimumLoadingTime(amountLoading);
   const [activeTab, setActiveTab] = useState('topup');
+  const isDarkMode = actualTheme === 'dark';
   const hasOnlineTopUp =
     enableOnlineTopUp ||
     enableStripeTopUp ||
@@ -280,6 +283,7 @@ const RechargeCard = ({
       icon: TrendingUp,
       accent: 'rgba(124, 58, 237, 1)',
       background: 'rgba(245, 243, 255, 0.88)',
+      darkBackground: 'rgba(88, 28, 135, 0.20)',
     },
     {
       label: t('请求次数'),
@@ -289,6 +293,7 @@ const RechargeCard = ({
       icon: BarChart2,
       accent: 'rgba(14, 116, 144, 1)',
       background: 'rgba(240, 249, 255, 0.92)',
+      darkBackground: 'rgba(14, 116, 144, 0.18)',
     },
     {
       label: t('今日消耗'),
@@ -298,6 +303,7 @@ const RechargeCard = ({
       icon: Activity,
       accent: 'rgba(5, 150, 105, 1)',
       background: 'rgba(236, 253, 245, 0.92)',
+      darkBackground: 'rgba(5, 150, 105, 0.18)',
     },
     {
       label: t('近 7 日消耗'),
@@ -307,6 +313,7 @@ const RechargeCard = ({
       icon: CalendarDays,
       accent: 'rgba(217, 119, 6, 1)',
       background: 'rgba(255, 251, 235, 0.92)',
+      darkBackground: 'rgba(217, 119, 6, 0.18)',
     },
   ];
 
@@ -314,7 +321,11 @@ const RechargeCard = ({
     <Card
       className='!rounded-2xl shadow-sm overflow-hidden'
       bodyStyle={{ padding: 0 }}
-      style={{ border: '1px solid rgba(14, 165, 233, 0.16)' }}
+      style={{
+        border: isDarkMode
+          ? '1px solid rgba(148, 163, 184, 0.18)'
+          : '1px solid rgba(14, 165, 233, 0.16)',
+      }}
     >
       <div
         className='h-1.5'
@@ -348,9 +359,12 @@ const RechargeCard = ({
         <div
           className='mt-5 rounded-2xl px-4 py-4'
           style={{
-            background:
-              'linear-gradient(135deg, rgba(240, 249, 255, 0.96), rgba(236, 253, 245, 0.74))',
-            border: '1px solid rgba(14, 165, 233, 0.14)',
+            background: isDarkMode
+              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(20, 83, 45, 0.22))'
+              : 'linear-gradient(135deg, rgba(240, 249, 255, 0.96), rgba(236, 253, 245, 0.74))',
+            border: isDarkMode
+              ? '1px solid rgba(148, 163, 184, 0.18)'
+              : '1px solid rgba(14, 165, 233, 0.14)',
           }}
         >
           <div className='flex flex-wrap items-end justify-between gap-3'>
@@ -376,8 +390,12 @@ const RechargeCard = ({
                 key={metric.label}
                 className='rounded-xl px-3 py-3'
                 style={{
-                  background: metric.background,
-                  border: '1px solid rgba(15, 23, 42, 0.06)',
+                  background: isDarkMode
+                    ? metric.darkBackground
+                    : metric.background,
+                  border: isDarkMode
+                    ? '1px solid rgba(148, 163, 184, 0.16)'
+                    : '1px solid rgba(15, 23, 42, 0.06)',
                 }}
               >
                 <div className='flex items-center gap-2 text-xs text-[var(--semi-color-text-2)]'>
@@ -396,7 +414,9 @@ const RechargeCard = ({
           className='mt-4 rounded-2xl px-4 py-4'
           style={{
             background: 'var(--semi-color-fill-0)',
-            border: '1px solid rgba(15, 23, 42, 0.06)',
+            border: isDarkMode
+              ? '1px solid rgba(148, 163, 184, 0.16)'
+              : '1px solid rgba(15, 23, 42, 0.06)',
           }}
         >
           <div className='flex items-center justify-between gap-3'>
@@ -680,9 +700,12 @@ const RechargeCard = ({
                       <div
                         className='rounded-2xl px-4 py-3 flex flex-wrap items-center gap-2'
                         style={{
-                          background:
-                            'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.08))',
-                          border: '1px solid rgba(148, 163, 184, 0.2)',
+                          background: isDarkMode
+                            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(59, 130, 246, 0.16))'
+                            : 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.08))',
+                          border: isDarkMode
+                            ? '1px solid rgba(148, 163, 184, 0.24)'
+                            : '1px solid rgba(148, 163, 184, 0.2)',
                         }}
                       >
                         <Sparkles
@@ -736,10 +759,16 @@ const RechargeCard = ({
                                 height: '100%',
                                 width: '100%',
                                 background: isSelected
-                                  ? 'linear-gradient(180deg, rgba(219, 234, 254, 0.95), rgba(255, 255, 255, 1))'
+                                  ? isDarkMode
+                                    ? 'linear-gradient(180deg, rgba(37, 99, 235, 0.30), rgba(15, 23, 42, 0.96))'
+                                    : 'linear-gradient(180deg, rgba(219, 234, 254, 0.95), rgba(255, 255, 255, 1))'
                                   : isBestValue
-                                    ? 'linear-gradient(180deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 1))'
-                                    : 'linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 1))',
+                                    ? isDarkMode
+                                      ? 'linear-gradient(180deg, rgba(5, 150, 105, 0.24), rgba(15, 23, 42, 0.96))'
+                                      : 'linear-gradient(180deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 1))'
+                                    : isDarkMode
+                                      ? 'linear-gradient(180deg, rgba(24, 24, 27, 0.96), rgba(15, 23, 42, 0.92))'
+                                      : 'linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 1))',
                                 boxShadow: isSelected
                                   ? '0 18px 34px rgba(59, 130, 246, 0.14)'
                                   : undefined,
@@ -760,7 +789,9 @@ const RechargeCard = ({
                                     ? 'linear-gradient(90deg, rgba(37, 99, 235, 1), rgba(96, 165, 250, 1))'
                                     : isBestValue
                                       ? 'linear-gradient(90deg, rgba(16, 185, 129, 1), rgba(59, 130, 246, 1))'
-                                      : 'linear-gradient(90deg, rgba(226, 232, 240, 1), rgba(248, 250, 252, 1))',
+                                      : isDarkMode
+                                        ? 'linear-gradient(90deg, rgba(71, 85, 105, 0.95), rgba(30, 41, 59, 0.95))'
+                                        : 'linear-gradient(90deg, rgba(226, 232, 240, 1), rgba(248, 250, 252, 1))',
                                 }}
                               />
                               <div className='p-4'>
@@ -820,10 +851,15 @@ const RechargeCard = ({
                                   className='mt-4 rounded-2xl px-4 py-3'
                                   style={{
                                     background: isSelected
-                                      ? 'rgba(219, 234, 254, 0.72)'
-                                      : 'rgba(255, 255, 255, 0.92)',
-                                    border:
-                                      '1px solid rgba(148, 163, 184, 0.18)',
+                                      ? isDarkMode
+                                        ? 'rgba(37, 99, 235, 0.22)'
+                                        : 'rgba(219, 234, 254, 0.72)'
+                                      : isDarkMode
+                                        ? 'rgba(15, 23, 42, 0.72)'
+                                        : 'rgba(255, 255, 255, 0.92)',
+                                    border: isDarkMode
+                                      ? '1px solid rgba(148, 163, 184, 0.20)'
+                                      : '1px solid rgba(148, 163, 184, 0.18)',
                                   }}
                                 >
                                   <div className='text-xs text-[var(--semi-color-text-2)]'>
@@ -873,7 +909,9 @@ const RechargeCard = ({
                                   <div
                                     className='rounded-xl px-3 py-3'
                                     style={{
-                                      background: 'rgba(248, 250, 252, 0.92)',
+                                      background: isDarkMode
+                                        ? 'rgba(15, 23, 42, 0.62)'
+                                        : 'rgba(248, 250, 252, 0.92)',
                                     }}
                                   >
                                     <div className='text-[11px] text-[var(--semi-color-text-2)]'>
@@ -887,7 +925,9 @@ const RechargeCard = ({
                                   <div
                                     className='rounded-xl px-3 py-3'
                                     style={{
-                                      background: 'rgba(248, 250, 252, 0.92)',
+                                      background: isDarkMode
+                                        ? 'rgba(15, 23, 42, 0.62)'
+                                        : 'rgba(248, 250, 252, 0.92)',
                                     }}
                                   >
                                     <div className='text-[11px] text-[var(--semi-color-text-2)]'>
@@ -907,8 +947,12 @@ const RechargeCard = ({
                                   className='mt-4 flex items-center justify-between rounded-xl px-3 py-2'
                                   style={{
                                     background: isBestValue
-                                      ? 'rgba(209, 250, 229, 0.85)'
-                                      : 'rgba(248, 250, 252, 0.88)',
+                                      ? isDarkMode
+                                        ? 'rgba(5, 150, 105, 0.18)'
+                                        : 'rgba(209, 250, 229, 0.85)'
+                                      : isDarkMode
+                                        ? 'rgba(15, 23, 42, 0.54)'
+                                        : 'rgba(248, 250, 252, 0.88)',
                                   }}
                                 >
                                   <Text
@@ -916,7 +960,9 @@ const RechargeCard = ({
                                     style={{
                                       fontSize: '12px',
                                       color: isBestValue
-                                        ? 'rgba(4, 120, 87, 1)'
+                                        ? isDarkMode
+                                          ? 'rgba(52, 211, 153, 1)'
+                                          : 'rgba(4, 120, 87, 1)'
                                         : 'var(--semi-color-text-1)',
                                     }}
                                   >
@@ -950,13 +996,13 @@ const RechargeCard = ({
                         <Card
                           key={index}
                           onClick={() => creemPreTopUp(product)}
-                          className='cursor-pointer !rounded-2xl transition-all hover:shadow-md border-gray-200 hover:border-gray-300'
+                          className='cursor-pointer !rounded-2xl transition-all hover:shadow-md border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                           bodyStyle={{ textAlign: 'center', padding: '16px' }}
                         >
                           <div className='font-medium text-lg mb-2'>
                             {product.name}
                           </div>
-                          <div className='text-sm text-gray-600 mb-2'>
+                          <div className='text-sm text-gray-600 dark:text-gray-300 mb-2'>
                             {t('充值额度')}: {product.quota}
                           </div>
                           <div className='text-lg font-semibold text-blue-600'>
@@ -997,8 +1043,9 @@ const RechargeCard = ({
         <div
           className='pointer-events-none absolute inset-0 opacity-70'
           style={{
-            backgroundImage:
-              'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.42) 45%, transparent 64%), radial-gradient(circle at 12% 12%, rgba(14, 165, 233, 0.12), transparent 26%), radial-gradient(circle at 88% 8%, rgba(5, 150, 105, 0.12), transparent 22%)',
+            backgroundImage: isDarkMode
+              ? 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.06) 45%, transparent 64%), radial-gradient(circle at 12% 12%, rgba(14, 165, 233, 0.16), transparent 26%), radial-gradient(circle at 88% 8%, rgba(5, 150, 105, 0.16), transparent 22%)'
+              : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.42) 45%, transparent 64%), radial-gradient(circle at 12% 12%, rgba(14, 165, 233, 0.12), transparent 26%), radial-gradient(circle at 88% 8%, rgba(5, 150, 105, 0.12), transparent 22%)',
           }}
         />
         {redeemSuccessEffect && (
@@ -1015,14 +1062,26 @@ const RechargeCard = ({
                 className='inline-flex h-10 w-10 items-center justify-center rounded-2xl'
                 style={{
                   background: redeemSuccessEffect
-                    ? 'rgba(220, 252, 231, 0.92)'
-                    : 'rgba(240, 249, 255, 0.96)',
+                    ? isDarkMode
+                      ? 'rgba(5, 150, 105, 0.18)'
+                      : 'rgba(220, 252, 231, 0.92)'
+                    : isDarkMode
+                      ? 'rgba(14, 116, 144, 0.18)'
+                      : 'rgba(240, 249, 255, 0.96)',
                   color: redeemSuccessEffect
-                    ? 'rgba(5, 150, 105, 1)'
-                    : 'rgba(14, 116, 144, 1)',
+                    ? isDarkMode
+                      ? 'rgba(52, 211, 153, 1)'
+                      : 'rgba(5, 150, 105, 1)'
+                    : isDarkMode
+                      ? 'rgba(34, 211, 238, 1)'
+                      : 'rgba(14, 116, 144, 1)',
                   border: redeemSuccessEffect
-                    ? '1px solid rgba(5, 150, 105, 0.24)'
-                    : '1px solid rgba(14, 165, 233, 0.20)',
+                    ? isDarkMode
+                      ? '1px solid rgba(52, 211, 153, 0.26)'
+                      : '1px solid rgba(5, 150, 105, 0.24)'
+                    : isDarkMode
+                      ? '1px solid rgba(34, 211, 238, 0.24)'
+                      : '1px solid rgba(14, 165, 233, 0.20)',
                 }}
               >
                 {redeemSuccessEffect ? (
