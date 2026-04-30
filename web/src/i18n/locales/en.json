@@ -3786,6 +3786,17 @@
     "跃迁通道": "Warp lane",
     "权益进度": "Benefit progress",
     "按订阅快照": "Subscription snapshot",
+    "补给已到账": "Credit delivered",
+    "兑换码补给": "Redemption code top-up",
+    "已到账": "Delivered",
+    "自动识别额度码和套餐码": "Auto-detects quota and plan codes",
+    "输入兑换码完成补给": "Enter a code to complete your top-up",
+    "兑换后会自动刷新余额或套餐权益": "Balance or plan benefits refresh automatically after redemption",
+    "正在兑换": "Redeeming",
+    "立即兑换": "Redeem now",
+    "补给状态已同步": "Top-up status synced",
+    "套餐已开通": "Plan activated",
+    "额度补给": "Quota top-up",
     "等于 2.5 个 Pro 20x": "Equals 2.5 Pro 20x"
   }
 }

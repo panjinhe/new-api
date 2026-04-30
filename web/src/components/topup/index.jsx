@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   API,
@@ -36,6 +36,56 @@ import { StatusContext } from '../../context/Status';
 import RechargeCard from './RechargeCard';
 import PaymentConfirmModal from './modals/PaymentConfirmModal';
 import TopupHistoryModal from './modals/TopupHistoryModal';
+
+const RedeemSuccessContent = ({ t, title, description, children }) => (
+  <div className='relative overflow-hidden rounded-2xl px-4 py-4'>
+    <div
+      className='absolute inset-x-0 top-0 h-1'
+      style={{
+        background:
+          'linear-gradient(90deg, rgba(14, 165, 233, 0.94), rgba(5, 150, 105, 0.9), rgba(245, 158, 11, 0.78))',
+      }}
+    />
+    <div className='pointer-events-none absolute inset-0'>
+      <span className='absolute right-8 top-7 h-12 w-12 rounded-full bg-emerald-300/20 animate-ping' />
+      <span className='absolute left-6 top-10 h-2 w-2 rounded-full bg-sky-400/70 animate-pulse' />
+      <span className='absolute right-14 bottom-10 h-1.5 w-1.5 rounded-full bg-amber-400/80 animate-pulse' />
+      <span className='absolute left-14 bottom-8 h-1 w-16 rounded-full bg-emerald-400/40 animate-pulse' />
+    </div>
+    <div className='relative flex items-start gap-3'>
+      <div
+        className='flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-lg font-semibold'
+        style={{
+          background: 'rgba(220, 252, 231, 0.95)',
+          color: 'rgba(5, 150, 105, 1)',
+          border: '1px solid rgba(5, 150, 105, 0.22)',
+        }}
+      >
+        ✓
+      </div>
+      <div className='min-w-0 flex-1'>
+        <div className='text-base font-semibold text-[var(--semi-color-text-0)]'>
+          {title}
+        </div>
+        <div className='mt-1 text-sm text-[var(--semi-color-text-2)]'>
+          {description}
+        </div>
+      </div>
+    </div>
+    <div
+      className='relative mt-4 rounded-xl px-3 py-3 text-sm leading-6'
+      style={{
+        background: 'rgba(240, 253, 250, 0.78)',
+        border: '1px solid rgba(5, 150, 105, 0.14)',
+      }}
+    >
+      {children}
+    </div>
+    <div className='relative mt-3 text-xs text-[var(--semi-color-text-2)]'>
+      {t('补给状态已同步')}
+    </div>
+  </div>
+);
 
 const TopUp = () => {
   const { t } = useTranslation();
@@ -78,6 +128,8 @@ const TopUp = () => {
   const [waffoPancakeMinTopUp, setWaffoPancakeMinTopUp] = useState(1);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [redeemSuccessEffect, setRedeemSuccessEffect] = useState(null);
+  const redeemEffectTimerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [payWay, setPayWay] = useState('');
   const [amountLoading, setAmountLoading] = useState(false);
@@ -101,6 +153,25 @@ const TopUp = () => {
   // 预设充值额度选项
   const [presetAmounts, setPresetAmounts] = useState([]);
   const [selectedPreset, setSelectedPreset] = useState(null);
+
+  const triggerRedeemSuccessEffect = (effect) => {
+    if (redeemEffectTimerRef.current) {
+      window.clearTimeout(redeemEffectTimerRef.current);
+    }
+    setRedeemSuccessEffect(effect);
+    redeemEffectTimerRef.current = window.setTimeout(() => {
+      setRedeemSuccessEffect(null);
+      redeemEffectTimerRef.current = null;
+    }, 1800);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (redeemEffectTimerRef.current) {
+        window.clearTimeout(redeemEffectTimerRef.current);
+      }
+    };
+  }, []);
 
   // 充值配置信息
   const [topupInfo, setTopupInfo] = useState({
@@ -160,10 +231,18 @@ const TopUp = () => {
         showSuccess(t('兑换成功！'));
         if (result.type === 'plan' && result.subscription) {
           const subscription = result.subscription;
+          triggerRedeemSuccessEffect({
+            type: 'plan',
+            summary: `${t('套餐已开通')} · ${subscription.plan_title}`,
+          });
           Modal.success({
             title: t('成功开通套餐'),
             content: (
-              <div>
+              <RedeemSuccessContent
+                t={t}
+                title={t('套餐已开通')}
+                description={subscription.plan_title}
+              >
                 <p>
                   {t('套餐')}：{subscription.plan_title}
                 </p>
@@ -183,16 +262,35 @@ const TopUp = () => {
                   {t('有效期')}：{timestamp2string(subscription.start_time)} -{' '}
                   {timestamp2string(subscription.end_time)}
                 </p>
-              </div>
+              </RedeemSuccessContent>
             ),
             centered: true,
           });
           await getSubscriptionSelf();
         } else {
           const quota = Number(result.quota || 0);
+          triggerRedeemSuccessEffect({
+            type: 'quota',
+            summary: `${t('额度补给')} ${renderQuota(quota)}`,
+          });
           Modal.success({
             title: t('兑换成功！'),
-            content: t('成功兑换额度：') + renderQuota(quota),
+            content: (
+              <RedeemSuccessContent
+                t={t}
+                title={t('补给已到账')}
+                description={t('成功兑换额度：') + renderQuota(quota)}
+              >
+                <div className='flex flex-wrap items-center justify-between gap-3'>
+                  <span className='text-[var(--semi-color-text-2)]'>
+                    {t('额度补给')}
+                  </span>
+                  <span className='text-xl font-semibold text-emerald-600'>
+                    {renderQuota(quota)}
+                  </span>
+                </div>
+              </RedeemSuccessContent>
+            ),
             centered: true,
           });
           if (userState.user) {
@@ -983,6 +1081,7 @@ const TopUp = () => {
           activeSubscriptions={activeSubscriptions}
           allSubscriptions={allSubscriptions}
           reloadSubscriptionSelf={getSubscriptionSelf}
+          redeemSuccessEffect={redeemSuccessEffect}
         />
       </div>
     </div>

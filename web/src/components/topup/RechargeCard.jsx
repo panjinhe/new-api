@@ -42,6 +42,8 @@ import {
   TrendingUp,
   Receipt,
   Sparkles,
+  CheckCircle2,
+  TicketCheck,
 } from 'lucide-react';
 import { IconGift } from '@douyinfe/semi-icons';
 import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime';
@@ -182,6 +184,7 @@ const RechargeCard = ({
   activeSubscriptions = [],
   allSubscriptions = [],
   reloadSubscriptionSelf,
+  redeemSuccessEffect = null,
 }) => {
   const onlineFormApiRef = useRef(null);
   const redeemFormApiRef = useRef(null);
@@ -835,56 +838,132 @@ const RechargeCard = ({
 
       {/* 兑换码充值 */}
       <Card
-        className='!rounded-xl w-full'
-        title={
-          <Text type='tertiary' strong>
-            {t('兑换码充值')}
-          </Text>
-        }
+        className='!rounded-2xl w-full relative overflow-hidden transition-all duration-300'
+        bodyStyle={{ padding: 0 }}
+        style={{
+          border: redeemSuccessEffect
+            ? '1px solid rgba(5, 150, 105, 0.42)'
+            : '1px solid rgba(14, 165, 233, 0.20)',
+          boxShadow: redeemSuccessEffect
+            ? '0 18px 44px rgba(5, 150, 105, 0.15)'
+            : '0 14px 34px rgba(14, 165, 233, 0.08)',
+        }}
       >
-        <Form
-          getFormApi={(api) => (redeemFormApiRef.current = api)}
-          initValues={{ redemptionCode: redemptionCode }}
-        >
-          <Form.Input
-            field='redemptionCode'
-            noLabel={true}
-            placeholder={t('请输入兑换码')}
-            value={redemptionCode}
-            onChange={(value) => setRedemptionCode(value)}
-            prefix={<IconGift />}
-            suffix={
-              <div className='flex items-center gap-2'>
-                <Button
-                  type='primary'
-                  theme='solid'
-                  onClick={topUp}
-                  loading={isSubmitting}
-                >
-                  {t('兑换额度')}
-                </Button>
-              </div>
-            }
-            showClear
-            style={{ width: '100%' }}
-            extraText={
-              !redemptionOnlyMode &&
-              topUpLink && (
-                <Text type='tertiary'>
-                  {t('在找兑换码？')}
-                  <Text
-                    type='secondary'
-                    underline
-                    className='cursor-pointer'
-                    onClick={openTopUpLink}
-                  >
-                    {t('购买兑换码')}
+        <div
+          className='absolute inset-x-0 top-0 h-1.5'
+          style={{
+            background:
+              'linear-gradient(90deg, rgba(14, 165, 233, 0.94), rgba(5, 150, 105, 0.88), rgba(245, 158, 11, 0.78))',
+          }}
+        />
+        <div
+          className='pointer-events-none absolute inset-0 opacity-70'
+          style={{
+            backgroundImage:
+              'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.42) 45%, transparent 64%), radial-gradient(circle at 12% 12%, rgba(14, 165, 233, 0.12), transparent 26%), radial-gradient(circle at 88% 8%, rgba(5, 150, 105, 0.12), transparent 22%)',
+          }}
+        />
+        {redeemSuccessEffect && (
+          <div className='pointer-events-none absolute inset-0'>
+            <div className='absolute right-8 top-8 h-14 w-14 rounded-full bg-emerald-300/20 animate-ping' />
+            <div className='absolute bottom-5 left-10 h-2 w-24 rounded-full bg-emerald-400/40 animate-pulse' />
+          </div>
+        )}
+
+        <div className='relative grid grid-cols-1 gap-4 p-4 lg:grid-cols-[0.82fr_1.18fr] lg:items-center'>
+          <div className='min-w-0'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <span
+                className='inline-flex h-10 w-10 items-center justify-center rounded-2xl'
+                style={{
+                  background: redeemSuccessEffect
+                    ? 'rgba(220, 252, 231, 0.92)'
+                    : 'rgba(240, 249, 255, 0.96)',
+                  color: redeemSuccessEffect
+                    ? 'rgba(5, 150, 105, 1)'
+                    : 'rgba(14, 116, 144, 1)',
+                  border: redeemSuccessEffect
+                    ? '1px solid rgba(5, 150, 105, 0.24)'
+                    : '1px solid rgba(14, 165, 233, 0.20)',
+                }}
+              >
+                {redeemSuccessEffect ? (
+                  <CheckCircle2 size={19} />
+                ) : (
+                  <TicketCheck size={19} />
+                )}
+              </span>
+              <div className='min-w-0'>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <Text strong style={{ fontSize: 16 }}>
+                    {redeemSuccessEffect ? t('补给已到账') : t('兑换码补给')}
                   </Text>
+                  <Tag
+                    color={redeemSuccessEffect ? 'green' : 'cyan'}
+                    shape='circle'
+                    size='small'
+                  >
+                    {redeemSuccessEffect
+                      ? t('已到账')
+                      : t('自动识别额度码和套餐码')}
+                  </Tag>
+                </div>
+                <Text type='tertiary' size='small'>
+                  {redeemSuccessEffect
+                    ? redeemSuccessEffect.summary
+                    : t('输入兑换码完成补给')}
                 </Text>
-              )
-            }
-          />
-        </Form>
+              </div>
+            </div>
+
+            <div className='mt-3 text-xs leading-5 text-[var(--semi-color-text-2)]'>
+              {t('兑换后会自动刷新余额或套餐权益')}
+            </div>
+          </div>
+
+          <Form
+            getFormApi={(api) => (redeemFormApiRef.current = api)}
+            initValues={{ redemptionCode: redemptionCode }}
+          >
+            <div className='grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-start'>
+              <Form.Input
+                field='redemptionCode'
+                noLabel={true}
+                placeholder={t('请输入兑换码')}
+                value={redemptionCode}
+                onChange={(value) => setRedemptionCode(value)}
+                prefix={<IconGift />}
+                showClear
+                style={{ width: '100%' }}
+                extraText={
+                  !redemptionOnlyMode &&
+                  topUpLink && (
+                    <Text type='tertiary'>
+                      {t('在找兑换码？')}
+                      <Text
+                        type='secondary'
+                        underline
+                        className='cursor-pointer'
+                        onClick={openTopUpLink}
+                      >
+                        {t('购买兑换码')}
+                      </Text>
+                    </Text>
+                  )
+                }
+              />
+              <Button
+                type='primary'
+                theme='solid'
+                className='w-full md:w-auto md:min-w-[116px]'
+                onClick={topUp}
+                loading={isSubmitting}
+              >
+                {isSubmitting ? t('正在兑换') : t('立即兑换')}
+              </Button>
+            </div>
+          </Form>
+        </div>
       </Card>
 
       <RechargeSupportCard
