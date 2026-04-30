@@ -37,6 +37,13 @@ import RechargeCard from './RechargeCard';
 import PaymentConfirmModal from './modals/PaymentConfirmModal';
 import TopupHistoryModal from './modals/TopupHistoryModal';
 
+const getUnixTimestamp = (date) => Math.floor(date.getTime() / 1000);
+
+const getLocalDayStart = (date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const getShortDateLabel = (date) => `${date.getMonth() + 1}/${date.getDate()}`;
+
 const RedeemSuccessContent = ({ t, title, description, children }) => (
   <div className='relative overflow-hidden rounded-2xl px-4 py-4'>
     <div
@@ -149,6 +156,12 @@ const TopUp = () => {
     useState('subscription_first');
   const [activeSubscriptions, setActiveSubscriptions] = useState([]);
   const [allSubscriptions, setAllSubscriptions] = useState([]);
+  const [walletUsageStats, setWalletUsageStats] = useState({
+    loading: true,
+    todayQuota: 0,
+    weekQuota: 0,
+    daily: [],
+  });
 
   // 预设充值额度选项
   const [presetAmounts, setPresetAmounts] = useState([]);
@@ -309,6 +322,58 @@ const TopUp = () => {
       showError(t('请求失败'));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const getWalletUsageStats = async () => {
+    setWalletUsageStats((stats) => ({
+      ...stats,
+      loading: true,
+    }));
+    const now = new Date();
+    const todayStart = getLocalDayStart(now);
+    const dayStarts = Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(todayStart);
+      day.setDate(todayStart.getDate() - (6 - index));
+      return day;
+    });
+
+    try {
+      const daily = await Promise.all(
+        dayStarts.map(async (startDate, index) => {
+          const endDate =
+            index === dayStarts.length - 1 ? now : dayStarts[index + 1];
+          const url = encodeURI(
+            `/api/log/self/stat?type=0&token_name=&model_name=&start_timestamp=${getUnixTimestamp(
+              startDate,
+            )}&end_timestamp=${getUnixTimestamp(endDate)}&group=`,
+          );
+          const res = await API.get(url);
+          const { success, data } = res.data;
+          return {
+            label: getShortDateLabel(startDate),
+            quota: success ? Number(data?.quota || 0) : 0,
+          };
+        }),
+      );
+      const weekQuota = daily.reduce((sum, item) => sum + item.quota, 0);
+      const todayQuota = daily[daily.length - 1]?.quota || 0;
+      setWalletUsageStats({
+        loading: false,
+        todayQuota,
+        weekQuota,
+        daily,
+      });
+    } catch (error) {
+      setWalletUsageStats({
+        loading: false,
+        todayQuota: 0,
+        weekQuota: 0,
+        daily: dayStarts.map((day) => ({
+          label: getShortDateLabel(day),
+          quota: 0,
+        })),
+      });
     }
   };
 
@@ -861,6 +926,12 @@ const TopUp = () => {
     getUserQuota().then();
   }, []);
 
+  useEffect(() => {
+    if (userState?.user?.id) {
+      getWalletUsageStats().then();
+    }
+  }, [userState?.user?.id]);
+
   // 在 statusState 可用时获取充值信息
   useEffect(() => {
     getTopupInfo().then();
@@ -1068,6 +1139,7 @@ const TopUp = () => {
           topUpLink={topUpLink}
           openTopUpLink={openTopUpLink}
           userState={userState}
+          walletUsageStats={walletUsageStats}
           renderQuota={renderQuota}
           statusLoading={statusLoading}
           topupInfo={topupInfo}

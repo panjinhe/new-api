@@ -3797,6 +3797,14 @@
     "补给状态已同步": "Top-up status synced",
     "套餐已开通": "Plan activated",
     "额度补给": "Quota top-up",
+    "钱包资产": "Wallet assets",
+    "今日消耗": "Today usage",
+    "近 7 日消耗": "7-day usage",
+    "近 7 日趋势": "7-day trend",
+    "按天统计额度消耗": "Daily quota usage",
+    "最近 7 天": "Last 7 days",
+    "暂无用量": "No usage yet",
+    "加载中": "Loading",
     "等于 2.5 个 Pro 20x": "Equals 2.5 Pro 20x"
   }
 }
