@@ -473,19 +473,6 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 	}
 	upgradeGroup := strings.TrimSpace(plan.UpgradeGroup)
 	prevGroup := ""
-	if upgradeGroup != "" {
-		currentGroup, err := getUserGroupByIdTx(tx, userId)
-		if err != nil {
-			return nil, err
-		}
-		if currentGroup != upgradeGroup {
-			prevGroup = currentGroup
-			if err := tx.Model(&User{}).Where("id = ?", userId).
-				Update("group", upgradeGroup).Error; err != nil {
-				return nil, err
-			}
-		}
-	}
 	sub := &UserSubscription{
 		UserId:          userId,
 		PlanId:          plan.Id,
@@ -504,6 +491,9 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		UpdatedAt:       common.GetTimestamp(),
 	}
 	if err := tx.Create(sub).Error; err != nil {
+		return nil, err
+	}
+	if _, err := promoteUserToPaidGroupTx(tx, userId); err != nil {
 		return nil, err
 	}
 	return sub, nil
@@ -555,6 +545,9 @@ func RedeemSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPla
 		if err := tx.Save(&active).Error; err != nil {
 			return nil, false, err
 		}
+		if _, err := promoteUserToPaidGroupTx(tx, userId); err != nil {
+			return nil, false, err
+		}
 		return &active, true, nil
 	}
 	if plan.MaxPurchasePerUser > 0 {
@@ -581,19 +574,6 @@ func RedeemSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPla
 	}
 	upgradeGroup := strings.TrimSpace(plan.UpgradeGroup)
 	prevGroup := ""
-	if upgradeGroup != "" {
-		currentGroup, err := getUserGroupByIdTx(tx, userId)
-		if err != nil {
-			return nil, false, err
-		}
-		if currentGroup != upgradeGroup {
-			prevGroup = currentGroup
-			if err := tx.Model(&User{}).Where("id = ?", userId).
-				Update("group", upgradeGroup).Error; err != nil {
-				return nil, false, err
-			}
-		}
-	}
 	sub := &UserSubscription{
 		UserId:             userId,
 		PlanId:             plan.Id,
@@ -615,6 +595,9 @@ func RedeemSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPla
 	if err := tx.Create(sub).Error; err != nil {
 		return nil, false, err
 	}
+	if _, err := promoteUserToPaidGroupTx(tx, userId); err != nil {
+		return nil, false, err
+	}
 	return sub, false, nil
 }
 
@@ -631,7 +614,6 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 	var logPlanTitle string
 	var logMoney float64
 	var logPaymentMethod string
-	var upgradeGroup string
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var order SubscriptionOrder
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(&order).Error; err != nil {
@@ -653,7 +635,6 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if !plan.Enabled {
 			// still allow completion for already purchased orders
 		}
-		upgradeGroup = strings.TrimSpace(plan.UpgradeGroup)
 		_, err = CreateUserSubscriptionFromPlanTx(tx, order.UserId, plan, "order")
 		if err != nil {
 			return err
@@ -678,8 +659,8 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 	if err != nil {
 		return err
 	}
-	if upgradeGroup != "" && logUserId > 0 {
-		_ = UpdateUserGroupCache(logUserId, upgradeGroup)
+	if logUserId > 0 {
+		invalidateClassifiedUserCaches([]int{logUserId})
 	}
 	if logUserId > 0 {
 		msg := fmt.Sprintf("订阅购买成功，套餐: %s，支付金额: %.2f，支付方式: %s", logPlanTitle, logMoney, logPaymentMethod)
@@ -765,11 +746,8 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 	if err != nil {
 		return "", err
 	}
-	if strings.TrimSpace(plan.UpgradeGroup) != "" {
-		_ = UpdateUserGroupCache(userId, plan.UpgradeGroup)
-		return fmt.Sprintf("用户分组将升级到 %s", plan.UpgradeGroup), nil
-	}
-	return "", nil
+	invalidateClassifiedUserCaches([]int{userId})
+	return fmt.Sprintf("用户分组将归类为 %s", DefaultPaidUserGroup), nil
 }
 
 // GetAllActiveUserSubscriptions returns all active subscriptions for a user.

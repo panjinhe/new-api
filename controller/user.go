@@ -604,6 +604,9 @@ func UpdateUser(c *gin.Context) {
 	if updatedUser.Password == "$I_LOVE_U" {
 		updatedUser.Password = "" // rollback to what it should be
 	}
+	if originUser.Role == common.RoleCommonUser {
+		updatedUser.Group = model.NormalizeManagedUserGroup(updatedUser.Group)
+	}
 	updatePassword := updatedUser.Password != ""
 	if err := updatedUser.Edit(updatePassword); err != nil {
 		common.ApiError(c, err)

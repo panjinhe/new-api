@@ -92,27 +92,15 @@ const EditUserModal = (props) => {
     email: '',
     quota: 0,
     quota_amount: 0,
-    group: 'default',
+    group: '白嫖怪',
     remark: '',
   });
 
   const fetchGroups = async () => {
-    try {
-      let res = await API.get(`/api/group/`);
-      const seen = new Set();
-      const groups = [...res.data.data, '充值用户', '白嫖怪']
-        .filter((group) => {
-          if (!group || seen.has(group)) {
-            return false;
-          }
-          seen.add(group);
-          return true;
-        })
-        .map((g) => ({ label: t(g), value: g }));
-      setGroupOptions(groups);
-    } catch (e) {
-      showError(e.message);
-    }
+    setGroupOptions([
+      { label: t('充值用户'), value: '充值用户' },
+      { label: t('白嫖怪'), value: '白嫖怪' },
+    ]);
   };
 
   const handleCancel = () => props.handleClose();
@@ -376,7 +364,6 @@ const EditUserModal = (props) => {
                           label={t('分组')}
                           placeholder={t('请选择分组')}
                           optionList={groupOptions}
-                          allowAdditions
                           search
                           rules={[{ required: true, message: t('请选择分组') }]}
                         />

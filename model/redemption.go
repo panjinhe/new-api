@@ -229,9 +229,7 @@ func Redeem(key string, userId int) (*RedemptionResult, error) {
 	}
 	if redemption.RedemptionType == RedemptionTypePlan && result.Subscription != nil {
 		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码开通套餐 %s，兑换码ID %d", result.Subscription.PlanTitle, redemption.Id))
-		if strings.TrimSpace(result.Subscription.UpgradeGroup) != "" {
-			_ = UpdateUserGroupCache(userId, result.Subscription.UpgradeGroup)
-		}
+		invalidateClassifiedUserCaches([]int{userId})
 	} else {
 		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
 	}

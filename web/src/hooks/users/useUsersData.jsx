@@ -289,17 +289,7 @@ export const useUsersData = () => {
 
   // Fetch groups data
   const fetchGroups = async () => {
-    try {
-      let res = await API.get(`/api/group/`);
-      if (res === undefined) {
-        return;
-      }
-      setGroupOptions(
-        toGroupOptions([...res.data.data, ...CLASSIFICATION_GROUPS], t),
-      );
-    } catch (error) {
-      showError(error.message);
-    }
+    setGroupOptions(toGroupOptions(CLASSIFICATION_GROUPS, t));
   };
 
   // Modal control functions

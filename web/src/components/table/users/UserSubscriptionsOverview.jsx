@@ -529,16 +529,10 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
   };
 
   const fetchGroups = async () => {
-    try {
-      const res = await API.get('/api/group/');
-      if (res?.data?.data) {
-        setGroupOptions(
-          res.data.data.map((group) => ({ label: group, value: group })),
-        );
-      }
-    } catch (error) {
-      showError(error.message);
-    }
+    setGroupOptions([
+      { label: t('充值用户'), value: '充值用户' },
+      { label: t('白嫖怪'), value: '白嫖怪' },
+    ]);
   };
 
   const fetchPlans = async () => {

@@ -56,6 +56,22 @@ func normalizeUserGroupClassificationOptions(options UserGroupClassificationOpti
 	return options, nil
 }
 
+func NormalizeManagedUserGroup(group string) string {
+	switch strings.TrimSpace(group) {
+	case DefaultPaidUserGroup:
+		return DefaultPaidUserGroup
+	default:
+		return DefaultFreeloadingUserGroup
+	}
+}
+
+func normalizeNewUserGroup(user *User) {
+	if user == nil || user.Role != common.RoleCommonUser {
+		return
+	}
+	user.Group = NormalizeManagedUserGroup(user.Group)
+}
+
 func displayAmountToQuotaThreshold(amount float64) int {
 	if amount <= 0 {
 		return 0
@@ -105,10 +121,106 @@ func updateUsersGroupByIds(tx *gorm.DB, ids []int, group string) (int64, error) 
 	return result.RowsAffected, result.Error
 }
 
+func updateUserGroupTx(tx *gorm.DB, userId int, group string) (bool, error) {
+	if tx == nil {
+		tx = DB
+	}
+	if userId <= 0 {
+		return false, nil
+	}
+	result := tx.Model(&User{}).
+		Where("id = ? AND role = ?", userId, common.RoleCommonUser).
+		Where(subscriptionUserGroupColumn()+" <> ?", group).
+		Update("group", group)
+	return result.RowsAffected > 0, result.Error
+}
+
+func promoteUserToPaidGroupTx(tx *gorm.DB, userId int) (bool, error) {
+	return updateUserGroupTx(tx, userId, DefaultPaidUserGroup)
+}
+
 func invalidateClassifiedUserCaches(userIds []int) {
 	for _, userId := range userIds {
 		_ = InvalidateUserCache(userId)
 		_ = InvalidateUserTokensCache(userId)
+	}
+}
+
+func promoteUserToPaidGroup(userId int) {
+	var changed bool
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var err error
+		changed, err = promoteUserToPaidGroupTx(tx, userId)
+		return err
+	})
+	if err != nil {
+		common.SysLog("failed to promote user group: " + err.Error())
+		return
+	}
+	if changed {
+		invalidateClassifiedUserCaches([]int{userId})
+	}
+}
+
+func promoteUserToPaidGroupIfTopUpQualified(userId int) {
+	if userId <= 0 {
+		return
+	}
+	var changed bool
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var total float64
+		if err := tx.Model(&TopUp{}).
+			Select("COALESCE(SUM(money), 0)").
+			Where("user_id = ? AND status = ?", userId, common.TopUpStatusSuccess).
+			Scan(&total).Error; err != nil {
+			return err
+		}
+		if total < DefaultPaidAmountThreshold {
+			return nil
+		}
+		var err error
+		changed, err = promoteUserToPaidGroupTx(tx, userId)
+		return err
+	})
+	if err != nil {
+		common.SysLog("failed to classify user after topup: " + err.Error())
+		return
+	}
+	if changed {
+		invalidateClassifiedUserCaches([]int{userId})
+	}
+}
+
+func promoteUserToPaidGroupIfUsageQualified(userId int) {
+	if userId <= 0 {
+		return
+	}
+	threshold := displayAmountToQuotaThreshold(DefaultPaidAmountThreshold)
+	if threshold <= 0 {
+		return
+	}
+	var changed bool
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Model(&User{}).
+			Select("id, role, "+subscriptionUserGroupColumn()+", used_quota").
+			Where("id = ?", userId).
+			First(&user).Error; err != nil {
+			return err
+		}
+		if user.Role != common.RoleCommonUser || user.Group == DefaultPaidUserGroup || user.UsedQuota < threshold {
+			return nil
+		}
+		var err error
+		changed, err = promoteUserToPaidGroupTx(tx, userId)
+		return err
+	})
+	if err != nil {
+		common.SysLog("failed to classify user after usage update: " + err.Error())
+		return
+	}
+	if changed {
+		invalidateClassifiedUserCaches([]int{userId})
 	}
 }
 

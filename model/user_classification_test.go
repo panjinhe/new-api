@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func insertUserForClassificationTest(t *testing.T, id int, username string, group string, usedQuota int, role int) {
@@ -100,4 +101,70 @@ func TestClassifyUsersByPaymentAndUsage_RejectsSameGroups(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, result)
+}
+
+func TestUserInsertDefaultsCommonUserToFreeloadingGroup(t *testing.T) {
+	truncateTables(t)
+
+	user := &User{
+		Username:    "new-free-user",
+		Password:    "password123",
+		DisplayName: "New Free User",
+		Role:        common.RoleCommonUser,
+	}
+
+	require.NoError(t, user.Insert(0))
+	assert.Equal(t, DefaultFreeloadingUserGroup, getUserGroupForClassificationTest(t, user.Id))
+}
+
+func TestPromoteUserToPaidGroupIfTopUpQualified(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForClassificationTest(t, 906, "topup-promote", DefaultFreeloadingUserGroup, 0, common.RoleCommonUser)
+	insertTopUpForClassificationTest(t, 906, 20, common.TopUpStatusSuccess, "topup-promote-1")
+	promoteUserToPaidGroupIfTopUpQualified(906)
+	assert.Equal(t, DefaultFreeloadingUserGroup, getUserGroupForClassificationTest(t, 906))
+
+	insertTopUpForClassificationTest(t, 906, 30, common.TopUpStatusSuccess, "topup-promote-2")
+	promoteUserToPaidGroupIfTopUpQualified(906)
+	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 906))
+}
+
+func TestPromoteUserToPaidGroupIfUsageQualified(t *testing.T) {
+	truncateTables(t)
+
+	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType
+	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeUSD
+	t.Cleanup(func() {
+		operation_setting.GetGeneralSetting().QuotaDisplayType = oldDisplayType
+	})
+
+	threshold := displayAmountToQuotaThreshold(DefaultPaidAmountThreshold)
+	insertUserForClassificationTest(t, 907, "usage-promote", DefaultFreeloadingUserGroup, threshold, common.RoleCommonUser)
+
+	promoteUserToPaidGroupIfUsageQualified(907)
+	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 907))
+}
+
+func TestCreateUserSubscriptionPromotesPaidGroup(t *testing.T) {
+	truncateTables(t)
+
+	insertUserForClassificationTest(t, 908, "subscription-promote", DefaultFreeloadingUserGroup, 0, common.RoleCommonUser)
+	plan := &SubscriptionPlan{
+		Title:         "Subscription Promote",
+		PriceAmount:   10,
+		Currency:      "USD",
+		DurationUnit:  SubscriptionDurationDay,
+		DurationValue: 30,
+		Enabled:       true,
+		TotalAmount:   1000,
+		UpgradeGroup:  "codex-plus",
+	}
+	require.NoError(t, DB.Create(plan).Error)
+
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		_, err := CreateUserSubscriptionFromPlanTx(tx, 908, plan, "admin")
+		return err
+	}))
+	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 908))
 }
