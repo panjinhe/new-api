@@ -36,7 +36,7 @@ import {
   showSuccess,
 } from '../../helpers';
 import { useActualTheme } from '../../context/Theme';
-import { getCurrencyConfig } from '../../helpers/render';
+import { getSubscriptionPriceDisplay } from '../../helpers/render';
 import {
   formatSubscriptionDuration,
   formatSubscriptionResetPeriod,
@@ -73,18 +73,6 @@ function submitEpayForm({ url, params }) {
   form.submit();
   document.body.removeChild(form);
 }
-
-const getDisplayPrice = (plan) => {
-  const { symbol, rate } = getCurrencyConfig();
-  const price = Number(plan?.price_amount || 0);
-  const convertedPrice = price * rate;
-  return {
-    symbol,
-    displayPrice: convertedPrice.toFixed(
-      Number.isInteger(convertedPrice) ? 0 : 2,
-    ),
-  };
-};
 
 const isPremiumBlackPlan = (plan) => {
   const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
@@ -307,7 +295,7 @@ const SubscriptionPlanCatalog = ({
             {plans.map((item) => {
               const plan = item?.plan;
               const totalAmount = Number(plan?.total_amount || 0);
-              const { symbol, displayPrice } = getDisplayPrice(plan);
+              const { displayPrice, unit } = getSubscriptionPriceDisplay(plan);
               const subtitleLabel = getPlanSubtitleLabel(plan);
               const isRecommended =
                 (plan?.title || '').trim() === '前进三：巡航';
@@ -429,16 +417,6 @@ const SubscriptionPlanCatalog = ({
 
                     <div className='mt-5 flex items-end gap-1'>
                       <span
-                        className='text-lg font-semibold'
-                        style={{
-                          color: isPremium
-                            ? premiumBlackPlanVisual.accent
-                            : 'var(--semi-color-primary)',
-                        }}
-                      >
-                        {symbol}
-                      </span>
-                      <span
                         className='text-4xl font-semibold leading-none'
                         style={{
                           color: isPremium
@@ -457,7 +435,7 @@ const SubscriptionPlanCatalog = ({
                             : undefined,
                         }}
                       >
-                        / {t('月')}
+                        {unit} / {t('月')}
                       </Text>
                     </div>
 

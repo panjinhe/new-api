@@ -1109,6 +1109,23 @@ export function convertUSDToCurrency(usdAmount, digits = 2) {
   return symbol + convertedAmount.toFixed(digits);
 }
 
+export function getSubscriptionPriceDisplay(planOrAmount) {
+  const amount =
+    typeof planOrAmount === 'object' && planOrAmount !== null
+      ? Number(planOrAmount?.price_amount || 0)
+      : Number(planOrAmount || 0);
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  const displayPrice = safeAmount.toFixed(Number.isInteger(safeAmount) ? 0 : 2);
+  const unit = '元';
+
+  return {
+    amount: safeAmount,
+    displayPrice,
+    unit,
+    label: `${displayPrice} ${unit}`,
+  };
+}
+
 export function renderQuota(quota, digits = 2) {
   let quotaPerUnit = localStorage.getItem('quota_per_unit');
   const quotaDisplayType = localStorage.getItem('quota_display_type') || 'USD';

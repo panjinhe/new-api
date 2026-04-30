@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { openRechargeLink, renderQuota } from '../../helpers';
 import { useActualTheme } from '../../context/Theme';
+import { getSubscriptionPriceDisplay } from '../../helpers/render';
 import { formatSubscriptionResetPeriod } from '../../helpers/subscriptionFormat';
 
 const { Text, Paragraph } = Typography;
@@ -292,12 +293,6 @@ const getPlanVisualTexture = (visual) =>
     : visual?.themeDark
       ? 'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.055) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 26px)'
       : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.26) 0 1px, transparent 1px 24px)';
-
-const getPlanPriceLabel = (plan) => {
-  const price = Number(plan?.price_amount || 0);
-  const displayPrice = price.toFixed(Number.isInteger(price) ? 0 : 2);
-  return `${displayPrice} 元`;
-};
 
 const getPlanResetLabel = (plan, t) => {
   const resetText = formatSubscriptionResetPeriod(plan, t);
@@ -727,7 +722,8 @@ const RechargeSupportCard = ({
             <>
               <div className='mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2'>
                 {subscriptionPlanItems.map((plan, index) => {
-                  const displayPrice = getPlanPriceLabel(plan);
+                  const { label: displayPrice } =
+                    getSubscriptionPriceDisplay(plan);
                   const subtitleLabel = getPlanSubtitleLabel(plan);
                   const totalAmount = Number(plan?.total_amount || 0);
                   const isRecommended =
