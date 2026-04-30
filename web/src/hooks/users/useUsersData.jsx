@@ -24,6 +24,23 @@ import { ADMIN_ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
 
 const USERS_PAGE_SIZE_STORAGE_KEY = 'admin-users-page-size';
+const CLASSIFICATION_GROUPS = ['充值用户', '白嫖怪'];
+
+const toGroupOptions = (groups, t) => {
+  const seen = new Set();
+  return groups
+    .filter((group) => {
+      if (!group || seen.has(group)) {
+        return false;
+      }
+      seen.add(group);
+      return true;
+    })
+    .map((group) => ({
+      label: t(group),
+      value: group,
+    }));
+};
 
 export const useUsersData = () => {
   const { t } = useTranslation();
@@ -35,6 +52,7 @@ export const useUsersData = () => {
   const [activePage, setActivePage] = useState(1);
   const [pageSize, setPageSize] = useState(ADMIN_ITEMS_PER_PAGE);
   const [searching, setSearching] = useState(false);
+  const [classifyingUsers, setClassifyingUsers] = useState(false);
   const [groupOptions, setGroupOptions] = useState([]);
   const [userCount, setUserCount] = useState(0);
 
@@ -241,6 +259,34 @@ export const useUsersData = () => {
     }
   };
 
+  const classifyUsersByPaymentAndUsage = async () => {
+    setClassifyingUsers(true);
+    try {
+      const res = await API.post('/api/user/classify', {
+        amount_threshold: 50,
+        paid_group: '充值用户',
+        free_group: '白嫖怪',
+      });
+      const { success, message, data } = res.data;
+      if (success) {
+        showSuccess(
+          `${t('用户分组归类完成')}：${t('充值用户')} ${
+            data?.paid_users || 0
+          } ${t('人')}，${t('白嫖怪')} ${data?.free_users || 0} ${t(
+            '人',
+          )}，${t('更新')} ${data?.updated_users || 0} ${t('人')}`,
+        );
+        await refresh(1);
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message || t('操作失败，请重试'));
+    } finally {
+      setClassifyingUsers(false);
+    }
+  };
+
   // Fetch groups data
   const fetchGroups = async () => {
     try {
@@ -249,10 +295,7 @@ export const useUsersData = () => {
         return;
       }
       setGroupOptions(
-        res.data.data.map((group) => ({
-          label: group,
-          value: group,
-        })),
+        toGroupOptions([...res.data.data, ...CLASSIFICATION_GROUPS], t),
       );
     } catch (error) {
       showError(error.message);
@@ -293,6 +336,7 @@ export const useUsersData = () => {
     pageSize,
     userCount,
     searching,
+    classifyingUsers,
     groupOptions,
 
     // Modal state
@@ -315,6 +359,7 @@ export const useUsersData = () => {
     // Actions
     loadUsers,
     searchUsers,
+    classifyUsersByPaymentAndUsage,
     manageUser,
     resetUserPasskey,
     resetUserTwoFA,

@@ -46,6 +46,7 @@ const UsersManagementPanel = ({ tabsArea }) => {
     closeAddUser,
     closeEditUser,
     refresh,
+    classifyUsersByPaymentAndUsage,
 
     // Form state
     formInitValues,
@@ -57,6 +58,7 @@ const UsersManagementPanel = ({ tabsArea }) => {
     groupOptions,
     loading,
     searching,
+    classifyingUsers,
 
     // Description state
     compactMode,
@@ -93,7 +95,12 @@ const UsersManagementPanel = ({ tabsArea }) => {
         tabsArea={tabsArea}
         actionsArea={
           <div className='flex flex-col md:flex-row justify-between items-center gap-2 w-full'>
-            <UsersActions setShowAddUser={setShowAddUser} t={t} />
+            <UsersActions
+              setShowAddUser={setShowAddUser}
+              classifyUsersByPaymentAndUsage={classifyUsersByPaymentAndUsage}
+              classifyingUsers={classifyingUsers}
+              t={t}
+            />
 
             <UsersFilters
               formInitValues={formInitValues}

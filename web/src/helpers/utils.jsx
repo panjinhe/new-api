@@ -123,7 +123,7 @@ export function showError(error) {
   console.error(error);
   if (error.message) {
     if (error.name === 'AxiosError') {
-      switch (error.response.status) {
+      switch (error.response?.status) {
         case 401:
           // 清除用户状态
           localStorage.removeItem('user');
@@ -140,7 +140,11 @@ export function showError(error) {
           Toast.info('本站仅作演示之用，无服务端！');
           break;
         default:
-          Toast.error('错误：' + error.message);
+          if (!error.response) {
+            Toast.error('错误：无法连接服务器，请检查网络或稍后重试');
+          } else {
+            Toast.error('错误：' + error.message);
+          }
       }
       return;
     }

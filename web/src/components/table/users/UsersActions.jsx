@@ -18,19 +18,49 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Button } from '@douyinfe/semi-ui';
+import { Button, Popconfirm } from '@douyinfe/semi-ui';
+import { IconUserAdd, IconUserGroup } from '@douyinfe/semi-icons';
 
-const UsersActions = ({ setShowAddUser, t }) => {
+const UsersActions = ({
+  setShowAddUser,
+  classifyUsersByPaymentAndUsage,
+  classifyingUsers,
+  t,
+}) => {
   // Add new user
   const handleAddUser = () => {
     setShowAddUser(true);
   };
 
   return (
-    <div className='flex gap-2 w-full md:w-auto order-2 md:order-1'>
-      <Button className='w-full md:w-auto' onClick={handleAddUser} size='small'>
+    <div className='flex flex-wrap gap-2 w-full md:w-auto order-2 md:order-1'>
+      <Button
+        className='flex-1 md:flex-initial'
+        icon={<IconUserAdd />}
+        onClick={handleAddUser}
+        size='small'
+      >
         {t('添加用户')}
       </Button>
+      <Popconfirm
+        title={t('确认归类用户分组？')}
+        content={t(
+          '系统会将累计充值或使用金额达到 50、或历史绑过套餐的普通用户设置为“充值用户”，其余普通用户设置为“白嫖怪”。管理员和已注销用户不会被修改。',
+        )}
+        okText={t('开始归类')}
+        cancelText={t('取消')}
+        onConfirm={classifyUsersByPaymentAndUsage}
+      >
+        <Button
+          className='flex-1 md:flex-initial'
+          icon={<IconUserGroup />}
+          loading={classifyingUsers}
+          size='small'
+          type='warning'
+        >
+          {t('归类白嫖怪')}
+        </Button>
+      </Popconfirm>
     </div>
   );
 };

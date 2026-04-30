@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -260,6 +261,37 @@ func SearchUsers(c *gin.Context) {
 	pageInfo.SetItems(users)
 	common.ApiSuccess(c, pageInfo)
 	return
+}
+
+func ClassifyUsersByPaymentAndUsage(c *gin.Context) {
+	var req model.UserGroupClassificationOptions
+	if c.Request.Body != nil {
+		err := common.DecodeJson(c.Request.Body, &req)
+		if err != nil && !errors.Is(err, io.EOF) {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+	}
+
+	result, err := model.ClassifyUsersByPaymentAndUsage(req)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	model.RecordLog(
+		c.GetInt("id"),
+		model.LogTypeManage,
+		fmt.Sprintf(
+			"批量归类用户分组：%s %d 人，%s %d 人，更新 %d 人",
+			result.PaidGroup,
+			result.PaidUsers,
+			result.FreeGroup,
+			result.FreeUsers,
+			result.UpdatedUsers,
+		),
+	)
+	common.ApiSuccess(c, result)
 }
 
 func GetUser(c *gin.Context) {

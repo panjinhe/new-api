@@ -1,0 +1,205 @@
+package model
+
+import (
+	"errors"
+	"math"
+	"strings"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"gorm.io/gorm"
+)
+
+const (
+	DefaultPaidUserGroup        = "充值用户"
+	DefaultFreeloadingUserGroup = "白嫖怪"
+	DefaultPaidAmountThreshold  = 50
+)
+
+type UserGroupClassificationOptions struct {
+	AmountThreshold float64 `json:"amount_threshold"`
+	PaidGroup       string  `json:"paid_group"`
+	FreeGroup       string  `json:"free_group"`
+}
+
+type UserGroupClassificationResult struct {
+	AmountThreshold     float64 `json:"amount_threshold"`
+	UsedQuotaThreshold  int     `json:"used_quota_threshold"`
+	PaidGroup           string  `json:"paid_group"`
+	FreeGroup           string  `json:"free_group"`
+	TotalUsers          int64   `json:"total_users"`
+	PaidUsers           int64   `json:"paid_users"`
+	FreeUsers           int64   `json:"free_users"`
+	PaidUsersUpdated    int64   `json:"paid_users_updated"`
+	FreeUsersUpdated    int64   `json:"free_users_updated"`
+	UpdatedUsers        int64   `json:"updated_users"`
+	TopUpQualifiedUsers int64   `json:"topup_qualified_users"`
+	UsageQualifiedUsers int64   `json:"usage_qualified_users"`
+	SubscriptionUsers   int64   `json:"subscription_users"`
+}
+
+func normalizeUserGroupClassificationOptions(options UserGroupClassificationOptions) (UserGroupClassificationOptions, error) {
+	options.PaidGroup = strings.TrimSpace(options.PaidGroup)
+	if options.PaidGroup == "" {
+		options.PaidGroup = DefaultPaidUserGroup
+	}
+	options.FreeGroup = strings.TrimSpace(options.FreeGroup)
+	if options.FreeGroup == "" {
+		options.FreeGroup = DefaultFreeloadingUserGroup
+	}
+	if options.AmountThreshold <= 0 {
+		options.AmountThreshold = DefaultPaidAmountThreshold
+	}
+	if options.PaidGroup == options.FreeGroup {
+		return options, errors.New("充值用户分组和白嫖怪分组不能相同")
+	}
+	return options, nil
+}
+
+func displayAmountToQuotaThreshold(amount float64) int {
+	if amount <= 0 {
+		return 0
+	}
+	rate := operation_setting.GetUsdToCurrencyRate(operation_setting.USDExchangeRate)
+	if rate <= 0 {
+		rate = 1
+	}
+	return int(math.Ceil(amount / rate * common.QuotaPerUnit))
+}
+
+func commonUserQuery(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&User{}).Where("role = ?", common.RoleCommonUser)
+}
+
+func successfulTopUpQualifiedUserQuery(tx *gorm.DB, threshold float64) *gorm.DB {
+	return tx.Model(&TopUp{}).
+		Select("user_id").
+		Where("status = ?", common.TopUpStatusSuccess).
+		Group("user_id").
+		Having("COALESCE(SUM(money), 0) >= ?", threshold)
+}
+
+func subscriptionUserQuery(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&UserSubscription{}).Select("DISTINCT user_id")
+}
+
+func classifyChangedUsers(tx *gorm.DB, ids []int, group string) ([]int, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var changedIDs []int
+	err := commonUserQuery(tx).
+		Where("id IN ?", ids).
+		Where(subscriptionUserGroupColumn()+" <> ?", group).
+		Pluck("id", &changedIDs).Error
+	return changedIDs, err
+}
+
+func updateUsersGroupByIds(tx *gorm.DB, ids []int, group string) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	result := tx.Model(&User{}).
+		Where("id IN ?", ids).
+		Update("group", group)
+	return result.RowsAffected, result.Error
+}
+
+func invalidateClassifiedUserCaches(userIds []int) {
+	for _, userId := range userIds {
+		_ = InvalidateUserCache(userId)
+		_ = InvalidateUserTokensCache(userId)
+	}
+}
+
+func ClassifyUsersByPaymentAndUsage(options UserGroupClassificationOptions) (*UserGroupClassificationResult, error) {
+	options, err := normalizeUserGroupClassificationOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
+	usedQuotaThreshold := displayAmountToQuotaThreshold(options.AmountThreshold)
+	result := &UserGroupClassificationResult{
+		AmountThreshold:    options.AmountThreshold,
+		UsedQuotaThreshold: usedQuotaThreshold,
+		PaidGroup:          options.PaidGroup,
+		FreeGroup:          options.FreeGroup,
+	}
+
+	var paidIDs []int
+	var freeIDs []int
+	var paidChangedIDs []int
+	var freeChangedIDs []int
+
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		paidTopUpUsers := successfulTopUpQualifiedUserQuery(tx, options.AmountThreshold)
+		subscriptionUsers := subscriptionUserQuery(tx)
+
+		if err := commonUserQuery(tx).Count(&result.TotalUsers).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&TopUp{}).
+			Select("COUNT(DISTINCT user_id)").
+			Where("user_id IN (?)", paidTopUpUsers).
+			Scan(&result.TopUpQualifiedUsers).Error; err != nil {
+			return err
+		}
+		if err := commonUserQuery(tx).
+			Where("used_quota >= ?", usedQuotaThreshold).
+			Count(&result.UsageQualifiedUsers).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&UserSubscription{}).
+			Select("COUNT(DISTINCT user_id)").
+			Scan(&result.SubscriptionUsers).Error; err != nil {
+			return err
+		}
+
+		err := commonUserQuery(tx).
+			Where("used_quota >= ? OR id IN (?) OR id IN (?)", usedQuotaThreshold, paidTopUpUsers, subscriptionUsers).
+			Pluck("id", &paidIDs).Error
+		if err != nil {
+			return err
+		}
+		if len(paidIDs) > 0 {
+			err = commonUserQuery(tx).
+				Where("id NOT IN ?", paidIDs).
+				Pluck("id", &freeIDs).Error
+		} else {
+			err = commonUserQuery(tx).Pluck("id", &freeIDs).Error
+		}
+		if err != nil {
+			return err
+		}
+
+		paidChangedIDs, err = classifyChangedUsers(tx, paidIDs, options.PaidGroup)
+		if err != nil {
+			return err
+		}
+		freeChangedIDs, err = classifyChangedUsers(tx, freeIDs, options.FreeGroup)
+		if err != nil {
+			return err
+		}
+
+		result.PaidUsers = int64(len(paidIDs))
+		result.FreeUsers = int64(len(freeIDs))
+
+		result.PaidUsersUpdated, err = updateUsersGroupByIds(tx, paidChangedIDs, options.PaidGroup)
+		if err != nil {
+			return err
+		}
+		result.FreeUsersUpdated, err = updateUsersGroupByIds(tx, freeChangedIDs, options.FreeGroup)
+		if err != nil {
+			return err
+		}
+		result.UpdatedUsers = result.PaidUsersUpdated + result.FreeUsersUpdated
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	invalidateClassifiedUserCaches(paidChangedIDs)
+	invalidateClassifiedUserCaches(freeChangedIDs)
+	return result, nil
+}

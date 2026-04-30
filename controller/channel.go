@@ -537,6 +537,14 @@ type AddChannelRequest struct {
 	Channel                   *model.Channel        `json:"channel"`
 }
 
+func resetNewChannelRuntimeFields(channel *model.Channel) {
+	if channel == nil {
+		return
+	}
+	channel.Id = 0
+	channel.ResetRuntimeState()
+}
+
 func getVertexArrayKeys(keys string) ([]string, error) {
 	if keys == "" {
 		return nil, nil
@@ -589,6 +597,7 @@ func AddChannel(c *gin.Context) {
 	}
 
 	addChannelRequest.Channel.CreatedTime = common.GetTimestamp()
+	resetNewChannelRuntimeFields(addChannelRequest.Channel)
 	keys := make([]string, 0)
 	switch addChannelRequest.Mode {
 	case "multi_to_single":
@@ -890,6 +899,8 @@ func UpdateChannel(c *gin.Context) {
 		channel.ChannelInfo.MultiKeyMode = constant.MultiKeyMode(*channel.MultiKeyMode)
 	}
 
+	channel.OtherInfo = originChannel.OtherInfo
+
 	// 处理多key模式下的密钥追加/覆盖逻辑
 	if channel.KeyMode != nil && channel.ChannelInfo.IsMultiKey {
 		switch *channel.KeyMode {
@@ -969,6 +980,13 @@ func UpdateChannel(c *gin.Context) {
 		case "replace":
 			// 覆盖模式：直接使用新密钥（默认行为，不需要特殊处理）
 		}
+	}
+	shouldResetRuntimeState := channel.Type != originChannel.Type
+	if !shouldResetRuntimeState && strings.TrimSpace(channel.Key) != "" && strings.TrimSpace(channel.Key) != strings.TrimSpace(originChannel.Key) {
+		shouldResetRuntimeState = !(channel.ChannelInfo.IsMultiKey && channel.KeyMode != nil && *channel.KeyMode == "append")
+	}
+	if shouldResetRuntimeState {
+		channel.ResetRuntimeState()
 	}
 	err = channel.Update()
 	if err != nil {
@@ -1203,14 +1221,14 @@ func CopyChannel(c *gin.Context) {
 
 	// clone channel
 	clone := *origin // shallow copy is sufficient as we will overwrite primitives
-	clone.Id = 0     // let DB auto-generate
+	originalBalance := clone.Balance
+	originalUsedQuota := clone.UsedQuota
 	clone.CreatedTime = common.GetTimestamp()
 	clone.Name = origin.Name + suffix
-	clone.TestTime = 0
-	clone.ResponseTime = 0
-	if resetBalance {
-		clone.Balance = 0
-		clone.UsedQuota = 0
+	resetNewChannelRuntimeFields(&clone)
+	if !resetBalance {
+		clone.Balance = originalBalance
+		clone.UsedQuota = originalUsedQuota
 	}
 
 	// insert
