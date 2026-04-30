@@ -225,8 +225,8 @@ const getPlanComparisonLabel = (plan) => {
   const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
   if (/pro\s*50x|pro50x|黑卡/i.test(text)) return '等于 2.5 个 Pro 20x';
   if (text.includes('光速跃迁')) return '约等于 1.5个 Pro 20x';
-  if (text.includes('加速')) return '约等于3个 pro 5x';
-  if (text.includes('巡航')) return '约等于1.5个 pro5x';
+  if (text.includes('加速')) return '约等于3个 Pro 5x';
+  if (text.includes('巡航')) return '约等于1.5个 Pro 5x';
   if (text.includes('启航')) return '约等于 4 个 Plus 账号';
   if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
   return '';
