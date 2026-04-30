@@ -32,10 +32,12 @@ import {
 } from '@douyinfe/semi-ui';
 import {
   CalendarClock,
+  CircleDollarSign,
   CreditCard,
   Gauge,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { renderQuota } from '../../helpers';
 import {
@@ -114,6 +116,120 @@ const StatusTag = ({ t, summary }) => {
       {cancelled ? t('已作废') : t('已过期')}
     </Tag>
   );
+};
+
+const subscriptionPlanVisuals = [
+  {
+    titleKeyword: 'Pro 50x',
+    code: 'PRO-50X',
+    label: '黑卡旗舰',
+    dark: true,
+    accent: 'rgba(245, 199, 108, 1)',
+    muted: 'rgba(214, 211, 202, 0.82)',
+    border: 'rgba(245, 199, 108, 0.34)',
+    background:
+      'linear-gradient(132deg, rgba(245, 199, 108, 0.16), transparent 26%, rgba(255, 255, 255, 0.055) 54%, transparent 74%), linear-gradient(145deg, rgba(10, 12, 16, 1), rgba(25, 25, 24, 1) 48%, rgba(8, 10, 14, 1))',
+    rail: 'linear-gradient(90deg, rgba(245, 199, 108, 0), rgba(245, 199, 108, 0.96), rgba(255, 244, 214, 0.84), rgba(245, 199, 108, 0))',
+    glow: '0 22px 50px rgba(2, 6, 23, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.36)',
+  },
+  {
+    titleKeyword: '探测',
+    code: 'SCAN-01',
+    label: '低轨探测',
+    accent: 'rgba(8, 145, 178, 1)',
+    border: 'rgba(8, 145, 178, 0.32)',
+    background:
+      'linear-gradient(135deg, rgba(236, 254, 255, 0.98), rgba(255, 255, 255, 1) 56%, rgba(240, 249, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(8, 145, 178, 0.96), rgba(34, 211, 238, 0.72))',
+    glow: '0 16px 34px rgba(8, 145, 178, 0.10)',
+  },
+  {
+    titleKeyword: '启航',
+    code: 'LAUNCH-02',
+    label: '启航窗口',
+    accent: 'rgba(37, 99, 235, 1)',
+    border: 'rgba(37, 99, 235, 0.32)',
+    background:
+      'linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 1) 54%, rgba(238, 242, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(37, 99, 235, 0.96), rgba(96, 165, 250, 0.72))',
+    glow: '0 16px 34px rgba(37, 99, 235, 0.10)',
+  },
+  {
+    titleKeyword: '巡航',
+    code: 'CRUISE-03',
+    label: '主力巡航',
+    accent: 'rgba(5, 150, 105, 1)',
+    border: 'rgba(5, 150, 105, 0.34)',
+    background:
+      'linear-gradient(135deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 1) 50%, rgba(239, 246, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(5, 150, 105, 0.96), rgba(59, 130, 246, 0.72))',
+    glow: '0 18px 38px rgba(5, 150, 105, 0.13)',
+  },
+  {
+    titleKeyword: '加速',
+    code: 'BOOST-04',
+    label: '高能加速',
+    accent: 'rgba(217, 119, 6, 1)',
+    border: 'rgba(217, 119, 6, 0.34)',
+    background:
+      'linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 1) 52%, rgba(255, 247, 237, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(217, 119, 6, 0.96), rgba(251, 191, 36, 0.72))',
+    glow: '0 18px 38px rgba(217, 119, 6, 0.12)',
+  },
+  {
+    titleKeyword: '光速跃迁',
+    code: 'WARP-05',
+    label: '跃迁通道',
+    accent: 'rgba(124, 58, 237, 1)',
+    border: 'rgba(124, 58, 237, 0.36)',
+    background:
+      'linear-gradient(135deg, rgba(245, 243, 255, 0.98), rgba(255, 255, 255, 1) 52%, rgba(253, 244, 255, 0.92))',
+    rail: 'linear-gradient(90deg, rgba(124, 58, 237, 0.96), rgba(236, 72, 153, 0.66))',
+    glow: '0 18px 38px rgba(124, 58, 237, 0.13)',
+  },
+];
+
+const getSubscriptionPlanVisual = (plan) => {
+  const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
+  if (/pro\s*50x|pro50x|黑卡/i.test(text)) {
+    return subscriptionPlanVisuals[0];
+  }
+  return (
+    subscriptionPlanVisuals.find((item) => text.includes(item.titleKeyword)) ||
+    subscriptionPlanVisuals[2]
+  );
+};
+
+const getPlanVisualTexture = (visual) =>
+  visual?.dark
+    ? 'linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.08) 44%, transparent 62%), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 26px)'
+    : 'linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.36) 48%, transparent 68%), repeating-linear-gradient(90deg, rgba(255,255,255,0.22) 0 1px, transparent 1px 24px)';
+
+const getPlanVisualPanel = (visual) =>
+  visual?.dark
+    ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.055))'
+    : 'rgba(255,255,255,0.80)';
+
+const getPlanVisualSurface = (visual) =>
+  visual?.dark
+    ? 'linear-gradient(180deg, rgba(245, 199, 108, 0.16), rgba(255, 255, 255, 0.07))'
+    : 'rgba(255, 255, 255, 0.68)';
+
+const getPlanVisualText = (visual) =>
+  visual?.dark ? 'rgba(255, 251, 235, 0.96)' : 'var(--semi-color-text-0)';
+
+const getPlanVisualMutedText = (visual) =>
+  visual?.dark ? visual.muted : 'var(--semi-color-text-2)';
+
+const getPlanComparisonLabel = (plan) => {
+  const text = `${plan?.title || ''} ${plan?.subtitle || ''}`;
+  if (/pro\s*50x|pro50x|黑卡/i.test(text)) return '等于 2.5 个 Pro 20x';
+  if (text.includes('光速跃迁')) return '约等于 1.5个 Pro 20x';
+  if (text.includes('加速')) return '约等于3个 pro 5x';
+  if (text.includes('巡航')) return '约等于1.5个 pro5x';
+  if (text.includes('启航')) return '约等于 4 个 Plus 账号';
+  if (text.includes('探测')) return '约等于 1.4 个 Plus 账号';
+  return '';
 };
 
 const DetailItem = ({ icon, label, value, tooltip }) => {
@@ -197,6 +313,13 @@ const SubscriptionStatusPanel = ({
     primaryTotalAmount - primaryUsedAmount,
   );
   const hasLimitedPrimaryQuota = primaryTotalAmount > 0;
+  const primaryVisual = getSubscriptionPlanVisual(primaryPlan);
+  const primaryVisualDark = Boolean(primaryVisual?.dark);
+  const primaryComparisonLabel = getPlanComparisonLabel(primaryPlan);
+  const primaryDailyQuota = Number(primaryPlan?.total_amount || 0);
+  const primaryResetLabel = primaryPlan
+    ? formatSubscriptionResetPeriod(primaryPlan, t)
+    : t('按订阅快照');
 
   useEffect(() => {
     setAnimatedPercent(0);
@@ -353,20 +476,63 @@ const SubscriptionStatusPanel = ({
         </div>
       ) : hasActiveSubscription ? (
         <div
-          className='mt-5 rounded-2xl p-4'
+          className='mt-5 relative overflow-hidden rounded-2xl p-4 transition-all duration-200'
           style={{
-            background:
-              'linear-gradient(180deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.96))',
-            border: '1px solid rgba(59, 130, 246, 0.18)',
+            background: primaryVisual.background,
+            border: `1px solid ${primaryVisual.border}`,
+            boxShadow: primaryVisual.glow,
           }}
         >
-          <div className='flex flex-wrap items-start justify-between gap-3'>
+          <div
+            className='absolute inset-x-0 top-0 h-1.5'
+            style={{ background: primaryVisual.rail }}
+          />
+          <div
+            className='pointer-events-none absolute inset-0'
+            style={{
+              backgroundImage: getPlanVisualTexture(primaryVisual),
+              opacity: primaryVisualDark ? 0.72 : 0.58,
+            }}
+          />
+
+          <div className='relative flex flex-wrap items-start justify-between gap-3'>
             <div className='min-w-0'>
+              <div className='flex flex-wrap items-center gap-2 mb-3'>
+                <span
+                  className='rounded-full px-2.5 py-1 text-xs font-semibold'
+                  style={{
+                    background: getPlanVisualSurface(primaryVisual),
+                    border: `1px solid ${primaryVisual.border}`,
+                    color: primaryVisual.accent,
+                  }}
+                >
+                  {primaryVisual.code}
+                </span>
+                <span
+                  className='inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium'
+                  style={{
+                    background: primaryVisualDark
+                      ? 'rgba(245, 199, 108, 0.14)'
+                      : 'rgba(255, 255, 255, 0.64)',
+                    border: `1px solid ${primaryVisual.border}`,
+                    color: primaryVisualDark
+                      ? 'rgba(255, 244, 214, 0.94)'
+                      : primaryVisual.accent,
+                  }}
+                >
+                  <Sparkles size={12} className='mr-1' />
+                  {t(primaryVisual.label)}
+                </span>
+              </div>
               <div className='flex flex-wrap items-center gap-2'>
                 <Typography.Title
                   heading={5}
                   ellipsis={{ rows: 1, showTooltip: true }}
-                  style={{ margin: 0, maxWidth: 320 }}
+                  style={{
+                    margin: 0,
+                    maxWidth: 360,
+                    color: getPlanVisualText(primaryVisual),
+                  }}
                 >
                   {getPlanTitle(primarySubscription, planMap, t)}
                 </Typography.Title>
@@ -381,7 +547,11 @@ const SubscriptionStatusPanel = ({
                 type='tertiary'
                 size='small'
                 ellipsis={{ rows: 1, showTooltip: true }}
-                style={{ display: 'block', maxWidth: 520 }}
+                style={{
+                  display: 'block',
+                  maxWidth: 520,
+                  color: getPlanVisualMutedText(primaryVisual),
+                }}
               >
                 {primaryPlan?.subtitle ||
                   (primaryPlan
@@ -390,18 +560,46 @@ const SubscriptionStatusPanel = ({
               </Text>
             </div>
             <div className='text-right'>
-              <div className='text-2xl font-semibold text-[var(--semi-color-text-0)] leading-none'>
+              <div
+                className='text-3xl font-semibold leading-none'
+                style={{ color: primaryVisual.accent }}
+              >
                 {getRemainingDays(primarySubscription)}
               </div>
-              <Text type='tertiary' size='small'>
+              <Text
+                type='tertiary'
+                size='small'
+                style={{ color: getPlanVisualMutedText(primaryVisual) }}
+              >
                 {t('剩余天数')}
               </Text>
             </div>
           </div>
 
-          <div className='mt-4'>
-            <div className='mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--semi-color-text-2)]'>
-              <span>{t('每日额度使用')}</span>
+          {primaryComparisonLabel && (
+            <div
+              className='relative mt-4 flex items-center gap-2 rounded-xl px-3 py-2'
+              style={{
+                background: getPlanVisualSurface(primaryVisual),
+                border: `1px solid ${primaryVisual.border}`,
+                color: primaryVisualDark
+                  ? 'rgba(255, 244, 214, 0.98)'
+                  : primaryVisual.accent,
+              }}
+            >
+              <CircleDollarSign size={17} className='shrink-0' />
+              <span className='min-w-0 break-words text-base font-semibold leading-snug'>
+                {t(primaryComparisonLabel)}
+              </span>
+            </div>
+          )}
+
+          <div className='relative mt-4'>
+            <div
+              className='mb-2 flex flex-wrap items-center justify-between gap-2 text-xs'
+              style={{ color: getPlanVisualMutedText(primaryVisual) }}
+            >
+              <span>{t('权益进度')}</span>
               {hasLimitedPrimaryQuota ? (
                 <Tooltip
                   content={`${t('原生额度')}：${primaryUsedAmount}/${primaryTotalAmount}`}
@@ -419,13 +617,51 @@ const SubscriptionStatusPanel = ({
               <Progress
                 percent={animatedPercent}
                 showInfo={false}
-                stroke='rgba(37, 99, 235, 1)'
+                stroke={primaryVisual.accent}
                 aria-label='subscription usage'
               />
             ) : null}
           </div>
 
-          <div className='mt-4 flex flex-wrap gap-2'>
+          <div className='relative mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4'>
+            <div
+              className='rounded-xl px-3 py-2'
+              style={{ background: getPlanVisualPanel(primaryVisual) }}
+            >
+              <div
+                className='flex items-center gap-1.5 text-xs'
+                style={{ color: getPlanVisualMutedText(primaryVisual) }}
+              >
+                <Gauge size={13} />
+                {t('每日额度')}
+              </div>
+              <div
+                className='mt-1 break-words text-base font-semibold leading-tight'
+                style={{ color: getPlanVisualText(primaryVisual) }}
+              >
+                {primaryDailyQuota > 0
+                  ? renderQuota(primaryDailyQuota)
+                  : t('不限')}
+              </div>
+            </div>
+            <div
+              className='rounded-xl px-3 py-2'
+              style={{ background: getPlanVisualPanel(primaryVisual) }}
+            >
+              <div
+                className='flex items-center gap-1.5 text-xs'
+                style={{ color: getPlanVisualMutedText(primaryVisual) }}
+              >
+                <RefreshCw size={13} />
+                {t('重置')}
+              </div>
+              <div
+                className='mt-1 break-words text-sm font-semibold leading-tight'
+                style={{ color: getPlanVisualText(primaryVisual) }}
+              >
+                {primaryResetLabel}
+              </div>
+            </div>
             <DetailItem
               icon={<CalendarClock size={14} />}
               label={t('下次重置')}
@@ -438,6 +674,9 @@ const SubscriptionStatusPanel = ({
               label={t('到期时间')}
               value={formatDateTime(primarySubscription.subscription.end_time)}
             />
+          </div>
+
+          <div className='relative mt-3 flex flex-wrap gap-2'>
             <DetailItem
               icon={<Gauge size={14} />}
               label={t('扣费偏好')}
@@ -454,7 +693,10 @@ const SubscriptionStatusPanel = ({
           </div>
 
           {activeList.length > 1 && (
-            <div className='mt-3 text-xs text-[var(--semi-color-text-2)]'>
+            <div
+              className='relative mt-3 text-xs'
+              style={{ color: getPlanVisualMutedText(primaryVisual) }}
+            >
               {t('还有')} {activeList.length - 1}{' '}
               {t('个生效订阅，可在最近订阅中查看')}
             </div>
