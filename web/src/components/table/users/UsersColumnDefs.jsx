@@ -221,7 +221,7 @@ const renderOperations = (
   const moreMenu = [
     {
       node: 'item',
-      name: t('订阅管理'),
+      name: t('权益管理'),
       onClick: () => showUserSubscriptionsModal(record),
     },
     {

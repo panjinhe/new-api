@@ -293,7 +293,7 @@ const buildColumns = ({ t, openSubscriptions }) => [
         icon={<Settings2 size={14} />}
         onClick={() => openSubscriptions(record)}
       >
-        {t('订阅管理')}
+        {t('权益管理')}
       </Button>
     ),
   },
@@ -601,7 +601,7 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
         descriptionArea={
           <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full'>
             <div className='flex items-center gap-2 text-blue-500'>
-              <Text>{t('用户套餐')}</Text>
+              <Text>{t('用户权益')}</Text>
               <Tag color='white' shape='circle'>
                 {t('本页生效')}: {renderNumber(activeUsers)}
               </Tag>

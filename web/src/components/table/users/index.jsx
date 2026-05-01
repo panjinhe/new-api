@@ -148,7 +148,7 @@ const UsersPage = () => {
   const tabsArea = (
     <Tabs type='line' activeKey={activeTab} onChange={handleTabChange}>
       <TabPane tab={t('用户管理')} itemKey='users' />
-      <TabPane tab={t('用户套餐')} itemKey='subscriptions' />
+      <TabPane tab={t('用户权益')} itemKey='subscriptions' />
     </Tabs>
   );
 
