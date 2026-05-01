@@ -399,6 +399,7 @@ func BatchInsertChannels(channels []Channel) error {
 	}
 	for i := range channels {
 		ApplyDefaultProxyForNewChannel(&channels[i])
+		ApplyDefaultParamOverrideForNewChannel(&channels[i])
 	}
 	tx := DB.Begin()
 	if tx.Error != nil {
