@@ -361,16 +361,16 @@ const RechargeSupportCard = ({
             <div className='flex items-center gap-2 flex-wrap'>
               <Rocket size={18} className='text-amber-500' />
               <Text strong style={{ fontSize: 16 }}>
-                {t('Codex API 接入服务')}
+                {t('Codex API 7日额度包')}
               </Text>
               <Tag color='orange'>
                 {t('单价低至')} {bestUnitPrice.toFixed(2)} {t('元 / 刀')}
               </Tag>
-              <Tag color='green'>{t('超值倍率')}</Tag>
+              <Tag color='green'>{t('7天有效')}</Tag>
             </div>
             <div className='mt-2 text-sm text-[var(--semi-color-text-1)]'>
               {t(
-                '平台当前主打 Codex 系列，适合日常 Coding、脚本、自动化、插件和 Bot 调用。',
+                '购买后自动发唯一兑换码，兑换成功起 7 天内按实际调用消耗额度。',
               )}
             </div>
           </div>
@@ -395,7 +395,7 @@ const RechargeSupportCard = ({
         <div className='mt-4 space-y-3'>
           <Paragraph className='!mb-0'>
             {t(
-              '余额用完可直接联系 QQ 群获取兑换码和接入帮助，少走弯路，拿到就能配。',
+              '适合 Codex API、脚本、自动化、插件和 Bot 调用；需要接入帮助可联系 QQ 群。',
             )}
           </Paragraph>
           <div className='rounded-xl bg-[var(--semi-color-fill-0)] px-4 py-3'>
@@ -415,7 +415,7 @@ const RechargeSupportCard = ({
               icon={<Wallet size={14} />}
               onClick={onGoTopup}
             >
-              {t('去钱包管理')}
+              {t('去兑换码充值')}
             </Button>
             <Button
               theme='solid'
@@ -454,12 +454,15 @@ const RechargeSupportCard = ({
               <div className='flex items-center gap-2 flex-wrap'>
                 <CircleDollarSign size={18} color='rgba(5, 150, 105, 1)' />
                 <Text strong style={{ fontSize: 16 }}>
-                  {t('Codex API 接入服务')}
+                  {t('Codex API 7日额度包')}
                 </Text>
-                <Tag color='green'>{t('按量付费')}</Tag>
+                <Tag color='green'>{t('兑换码发货')}</Tag>
+                <Tag color='orange'>{t('7天有效')}</Tag>
               </div>
               <div className='mt-2 text-sm leading-6 text-[var(--semi-color-text-2)]'>
-                {t('按量扣费，使用钱包余额；余额不足时用兑换码补充。')}
+                {t(
+                  '购买对应面额 SKU 后自动发唯一兑换码；兑换成功起 7 天有效，按实际调用消耗额度。',
+                )}
               </div>
             </div>
             <Space wrap>
@@ -639,7 +642,7 @@ const RechargeSupportCard = ({
                         className='shrink-0 font-semibold'
                         style={{ color: visual.accent }}
                       >
-                        {t('钱包扣费')}
+                        {t('7天有效')}
                       </span>
                     </div>
                   </div>
@@ -668,12 +671,12 @@ const RechargeSupportCard = ({
             />
             <div className='relative flex items-center gap-2 text-sm font-medium text-[var(--semi-color-text-0)]'>
               <Gift size={16} className='text-emerald-600' />
-              {t('兑换码补给站')}
+              {t('7日兑换码补给站')}
             </div>
             <div className='relative mt-2 text-xs leading-6 text-[var(--semi-color-text-2)]'>
               {t('主推')} {featuredPricingPlan.quota} · {t('单价低至')}{' '}
               {featuredPricingPlan.unitPrice.toFixed(2)} {t('元 / 刀')} ·{' '}
-              {t('官网同额')} {featuredPricingPlan.officialPriceLabel}
+              {t('兑换成功起 7 天有效')}
             </div>
             <div className='relative mt-3'>
               <Button
@@ -683,7 +686,7 @@ const RechargeSupportCard = ({
                 icon={<ExternalLink size={14} />}
                 onClick={handleOpenRechargeLink}
               >
-                {t('购买兑换码')}
+                {t('淘宝购买7日额度包')}
               </Button>
             </div>
           </div>
