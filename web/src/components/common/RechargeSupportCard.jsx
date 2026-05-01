@@ -36,10 +36,10 @@ const toolTags = ['Codex', 'CLI', 'VSCode', 'OpenClaw', '小龙虾', 'AstrBot'];
 const modelTags = ['5.4', '5.3codex', '5.4mini', '5.2'];
 
 const pricingItems = [
-  { quota: '50 刀', quotaValue: 50, price: '15 元', priceValue: 15 },
-  { quota: '100 刀', quotaValue: 100, price: '25 元', priceValue: 25 },
+  { quota: '50 刀', quotaValue: 50, price: '13 元', priceValue: 13 },
+  { quota: '100 刀', quotaValue: 100, price: '24 元', priceValue: 24 },
   { quota: '200 刀', quotaValue: 200, price: '45 元', priceValue: 45 },
-  { quota: '500 刀', quotaValue: 500, price: '100 元', priceValue: 100 },
+  { quota: '500 刀', quotaValue: 500, price: '99 元', priceValue: 99 },
 ];
 const starterUnitPrice =
   pricingItems[0].priceValue / pricingItems[0].quotaValue;

@@ -185,6 +185,7 @@ const RechargeCard = ({
   subscriptionPlans = [],
   billingPreference,
   onChangeBillingPreference,
+  quotaBuckets,
   activeSubscriptions = [],
   allSubscriptions = [],
   reloadSubscriptionSelf,
@@ -268,14 +269,6 @@ const RechargeCard = ({
     }
   }, [shouldShowSubscriptionCatalog, activeTab]);
 
-  const dailyUsage = walletUsageStats?.daily?.length
-    ? walletUsageStats.daily
-    : [];
-  const maxDailyQuota = Math.max(
-    ...dailyUsage.map((item) => item.quota || 0),
-    0,
-  );
-  const hasDailyUsage = maxDailyQuota > 0;
   const walletMetrics = [
     {
       label: t('历史消耗'),
@@ -319,168 +312,121 @@ const RechargeCard = ({
 
   const accountStatsPanel = (
     <Card
-      className='!rounded-2xl shadow-sm overflow-hidden'
+      className='!rounded-xl shadow-sm overflow-hidden'
       bodyStyle={{ padding: 0 }}
       style={{
         border: isDarkMode
-          ? '1px solid rgba(148, 163, 184, 0.18)'
-          : '1px solid rgba(14, 165, 233, 0.16)',
+          ? '1px solid rgba(148, 163, 184, 0.16)'
+          : '1px solid rgba(15, 23, 42, 0.08)',
+        background: isDarkMode
+          ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(17, 24, 39, 0.98))'
+          : 'linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98))',
       }}
     >
-      <div
-        className='h-1.5'
-        style={{
-          background:
-            'linear-gradient(90deg, rgba(14, 165, 233, 0.95), rgba(5, 150, 105, 0.78), rgba(99, 102, 241, 0.72))',
-        }}
-      />
-      <div className='p-5'>
-        <div className='flex items-start justify-between gap-3'>
-          <div>
-            <div className='flex items-center gap-2'>
-              <Wallet size={18} color='var(--semi-color-primary)' />
-              <Text strong>{t('钱包概览')}</Text>
-            </div>
-            <Text type='tertiary' size='small'>
-              {t('余额、消耗和请求次数')}
-            </Text>
-          </div>
-          <Button
-            size='small'
-            theme='light'
-            type='tertiary'
-            icon={<Receipt size={14} />}
-            onClick={onOpenHistory}
-          >
-            {t('账单')}
-          </Button>
-        </div>
-
+      <div className='relative overflow-hidden'>
         <div
-          className='mt-5 rounded-2xl px-4 py-4'
+          className='absolute inset-y-0 left-0 w-1'
+          style={{
+            background:
+              'linear-gradient(180deg, rgba(14, 165, 233, 0.96), rgba(5, 150, 105, 0.9), rgba(99, 102, 241, 0.72))',
+          }}
+        />
+        <div
+          className='pointer-events-none absolute inset-0'
           style={{
             background: isDarkMode
-              ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(20, 83, 45, 0.22))'
-              : 'linear-gradient(135deg, rgba(240, 249, 255, 0.96), rgba(236, 253, 245, 0.74))',
-            border: isDarkMode
-              ? '1px solid rgba(148, 163, 184, 0.18)'
-              : '1px solid rgba(14, 165, 233, 0.14)',
+              ? 'radial-gradient(circle at 14% 0%, rgba(14, 165, 233, 0.12), transparent 32%), radial-gradient(circle at 78% 110%, rgba(5, 150, 105, 0.10), transparent 30%)'
+              : 'radial-gradient(circle at 12% 0%, rgba(14, 165, 233, 0.10), transparent 32%), radial-gradient(circle at 76% 110%, rgba(5, 150, 105, 0.09), transparent 30%)',
           }}
-        >
-          <div className='flex flex-wrap items-end justify-between gap-3'>
+        />
+
+        <div className='relative grid grid-cols-1 lg:grid-cols-[minmax(250px,0.9fr)_minmax(0,1.8fr)_auto]'>
+          <div className='flex min-w-0 items-center gap-3 px-4 py-4 lg:px-5'>
+            <div
+              className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl'
+              style={{
+                background: isDarkMode
+                  ? 'rgba(14, 165, 233, 0.16)'
+                  : 'rgba(14, 165, 233, 0.10)',
+                color: 'var(--semi-color-primary)',
+              }}
+            >
+              <Wallet size={18} />
+            </div>
             <div className='min-w-0'>
-              <div className='text-xs text-[var(--semi-color-text-2)]'>
-                {t('当前余额')}
+              <div className='flex flex-wrap items-center gap-2'>
+                <Text strong>{t('钱包概览')}</Text>
+                <Tag color='cyan' shape='circle' size='small'>
+                  {t('长期余额')}
+                </Tag>
               </div>
-              <div className='mt-1 text-3xl font-semibold text-[var(--semi-color-text-0)] break-words'>
+              <div className='mt-1 text-2xl font-semibold leading-tight text-[var(--semi-color-text-0)] break-words lg:text-3xl'>
                 {renderQuota(userState?.user?.quota || 0)}
               </div>
+              <Text type='tertiary' size='small'>
+                {t('永久或长期余额，仅在钱包中展示')}
+              </Text>
             </div>
-            <Tag color='cyan' shape='circle'>
-              {t('钱包资产')}
-            </Tag>
-          </div>
-        </div>
-
-        <div className='mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3'>
-          {walletMetrics.map((metric) => {
-            const MetricIcon = metric.icon;
-            return (
-              <div
-                key={metric.label}
-                className='rounded-xl px-3 py-3'
-                style={{
-                  background: isDarkMode
-                    ? metric.darkBackground
-                    : metric.background,
-                  border: isDarkMode
-                    ? '1px solid rgba(148, 163, 184, 0.16)'
-                    : '1px solid rgba(15, 23, 42, 0.06)',
-                }}
-              >
-                <div className='flex items-center gap-2 text-xs text-[var(--semi-color-text-2)]'>
-                  <MetricIcon size={14} color={metric.accent} />
-                  <span>{metric.label}</span>
-                </div>
-                <div className='mt-2 text-base font-semibold text-[var(--semi-color-text-0)] break-words'>
-                  {metric.value}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div
-          className='mt-4 rounded-2xl px-4 py-4'
-          style={{
-            background: 'var(--semi-color-fill-0)',
-            border: isDarkMode
-              ? '1px solid rgba(148, 163, 184, 0.16)'
-              : '1px solid rgba(15, 23, 42, 0.06)',
-          }}
-        >
-          <div className='flex items-center justify-between gap-3'>
-            <div>
-              <div className='text-sm font-medium text-[var(--semi-color-text-0)]'>
-                {t('近 7 日趋势')}
-              </div>
-              <div className='mt-0.5 text-xs text-[var(--semi-color-text-2)]'>
-                {t('按天统计额度消耗')}
-              </div>
-            </div>
-            <Text type='tertiary' size='small'>
-              {walletUsageStats?.loading
-                ? t('加载中')
-                : hasDailyUsage
-                  ? t('最近 7 天')
-                  : t('暂无用量')}
-            </Text>
           </div>
 
-          <div className='mt-4 flex h-20 items-end gap-2'>
-            {(dailyUsage.length
-              ? dailyUsage
-              : Array.from({ length: 7 }, (_, index) => ({
-                  label: '',
-                  quota: 0,
-                  placeholder: index,
-                }))
-            ).map((item) => {
-              const barHeight = walletUsageStats?.loading
-                ? 24 + (Number(item.placeholder || 0) % 4) * 10
-                : hasDailyUsage
-                  ? Math.max(
-                      10,
-                      Math.round(((item.quota || 0) / maxDailyQuota) * 72),
-                    )
-                  : 8;
+          <div
+            className='grid grid-cols-2 md:grid-cols-4'
+            style={{
+              borderLeft: isDarkMode
+                ? '1px solid rgba(148, 163, 184, 0.12)'
+                : '1px solid rgba(15, 23, 42, 0.06)',
+              borderTop: isDarkMode
+                ? '1px solid rgba(148, 163, 184, 0.12)'
+                : '1px solid rgba(15, 23, 42, 0.06)',
+            }}
+          >
+            {walletMetrics.map((metric, index) => {
+              const MetricIcon = metric.icon;
               return (
                 <div
-                  key={`${item.label}-${item.placeholder || item.quota}`}
-                  className='flex min-w-0 flex-1 flex-col items-center gap-2'
-                  title={
-                    item.label
-                      ? `${item.label} · ${renderQuota(item.quota || 0)}`
-                      : ''
-                  }
+                  key={metric.label}
+                  className='min-w-0 px-4 py-3'
+                  style={{
+                    borderLeft:
+                      index % 4 === 0
+                        ? 'none'
+                        : isDarkMode
+                          ? '1px solid rgba(148, 163, 184, 0.10)'
+                          : '1px solid rgba(15, 23, 42, 0.055)',
+                  }}
                 >
-                  <div
-                    className='w-full rounded-t-lg transition-all duration-300'
-                    style={{
-                      height: barHeight,
-                      background: walletUsageStats?.loading
-                        ? 'linear-gradient(180deg, rgba(14, 165, 233, 0.18), rgba(14, 165, 233, 0.08))'
-                        : hasDailyUsage
-                          ? 'linear-gradient(180deg, rgba(14, 165, 233, 0.85), rgba(5, 150, 105, 0.72))'
-                          : 'rgba(148, 163, 184, 0.18)',
-                    }}
-                  />
-                  <div className='truncate text-[10px] leading-3 text-[var(--semi-color-text-2)]'>
-                    {item.label || '-'}
+                  <div className='flex items-center gap-2 text-xs text-[var(--semi-color-text-2)]'>
+                    <MetricIcon size={14} color={metric.accent} />
+                    <span className='truncate'>{metric.label}</span>
+                  </div>
+                  <div className='mt-1.5 text-base font-semibold leading-tight text-[var(--semi-color-text-0)] break-words'>
+                    {metric.value}
                   </div>
                 </div>
               );
             })}
+          </div>
+
+          <div
+            className='flex items-center justify-start px-4 py-3 lg:justify-end'
+            style={{
+              borderLeft: isDarkMode
+                ? '1px solid rgba(148, 163, 184, 0.12)'
+                : '1px solid rgba(15, 23, 42, 0.06)',
+              borderTop: isDarkMode
+                ? '1px solid rgba(148, 163, 184, 0.12)'
+                : '1px solid rgba(15, 23, 42, 0.06)',
+            }}
+          >
+            <Button
+              size='small'
+              theme='light'
+              type='tertiary'
+              icon={<Receipt size={14} />}
+              onClick={onOpenHistory}
+            >
+              {t('账单')}
+            </Button>
           </div>
         </div>
       </div>
@@ -1102,7 +1048,7 @@ const RechargeCard = ({
                   >
                     {redeemSuccessEffect
                       ? t('已到账')
-                      : t('自动识别额度码和套餐码')}
+                      : t('自动识别额度码、一周畅用包和套餐码')}
                   </Tag>
                 </div>
                 <Text type='tertiary' size='small'>
@@ -1114,7 +1060,7 @@ const RechargeCard = ({
             </div>
 
             <div className='mt-3 text-xs leading-5 text-[var(--semi-color-text-2)]'>
-              {t('兑换后会自动刷新余额或套餐权益')}
+              {t('兑换后会自动刷新余额、一周畅用包或套餐权益')}
             </div>
           </div>
 
@@ -1204,7 +1150,7 @@ const RechargeCard = ({
         </div>
       </div>
 
-      <div className='grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4 items-start'>
+      <div className='space-y-4'>
         {accountStatsPanel}
         <SubscriptionStatusPanel
           t={t}
@@ -1212,6 +1158,7 @@ const RechargeCard = ({
           plans={subscriptionPlans}
           billingPreference={billingPreference}
           onChangeBillingPreference={onChangeBillingPreference}
+          quotaBuckets={quotaBuckets}
           activeSubscriptions={activeSubscriptions}
           allSubscriptions={allSubscriptions}
           reloadSubscriptionSelf={reloadSubscriptionSelf}

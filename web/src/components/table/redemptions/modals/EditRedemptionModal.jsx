@@ -57,6 +57,7 @@ import {
 const { Text, Title } = Typography;
 const DEFAULT_REDEMPTION_AMOUNT = 20;
 const REDEMPTION_AMOUNT_PRESETS = [20, 30, 50, 100, 200];
+const DEFAULT_BUCKET_DURATION_DAYS = 7;
 
 const EditRedemptionModal = (props) => {
   const { t } = useTranslation();
@@ -72,6 +73,8 @@ const EditRedemptionModal = (props) => {
     quota: displayAmountToQuota(DEFAULT_REDEMPTION_AMOUNT),
     redemption_type: 'quota',
     plan_id: 0,
+    bucket_duration_seconds: DEFAULT_BUCKET_DURATION_DAYS * 86400,
+    bucket_duration_days: DEFAULT_BUCKET_DURATION_DAYS,
     batch_id: '',
     source: 'manual',
     amount: DEFAULT_REDEMPTION_AMOUNT,
@@ -95,6 +98,15 @@ const EditRedemptionModal = (props) => {
       }
       data.amount = Math.round(quotaToDisplayAmount(data.quota || 0));
       data.redemption_type = data.redemption_type || 'quota';
+      data.bucket_duration_days = Math.max(
+        1,
+        Math.round(
+          Number(
+            data.bucket_duration_seconds ||
+              DEFAULT_BUCKET_DURATION_DAYS * 86400,
+          ) / 86400,
+        ),
+      );
       formApiRef.current?.setValues({ ...getInitValues(), ...data });
     } else {
       showError(message);
@@ -126,26 +138,34 @@ const EditRedemptionModal = (props) => {
   const submit = async (values) => {
     let name = values.name;
     const isPlanRedemption = values.redemption_type === 'plan';
+    const isBucketRedemption = values.redemption_type === 'bucket';
     const selectedPlan = plans.find(
       (item) => item?.plan?.id === Number(values.plan_id),
     )?.plan;
     if (!isEdit && (!name || name === '')) {
       if (isPlanRedemption && selectedPlan?.title) {
         name = [...selectedPlan.title].slice(0, 20).join('');
+      } else if (isBucketRedemption) {
+        name = t('一周畅用包');
       } else {
         name = renderQuota(values.quota);
       }
     }
-    if (!isPlanRedemption && (!name || name === '')) {
+    if (!isPlanRedemption && !isBucketRedemption && (!name || name === '')) {
       name = renderQuota(values.quota);
     }
     setLoading(true);
     let localInputs = { ...values };
     localInputs.count = parseInt(localInputs.count) || 0;
-    localInputs.redemption_type = isPlanRedemption ? 'plan' : 'quota';
+    localInputs.redemption_type = isPlanRedemption
+      ? 'plan'
+      : isBucketRedemption
+        ? 'bucket'
+        : 'quota';
     if (isPlanRedemption) {
       localInputs.plan_id = parseInt(localInputs.plan_id, 10) || 0;
       localInputs.quota = 0;
+      localInputs.bucket_duration_seconds = 0;
       if (localInputs.plan_id <= 0) {
         showError(t('请选择套餐'));
         setLoading(false);
@@ -154,6 +174,13 @@ const EditRedemptionModal = (props) => {
     } else {
       localInputs.plan_id = 0;
       localInputs.quota = displayAmountToQuota(localInputs.amount);
+      localInputs.bucket_duration_seconds = isBucketRedemption
+        ? Math.max(
+            1,
+            parseInt(localInputs.bucket_duration_days, 10) ||
+              DEFAULT_BUCKET_DURATION_DAYS,
+          ) * 86400
+        : 0;
       if (localInputs.quota <= 0) {
         showError(t('请输入金额'));
         setLoading(false);
@@ -361,6 +388,7 @@ const EditRedemptionModal = (props) => {
                         label={t('兑换码类型')}
                         optionList={[
                           { label: t('额度兑换码'), value: 'quota' },
+                          { label: t('限时额度包'), value: 'bucket' },
                           { label: t('套餐兑换码'), value: 'plan' },
                         ]}
                         style={{ width: '100%' }}
@@ -456,6 +484,35 @@ const EditRedemptionModal = (props) => {
                         </div>
                       </Col>
                     )}
+                    {values.redemption_type === 'bucket' ? (
+                      <Col span={24}>
+                        <Form.InputNumber
+                          field='bucket_duration_days'
+                          label={t('有效天数')}
+                          placeholder={t('默认 7 天')}
+                          precision={0}
+                          min={1}
+                          step={1}
+                          rules={[
+                            { required: true, message: t('请输入有效天数') },
+                            {
+                              validator: (rule, v) => {
+                                const num = parseInt(v, 10);
+                                return num > 0
+                                  ? Promise.resolve()
+                                  : Promise.reject(t('有效天数必须大于0'));
+                              },
+                            },
+                          ]}
+                          style={{ width: '100%' }}
+                        />
+                        <div className='mt-1 text-xs text-gray-500'>
+                          {t(
+                            '兑换后会生成独立的一周畅用包，不进入钱包或月卡套餐。',
+                          )}
+                        </div>
+                      </Col>
+                    ) : null}
                     <Col span={12}>
                       <Form.Input
                         field='batch_id'

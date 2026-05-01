@@ -32,9 +32,11 @@ import {
 } from '@douyinfe/semi-ui';
 import {
   CalendarClock,
+  ChevronDown,
   CircleDollarSign,
   CreditCard,
   Gauge,
+  PackageCheck,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -91,6 +93,38 @@ const isSubscriptionActive = (summary) => {
   return (
     subscription.status === 'active' &&
     Number(subscription.end_time || 0) > Date.now() / 1000
+  );
+};
+
+const getBucketUsagePercent = (summary) => {
+  const bucket = summary?.bucket;
+  const total = Number(bucket?.amount_total || 0);
+  const used = Number(bucket?.amount_used || 0);
+  if (total <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((used / total) * 100)));
+};
+
+const getBucketRemainingDays = (summary) => {
+  const endTime = Number(summary?.bucket?.end_time || 0);
+  if (endTime <= 0) return 0;
+  return Math.max(0, Math.ceil((endTime - Date.now() / 1000) / 86400));
+};
+
+const BucketStatusTag = ({ t, status }) => {
+  const color =
+    status === 'active' ? 'green' : status === 'expired' ? 'orange' : 'grey';
+  const label =
+    status === 'active'
+      ? t('生效中')
+      : status === 'empty'
+        ? t('已用完')
+        : status === 'expired'
+          ? t('已过期')
+          : t('已迁移');
+  return (
+    <Tag color={color} size='small' shape='circle'>
+      {label}
+    </Tag>
   );
 };
 
@@ -286,15 +320,14 @@ const SubscriptionStatusPanel = ({
   plans = [],
   billingPreference = 'subscription_first',
   onChangeBillingPreference,
+  quotaBuckets = {},
   activeSubscriptions = [],
-  allSubscriptions = [],
   reloadSubscriptionSelf,
-  catalogEnabled = false,
-  onViewCatalog,
 }) => {
   const actualTheme = useActualTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [animatedPercent, setAnimatedPercent] = useState(0);
+  const [bucketDetailsOpen, setBucketDetailsOpen] = useState(false);
   const isDarkMode = actualTheme === 'dark';
 
   const planMap = useMemo(() => {
@@ -312,15 +345,21 @@ const SubscriptionStatusPanel = ({
     () => (activeSubscriptions || []).filter((item) => item?.subscription),
     [activeSubscriptions],
   );
-  const allList = useMemo(
-    () => (allSubscriptions || []).filter((item) => item?.subscription),
-    [allSubscriptions],
-  );
   const primarySubscription = activeList[0] || null;
   const primaryPlan = getPlan(primarySubscription, planMap);
   const hasActiveSubscription = activeList.length > 0;
-  const hasAnySubscription = allList.length > 0;
-  const disableSubscriptionPreference = !hasActiveSubscription;
+  const activeBucketList = useMemo(
+    () => quotaBuckets?.active_buckets || [],
+    [quotaBuckets],
+  );
+  const allBucketList = useMemo(
+    () => quotaBuckets?.buckets || [],
+    [quotaBuckets],
+  );
+  const hasActiveBucket = activeBucketList.length > 0;
+  const hasAnyBucket = allBucketList.length > 0;
+  const hasActiveEntitlement = hasActiveBucket || hasActiveSubscription;
+  const disableSubscriptionPreference = !hasActiveEntitlement;
   const isSubscriptionPreference =
     billingPreference === 'subscription_first' ||
     billingPreference === 'subscription_only';
@@ -329,7 +368,7 @@ const SubscriptionStatusPanel = ({
       ? 'wallet_first'
       : billingPreference || 'wallet_first';
   const subscriptionPreferenceLabel =
-    billingPreference === 'subscription_only' ? t('仅用订阅') : t('优先订阅');
+    billingPreference === 'subscription_only' ? t('仅用权益') : t('优先权益');
   const usagePercent = getUsagePercent(primarySubscription);
   const primarySubscriptionRecord = primarySubscription?.subscription;
   const primaryTotalAmount = Number(
@@ -379,16 +418,16 @@ const SubscriptionStatusPanel = ({
         {
           value: 'subscription_first',
           label: disableSubscriptionPreference
-            ? `${t('优先订阅')} (${t('无生效')})`
-            : t('优先订阅'),
+            ? `${t('优先权益')} (${t('无生效')})`
+            : t('优先权益'),
           disabled: disableSubscriptionPreference,
         },
         { value: 'wallet_first', label: t('优先钱包') },
         {
           value: 'subscription_only',
           label: disableSubscriptionPreference
-            ? `${t('仅用订阅')} (${t('无生效')})`
-            : t('仅用订阅'),
+            ? `${t('仅用权益')} (${t('无生效')})`
+            : t('仅用权益'),
           disabled: disableSubscriptionPreference,
         },
         { value: 'wallet_only', label: t('仅用钱包') },
@@ -396,57 +435,201 @@ const SubscriptionStatusPanel = ({
     />
   );
 
-  const renderHistoryRows = () => {
-    const historyRows = allList
-      .filter(
-        (item) =>
-          item?.subscription?.id !== primarySubscription?.subscription?.id,
-      )
-      .slice(0, 3);
+  const renderBucketSection = () => {
+    if (!hasActiveBucket) return null;
 
-    if (historyRows.length === 0) return null;
+    const totalRemaining = Number(quotaBuckets?.total_remaining || 0);
+    const totalAmount = Number(quotaBuckets?.total_amount || 0);
+    const totalUsed = Number(quotaBuckets?.total_used || 0);
+    const nearestEndTime = Number(quotaBuckets?.nearest_end_time || 0);
+    const percent =
+      totalAmount > 0
+        ? Math.min(
+            100,
+            Math.max(0, Math.round((totalUsed / totalAmount) * 100)),
+          )
+        : 0;
 
     return (
-      <>
-        <Divider margin={12} />
-        <div className='flex items-center justify-between gap-2 mb-2'>
-          <Text strong size='small'>
-            {t('最近订阅')}
-          </Text>
-          <Tag color='white' size='small' shape='circle'>
-            {allList.length} {t('条记录')}
-          </Tag>
-        </div>
-        <div className='space-y-2'>
-          {historyRows.map((summary) => {
-            const subscription = summary.subscription;
-            const title = getPlanTitle(summary, planMap, t);
-            return (
-              <div
-                key={subscription.id}
-                className='flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2'
-                style={{ background: 'var(--semi-color-fill-0)' }}
+      <div
+        className='mt-4 rounded-2xl px-4 py-4'
+        style={{
+          border: '1px solid var(--semi-color-border)',
+          background: 'var(--semi-color-fill-0)',
+        }}
+      >
+        <div className='flex flex-wrap items-start justify-between gap-3'>
+          <div className='min-w-0'>
+            <div className='flex flex-wrap items-center gap-2'>
+              <PackageCheck size={17} color='rgba(5, 150, 105, 1)' />
+              <Text strong>{t('一周畅用包')}</Text>
+              <Tag
+                color={hasActiveBucket ? 'green' : 'grey'}
+                shape='circle'
+                size='small'
               >
-                <div className='min-w-0 flex items-center gap-2'>
-                  <Text
-                    strong
-                    ellipsis={{ rows: 1, showTooltip: true }}
-                    style={{ maxWidth: 220 }}
-                  >
-                    {title}
-                  </Text>
-                  <StatusTag t={t} summary={summary} />
-                </div>
-                <Text type='tertiary' size='small'>
-                  {formatDateTime(subscription.end_time)}
-                </Text>
-              </div>
-            );
-          })}
+                {hasActiveBucket
+                  ? `${activeBucketList.length} ${t('个生效中')}`
+                  : t('无生效')}
+              </Tag>
+            </div>
+            <Text type='tertiary' size='small'>
+              {t('限时额度包独立展示，默认优先消耗最早到期的包')}
+            </Text>
+          </div>
+          <Button
+            size='small'
+            theme='light'
+            type='tertiary'
+            icon={
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${bucketDetailsOpen ? 'rotate-180' : ''}`}
+              />
+            }
+            onClick={() => setBucketDetailsOpen((open) => !open)}
+            disabled={!hasAnyBucket}
+          >
+            {bucketDetailsOpen ? t('收起明细') : t('展开明细')}
+          </Button>
         </div>
-      </>
+
+        {hasActiveBucket ? (
+          <>
+            <div
+              className='mt-4 grid grid-cols-1 gap-3 rounded-xl px-3 py-3 sm:grid-cols-3'
+              style={{
+                background: 'var(--semi-color-bg-1)',
+                border: '1px solid var(--semi-color-border)',
+              }}
+            >
+              <div className='min-w-0'>
+                <div className='flex items-center gap-1.5 text-xs text-[var(--semi-color-text-2)]'>
+                  <Gauge size={13} />
+                  {t('总剩余额度')}
+                </div>
+                <div className='mt-1 text-lg font-semibold leading-tight text-[var(--semi-color-text-0)]'>
+                  {renderQuota(totalRemaining)}
+                </div>
+              </div>
+              <div className='min-w-0'>
+                <div className='flex items-center gap-1.5 text-xs text-[var(--semi-color-text-2)]'>
+                  <CircleDollarSign size={13} />
+                  {t('已用/总量')}
+                </div>
+                <div className='mt-1 text-sm font-medium leading-tight text-[var(--semi-color-text-0)]'>
+                  {renderQuota(totalUsed)} / {renderQuota(totalAmount)}
+                </div>
+              </div>
+              <div className='min-w-0'>
+                <div className='flex items-center gap-1.5 text-xs text-[var(--semi-color-text-2)]'>
+                  <CalendarClock size={13} />
+                  {t('最近到期')}
+                </div>
+                <div className='mt-1 text-sm font-medium leading-tight text-[var(--semi-color-text-0)]'>
+                  {formatDateTime(nearestEndTime)}
+                </div>
+              </div>
+            </div>
+            {totalAmount > 0 ? (
+              <Progress
+                className='mt-3'
+                percent={percent}
+                showInfo={false}
+                stroke='rgba(5, 150, 105, 1)'
+                aria-label='quota bucket usage'
+              />
+            ) : null}
+          </>
+        ) : (
+          <div className='mt-4 text-sm text-[var(--semi-color-text-2)]'>
+            {hasAnyBucket
+              ? t('历史限时额度包已过期或用完')
+              : t('兑换一周畅用包后，这里会展示每个码的额度和到期时间')}
+          </div>
+        )}
+
+        {bucketDetailsOpen && hasAnyBucket ? (
+          <div
+            className='mt-4 overflow-hidden rounded-xl'
+            style={{
+              border: '1px solid var(--semi-color-border)',
+              background: 'var(--semi-color-bg-1)',
+            }}
+          >
+            {allBucketList.map((summary) => {
+              const bucket = summary.bucket || {};
+              const remaining = Number(summary.remaining_quota || 0);
+              const used = Number(bucket.amount_used || 0);
+              const total = Number(bucket.amount_total || 0);
+              const percent = getBucketUsagePercent(summary);
+              return (
+                <div
+                  key={bucket.id}
+                  className='grid grid-cols-1 gap-3 px-3 py-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(160px,0.8fr)_auto] sm:items-center'
+                  style={{
+                    borderBottom:
+                      bucket.id ===
+                      allBucketList[allBucketList.length - 1]?.bucket?.id
+                        ? 'none'
+                        : '1px solid var(--semi-color-border)',
+                  }}
+                >
+                  <div className='min-w-0'>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <Text strong ellipsis={{ rows: 1, showTooltip: true }}>
+                        {bucket.title || t('一周畅用包')}
+                      </Text>
+                      <BucketStatusTag t={t} status={summary.status} />
+                    </div>
+                    <div className='mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--semi-color-text-2)]'>
+                      <span>
+                        {t('兑换')} {formatDateTime(bucket.start_time)}
+                      </span>
+                      <span>
+                        {t('到期')} {formatDateTime(bucket.end_time)}
+                      </span>
+                      <span>
+                        {t('剩余')} {getBucketRemainingDays(summary)} {t('天')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className='min-w-0'>
+                    <div className='mb-1 flex items-center justify-between gap-2 text-xs text-[var(--semi-color-text-2)]'>
+                      <span>{t('使用进度')}</span>
+                      <span>
+                        {renderQuota(used)} / {renderQuota(total)}
+                      </span>
+                    </div>
+                    {total > 0 ? (
+                      <Progress
+                        percent={percent}
+                        showInfo={false}
+                        stroke='rgba(5, 150, 105, 1)'
+                        aria-label='bucket item usage'
+                      />
+                    ) : null}
+                  </div>
+                  <div className='sm:text-right'>
+                    <div className='text-lg font-semibold leading-tight text-[var(--semi-color-text-0)]'>
+                      {renderQuota(remaining)}
+                    </div>
+                    <div className='mt-1 text-xs text-[var(--semi-color-text-2)]'>
+                      {t('剩余额度')}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
     );
   };
+
+  if (!loading && !hasActiveEntitlement) {
+    return null;
+  }
 
   return (
     <Card className='!rounded-2xl shadow-sm h-full' bodyStyle={{ padding: 20 }}>
@@ -454,15 +637,15 @@ const SubscriptionStatusPanel = ({
         <div className='min-w-0'>
           <div className='flex items-center gap-2'>
             <ShieldCheck size={18} color='var(--semi-color-primary)' />
-            <Text strong>{t('我的订阅')}</Text>
-            {hasActiveSubscription ? (
+            <Text strong>{t('权益中心')}</Text>
+            {hasActiveEntitlement ? (
               <Tag
                 color='white'
                 size='small'
                 shape='circle'
                 prefixIcon={<Badge dot type='success' />}
               >
-                {activeList.length} {t('个生效中')}
+                {activeBucketList.length + activeList.length} {t('项生效中')}
               </Tag>
             ) : (
               <Tag color='white' size='small' shape='circle'>
@@ -471,7 +654,7 @@ const SubscriptionStatusPanel = ({
             )}
           </div>
           <Text type='tertiary' size='small'>
-            {t('查看当前月卡、额度重置和扣费顺序')}
+            {t('查看一周畅用包、月卡套餐和扣费顺序')}
           </Text>
         </div>
         <div className='flex flex-wrap items-center justify-end gap-2'>
@@ -496,7 +679,7 @@ const SubscriptionStatusPanel = ({
         <div className='mt-3 text-xs text-[var(--semi-color-text-2)]'>
           {t('已保存偏好为')}
           {subscriptionPreferenceLabel}
-          {t('，当前无生效订阅，将自动使用钱包')}
+          {t('，当前无生效权益，将自动使用钱包')}
         </div>
       )}
 
@@ -505,261 +688,263 @@ const SubscriptionStatusPanel = ({
           <Skeleton.Title active style={{ width: '45%', height: 24 }} />
           <Skeleton.Paragraph active rows={3} />
         </div>
-      ) : hasActiveSubscription ? (
-        <div
-          className='mt-5 relative overflow-hidden rounded-2xl p-4 transition-all duration-200'
-          style={{
-            background: primaryVisual.background,
-            border: `1px solid ${primaryVisual.border}`,
-            boxShadow: primaryVisual.glow,
-          }}
-        >
-          <div
-            className='absolute inset-x-0 top-0 h-1.5'
-            style={{ background: primaryVisual.rail }}
-          />
-          <div
-            className='pointer-events-none absolute inset-0'
-            style={{
-              backgroundImage: getPlanVisualTexture(primaryVisual),
-              opacity: primaryVisualDark ? 0.72 : 0.58,
-            }}
-          />
-
-          <div className='relative flex flex-wrap items-start justify-between gap-3'>
-            <div className='min-w-0'>
-              <div className='flex flex-wrap items-center gap-2 mb-3'>
-                <span
-                  className='rounded-full px-2.5 py-1 text-xs font-semibold'
-                  style={{
-                    background: getPlanVisualSurface(primaryVisual),
-                    border: `1px solid ${primaryVisual.border}`,
-                    color: primaryVisual.accent,
-                  }}
-                >
-                  {primaryVisual.code}
-                </span>
-                <span
-                  className='inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium'
-                  style={{
-                    background: primaryVisualDark
-                      ? 'rgba(245, 199, 108, 0.14)'
-                      : 'rgba(255, 255, 255, 0.64)',
-                    border: `1px solid ${primaryVisual.border}`,
-                    color: primaryVisualDark
-                      ? 'rgba(255, 244, 214, 0.94)'
-                      : primaryVisual.accent,
-                  }}
-                >
-                  <Sparkles size={12} className='mr-1' />
-                  {t(primaryVisual.label)}
-                </span>
-              </div>
+      ) : (
+        <>
+          {renderBucketSection()}
+          {hasActiveBucket && hasActiveSubscription ? (
+            <Divider margin={16} />
+          ) : null}
+          {hasActiveSubscription ? (
+            <>
               <div className='flex flex-wrap items-center gap-2'>
-                <Typography.Title
-                  heading={5}
-                  ellipsis={{ rows: 1, showTooltip: true }}
-                  style={{
-                    margin: 0,
-                    maxWidth: 360,
-                    color: getPlanVisualText(primaryVisual),
-                  }}
+                <Sparkles size={17} color='var(--semi-color-primary)' />
+                <Text strong>{t('月卡套餐')}</Text>
+                <Tag
+                  color={hasActiveSubscription ? 'green' : 'grey'}
+                  shape='circle'
+                  size='small'
                 >
-                  {getPlanTitle(primarySubscription, planMap, t)}
-                </Typography.Title>
-                <StatusTag t={t} summary={primarySubscription} />
-                {!primaryPlan && (
-                  <Tag color='grey' size='small'>
-                    {t('套餐已删除')}
-                  </Tag>
-                )}
+                  {hasActiveSubscription
+                    ? `${activeList.length} ${t('个生效中')}`
+                    : t('无生效')}
+                </Tag>
               </div>
-              <Text
-                type='tertiary'
-                size='small'
-                ellipsis={{ rows: 1, showTooltip: true }}
+              <Text type='tertiary' size='small'>
+                {t('月卡保留每日额度、重置规则和到期时间')}
+              </Text>
+              <div
+                className='mt-5 relative overflow-hidden rounded-2xl p-4 transition-all duration-200'
                 style={{
-                  display: 'block',
-                  maxWidth: 520,
-                  color: getPlanVisualMutedText(primaryVisual),
+                  background: primaryVisual.background,
+                  border: `1px solid ${primaryVisual.border}`,
+                  boxShadow: primaryVisual.glow,
                 }}
               >
-                {primaryPlan?.subtitle ||
-                  (primaryPlan
-                    ? `${formatSubscriptionDuration(primaryPlan, t)} · ${formatSubscriptionResetPeriod(primaryPlan, t)}`
-                    : t('历史套餐信息不可用，按订阅快照展示额度'))}
-              </Text>
-            </div>
-            <div className='text-right'>
-              <div
-                className='text-3xl font-semibold leading-none'
-                style={{ color: primaryVisual.accent }}
-              >
-                {getRemainingDays(primarySubscription)}
-              </div>
-              <Text
-                type='tertiary'
-                size='small'
-                style={{ color: getPlanVisualMutedText(primaryVisual) }}
-              >
-                {t('剩余天数')}
-              </Text>
-            </div>
-          </div>
+                <div
+                  className='absolute inset-x-0 top-0 h-1.5'
+                  style={{ background: primaryVisual.rail }}
+                />
+                <div
+                  className='pointer-events-none absolute inset-0'
+                  style={{
+                    backgroundImage: getPlanVisualTexture(primaryVisual),
+                    opacity: primaryVisualDark ? 0.72 : 0.58,
+                  }}
+                />
 
-          {primaryComparisonLabel && (
-            <div
-              className='relative mt-4 flex items-center gap-2 rounded-xl px-3 py-2'
-              style={{
-                background: getPlanVisualSurface(primaryVisual),
-                border: `1px solid ${primaryVisual.border}`,
-                color: primaryVisualDark
-                  ? 'rgba(255, 244, 214, 0.98)'
-                  : primaryVisual.accent,
-              }}
-            >
-              <CircleDollarSign size={17} className='shrink-0' />
-              <span className='min-w-0 break-words text-base font-semibold leading-snug'>
-                {t(primaryComparisonLabel)}
-              </span>
-            </div>
-          )}
+                <div className='relative flex flex-wrap items-start justify-between gap-3'>
+                  <div className='min-w-0'>
+                    <div className='flex flex-wrap items-center gap-2 mb-3'>
+                      <span
+                        className='rounded-full px-2.5 py-1 text-xs font-semibold'
+                        style={{
+                          background: getPlanVisualSurface(primaryVisual),
+                          border: `1px solid ${primaryVisual.border}`,
+                          color: primaryVisual.accent,
+                        }}
+                      >
+                        {primaryVisual.code}
+                      </span>
+                      <span
+                        className='inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium'
+                        style={{
+                          background: primaryVisualDark
+                            ? 'rgba(245, 199, 108, 0.14)'
+                            : 'rgba(255, 255, 255, 0.64)',
+                          border: `1px solid ${primaryVisual.border}`,
+                          color: primaryVisualDark
+                            ? 'rgba(255, 244, 214, 0.94)'
+                            : primaryVisual.accent,
+                        }}
+                      >
+                        <Sparkles size={12} className='mr-1' />
+                        {t(primaryVisual.label)}
+                      </span>
+                    </div>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <Typography.Title
+                        heading={5}
+                        ellipsis={{ rows: 1, showTooltip: true }}
+                        style={{
+                          margin: 0,
+                          maxWidth: 360,
+                          color: getPlanVisualText(primaryVisual),
+                        }}
+                      >
+                        {getPlanTitle(primarySubscription, planMap, t)}
+                      </Typography.Title>
+                      <StatusTag t={t} summary={primarySubscription} />
+                      {!primaryPlan && (
+                        <Tag color='grey' size='small'>
+                          {t('套餐已删除')}
+                        </Tag>
+                      )}
+                    </div>
+                    <Text
+                      type='tertiary'
+                      size='small'
+                      ellipsis={{ rows: 1, showTooltip: true }}
+                      style={{
+                        display: 'block',
+                        maxWidth: 520,
+                        color: getPlanVisualMutedText(primaryVisual),
+                      }}
+                    >
+                      {primaryPlan?.subtitle ||
+                        (primaryPlan
+                          ? `${formatSubscriptionDuration(primaryPlan, t)} · ${formatSubscriptionResetPeriod(primaryPlan, t)}`
+                          : t('历史套餐信息不可用，按订阅快照展示额度'))}
+                    </Text>
+                  </div>
+                  <div className='text-right'>
+                    <div
+                      className='text-3xl font-semibold leading-none'
+                      style={{ color: primaryVisual.accent }}
+                    >
+                      {getRemainingDays(primarySubscription)}
+                    </div>
+                    <Text
+                      type='tertiary'
+                      size='small'
+                      style={{ color: getPlanVisualMutedText(primaryVisual) }}
+                    >
+                      {t('剩余天数')}
+                    </Text>
+                  </div>
+                </div>
 
-          <div className='relative mt-4'>
-            <div
-              className='mb-2 flex flex-wrap items-center justify-between gap-2 text-xs'
-              style={{ color: getPlanVisualMutedText(primaryVisual) }}
-            >
-              <span>{t('权益进度')}</span>
-              {hasLimitedPrimaryQuota ? (
-                <Tooltip
-                  content={`${t('原生额度')}：${primaryUsedAmount}/${primaryTotalAmount}`}
-                >
-                  <span>
-                    {renderQuota(primaryRemainAmount)} /{' '}
-                    {renderQuota(primaryTotalAmount)}
-                  </span>
-                </Tooltip>
-              ) : (
-                <span>{t('不限')}</span>
-              )}
-            </div>
-            {hasLimitedPrimaryQuota ? (
-              <Progress
-                percent={animatedPercent}
-                showInfo={false}
-                stroke={primaryVisual.accent}
-                aria-label='subscription usage'
-              />
-            ) : null}
-          </div>
+                {primaryComparisonLabel && (
+                  <div
+                    className='relative mt-4 flex items-center gap-2 rounded-xl px-3 py-2'
+                    style={{
+                      background: getPlanVisualSurface(primaryVisual),
+                      border: `1px solid ${primaryVisual.border}`,
+                      color: primaryVisualDark
+                        ? 'rgba(255, 244, 214, 0.98)'
+                        : primaryVisual.accent,
+                    }}
+                  >
+                    <CircleDollarSign size={17} className='shrink-0' />
+                    <span className='min-w-0 break-words text-base font-semibold leading-snug'>
+                      {t(primaryComparisonLabel)}
+                    </span>
+                  </div>
+                )}
 
-          <div className='relative mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4'>
-            <div
-              className='rounded-xl px-3 py-2'
-              style={{ background: getPlanVisualPanel(primaryVisual) }}
-            >
-              <div
-                className='flex items-center gap-1.5 text-xs'
-                style={{ color: getPlanVisualMutedText(primaryVisual) }}
-              >
-                <Gauge size={13} />
-                {t('每日额度')}
-              </div>
-              <div
-                className='mt-1 break-words text-base font-semibold leading-tight'
-                style={{ color: getPlanVisualText(primaryVisual) }}
-              >
-                {primaryDailyQuota > 0
-                  ? renderQuota(primaryDailyQuota)
-                  : t('不限')}
-              </div>
-            </div>
-            <div
-              className='rounded-xl px-3 py-2'
-              style={{ background: getPlanVisualPanel(primaryVisual) }}
-            >
-              <div
-                className='flex items-center gap-1.5 text-xs'
-                style={{ color: getPlanVisualMutedText(primaryVisual) }}
-              >
-                <RefreshCw size={13} />
-                {t('重置')}
-              </div>
-              <div
-                className='mt-1 break-words text-sm font-semibold leading-tight'
-                style={{ color: getPlanVisualText(primaryVisual) }}
-              >
-                {primaryResetLabel}
-              </div>
-            </div>
-            <DetailItem
-              icon={<CalendarClock size={14} />}
-              label={t('下次重置')}
-              value={formatDateTime(
-                primarySubscription.subscription.next_reset_time,
-              )}
-            />
-            <DetailItem
-              icon={<CreditCard size={14} />}
-              label={t('到期时间')}
-              value={formatDateTime(primarySubscription.subscription.end_time)}
-            />
-          </div>
+                <div className='relative mt-4'>
+                  <div
+                    className='mb-2 flex flex-wrap items-center justify-between gap-2 text-xs'
+                    style={{ color: getPlanVisualMutedText(primaryVisual) }}
+                  >
+                    <span>{t('权益进度')}</span>
+                    {hasLimitedPrimaryQuota ? (
+                      <Tooltip
+                        content={`${t('原生额度')}：${primaryUsedAmount}/${primaryTotalAmount}`}
+                      >
+                        <span>
+                          {renderQuota(primaryRemainAmount)} /{' '}
+                          {renderQuota(primaryTotalAmount)}
+                        </span>
+                      </Tooltip>
+                    ) : (
+                      <span>{t('不限')}</span>
+                    )}
+                  </div>
+                  {hasLimitedPrimaryQuota ? (
+                    <Progress
+                      percent={animatedPercent}
+                      showInfo={false}
+                      stroke={primaryVisual.accent}
+                      aria-label='subscription usage'
+                    />
+                  ) : null}
+                </div>
 
-          <div className='relative mt-3 flex flex-wrap gap-2'>
-            <DetailItem
-              icon={<Gauge size={14} />}
-              label={t('扣费偏好')}
-              value={
-                displayBillingPreference === 'subscription_first'
-                  ? t('优先订阅')
-                  : displayBillingPreference === 'subscription_only'
-                    ? t('仅用订阅')
-                    : displayBillingPreference === 'wallet_only'
-                      ? t('仅用钱包')
-                      : t('优先钱包')
-              }
-            />
-          </div>
+                <div className='relative mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4'>
+                  <div
+                    className='rounded-xl px-3 py-2'
+                    style={{ background: getPlanVisualPanel(primaryVisual) }}
+                  >
+                    <div
+                      className='flex items-center gap-1.5 text-xs'
+                      style={{ color: getPlanVisualMutedText(primaryVisual) }}
+                    >
+                      <Gauge size={13} />
+                      {t('每日额度')}
+                    </div>
+                    <div
+                      className='mt-1 break-words text-base font-semibold leading-tight'
+                      style={{ color: getPlanVisualText(primaryVisual) }}
+                    >
+                      {primaryDailyQuota > 0
+                        ? renderQuota(primaryDailyQuota)
+                        : t('不限')}
+                    </div>
+                  </div>
+                  <div
+                    className='rounded-xl px-3 py-2'
+                    style={{ background: getPlanVisualPanel(primaryVisual) }}
+                  >
+                    <div
+                      className='flex items-center gap-1.5 text-xs'
+                      style={{ color: getPlanVisualMutedText(primaryVisual) }}
+                    >
+                      <RefreshCw size={13} />
+                      {t('重置')}
+                    </div>
+                    <div
+                      className='mt-1 break-words text-sm font-semibold leading-tight'
+                      style={{ color: getPlanVisualText(primaryVisual) }}
+                    >
+                      {primaryResetLabel}
+                    </div>
+                  </div>
+                  <DetailItem
+                    icon={<CalendarClock size={14} />}
+                    label={t('下次重置')}
+                    value={formatDateTime(
+                      primarySubscription.subscription.next_reset_time,
+                    )}
+                  />
+                  <DetailItem
+                    icon={<CreditCard size={14} />}
+                    label={t('到期时间')}
+                    value={formatDateTime(
+                      primarySubscription.subscription.end_time,
+                    )}
+                  />
+                </div>
 
-          {activeList.length > 1 && (
-            <div
-              className='relative mt-3 text-xs'
-              style={{ color: getPlanVisualMutedText(primaryVisual) }}
-            >
-              {t('还有')} {activeList.length - 1}{' '}
-              {t('个生效订阅，可在最近订阅中查看')}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div
-          className='mt-5 rounded-2xl px-4 py-5'
-          style={{
-            border: '1px dashed var(--semi-color-border)',
-            background: 'var(--semi-color-fill-0)',
-          }}
-        >
-          <div className='flex flex-wrap items-center justify-between gap-3'>
-            <div>
-              <Text strong>{t('暂无生效订阅')}</Text>
-              <div className='mt-1 text-sm text-[var(--semi-color-text-2)]'>
-                {hasAnySubscription
-                  ? t('历史订阅已过期或作废，当前请求将按钱包偏好扣费')
-                  : t('购买月卡后，这里会展示每日额度、重置时间和到期时间')}
+                <div className='relative mt-3 flex flex-wrap gap-2'>
+                  <DetailItem
+                    icon={<Gauge size={14} />}
+                    label={t('扣费偏好')}
+                    value={
+                      displayBillingPreference === 'subscription_first'
+                        ? t('优先权益')
+                        : displayBillingPreference === 'subscription_only'
+                          ? t('仅用权益')
+                          : displayBillingPreference === 'wallet_only'
+                            ? t('仅用钱包')
+                            : t('优先钱包')
+                    }
+                  />
+                </div>
+
+                {activeList.length > 1 && (
+                  <div
+                    className='relative mt-3 text-xs'
+                    style={{ color: getPlanVisualMutedText(primaryVisual) }}
+                  >
+                    {t('还有')} {activeList.length - 1}{' '}
+                    {t('个月卡，可在最近订阅中查看')}
+                  </div>
+                )}
               </div>
-            </div>
-            {catalogEnabled && (
-              <Button theme='light' type='primary' onClick={onViewCatalog}>
-                {t('查看月卡')}
-              </Button>
-            )}
-          </div>
-        </div>
+            </>
+          ) : null}
+        </>
       )}
-
-      {!loading && renderHistoryRows()}
     </Card>
   );
 };

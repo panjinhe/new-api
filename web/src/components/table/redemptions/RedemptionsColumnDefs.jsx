@@ -75,9 +75,10 @@ const renderStatus = (status, record, t) => {
 
 const renderRedemptionType = (record, t) => {
   const isPlan = record.redemption_type === 'plan';
+  const isBucket = record.redemption_type === 'bucket';
   return (
-    <Tag color={isPlan ? 'violet' : 'blue'} shape='circle'>
-      {isPlan ? t('套餐兑换码') : t('额度兑换码')}
+    <Tag color={isPlan ? 'violet' : isBucket ? 'green' : 'blue'} shape='circle'>
+      {isPlan ? t('套餐兑换码') : isBucket ? t('限时额度包') : t('额度兑换码')}
     </Tag>
   );
 };
@@ -89,6 +90,22 @@ const renderRedemptionValue = (record, t) => {
         <Tag color='violet' shape='circle'>
           {record.plan?.title || `${t('套餐')} #${record.plan_id || '-'}`}
         </Tag>
+      </div>
+    );
+  }
+  if (record.redemption_type === 'bucket') {
+    const days = Math.max(
+      1,
+      Math.round(Number(record.bucket_duration_seconds || 604800) / 86400),
+    );
+    return (
+      <div className='flex flex-col gap-1'>
+        <Tag color='green' shape='circle'>
+          {renderQuota(parseInt(record.quota))}
+        </Tag>
+        <span className='text-xs text-[var(--semi-color-text-2)]'>
+          {days} {t('天')} · {t('限时额度包')}
+        </span>
       </div>
     );
   }

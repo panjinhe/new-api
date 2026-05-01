@@ -156,6 +156,15 @@ const TopUp = () => {
     useState('subscription_first');
   const [activeSubscriptions, setActiveSubscriptions] = useState([]);
   const [allSubscriptions, setAllSubscriptions] = useState([]);
+  const [quotaBuckets, setQuotaBuckets] = useState({
+    buckets: [],
+    active_buckets: [],
+    total_amount: 0,
+    total_used: 0,
+    total_remaining: 0,
+    nearest_end_time: 0,
+    active_bucket_count: 0,
+  });
   const [walletUsageStats, setWalletUsageStats] = useState({
     loading: true,
     todayQuota: 0,
@@ -275,6 +284,44 @@ const TopUp = () => {
                   {t('有效期')}：{timestamp2string(subscription.start_time)} -{' '}
                   {timestamp2string(subscription.end_time)}
                 </p>
+              </RedeemSuccessContent>
+            ),
+            centered: true,
+          });
+          await getSubscriptionSelf();
+        } else if (result.type === 'bucket' && result.bucket) {
+          const bucket = result.bucket.bucket || {};
+          const quota = Number(
+            result.bucket.remaining_quota || result.quota || 0,
+          );
+          triggerRedeemSuccessEffect({
+            type: 'bucket',
+            summary: `${t('已到账到一周畅用包')} · ${renderQuota(quota)}`,
+          });
+          Modal.success({
+            title: t('已到账到一周畅用包'),
+            content: (
+              <RedeemSuccessContent
+                t={t}
+                title={t('一周畅用包已开通')}
+                description={bucket.title || t('限时额度包')}
+              >
+                <div className='space-y-2'>
+                  <div className='flex flex-wrap items-center justify-between gap-3'>
+                    <span className='text-[var(--semi-color-text-2)]'>
+                      {t('包内额度')}
+                    </span>
+                    <span className='text-xl font-semibold text-emerald-600'>
+                      {renderQuota(quota)}
+                    </span>
+                  </div>
+                  <p>
+                    {t('兑换时间')}：{timestamp2string(bucket.start_time)}
+                  </p>
+                  <p>
+                    {t('到期时间')}：{timestamp2string(bucket.end_time)}
+                  </p>
+                </div>
               </RedeemSuccessContent>
             ),
             centered: true,
@@ -738,10 +785,30 @@ const TopUp = () => {
         // All subscriptions (including expired)
         const allSubs = res.data.data?.all_subscriptions || [];
         setAllSubscriptions(allSubs);
+        setQuotaBuckets(
+          res.data.data?.quota_buckets || {
+            buckets: [],
+            active_buckets: [],
+            total_amount: 0,
+            total_used: 0,
+            total_remaining: 0,
+            nearest_end_time: 0,
+            active_bucket_count: 0,
+          },
+        );
       }
     } catch (e) {
       setActiveSubscriptions([]);
       setAllSubscriptions([]);
+      setQuotaBuckets({
+        buckets: [],
+        active_buckets: [],
+        total_amount: 0,
+        total_used: 0,
+        total_remaining: 0,
+        nearest_end_time: 0,
+        active_bucket_count: 0,
+      });
     } finally {
       setSubscriptionLoading(false);
     }
@@ -1150,6 +1217,7 @@ const TopUp = () => {
           subscriptionPlans={subscriptionPlans}
           billingPreference={billingPreference}
           onChangeBillingPreference={updateBillingPreference}
+          quotaBuckets={quotaBuckets}
           activeSubscriptions={activeSubscriptions}
           allSubscriptions={allSubscriptions}
           reloadSubscriptionSelf={getSubscriptionSelf}
