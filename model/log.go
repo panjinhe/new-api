@@ -114,9 +114,15 @@ func RecordLogWithAdminInfo(userId int, logType int, content string, adminInfo m
 	}
 }
 
-func RecordTopupLog(userId int, content string, callerIp string, paymentMethod string, callbackPaymentMethod string) {
-	username, _ := GetUsernameById(userId, false)
-	adminInfo := map[string]interface{}{
+const (
+	TopupAuditSourceRedemption       = "redemption_code"
+	TopupAuditSourceSubscription     = "subscription_order"
+	TopupAuditSourceWaffoPancake     = "waffo_pancake"
+	TopupAuditSourceManualAdjustment = "manual_adjustment"
+)
+
+func buildTopupAdminInfo(callerIp string, paymentMethod string, callbackPaymentMethod string) map[string]interface{} {
+	return map[string]interface{}{
 		"server_ip":               common.GetIp(),
 		"node_name":               common.NodeName,
 		"caller_ip":               callerIp,
@@ -124,6 +130,10 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 		"callback_payment_method": callbackPaymentMethod,
 		"version":                 common.Version,
 	}
+}
+
+func recordTopupLogWithAdminInfo(userId int, content string, callerIp string, adminInfo map[string]interface{}) {
+	username, _ := GetUsernameById(userId, false)
 	other := map[string]interface{}{
 		"admin_info": adminInfo,
 	}
@@ -140,6 +150,16 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	if err != nil {
 		common.SysLog("failed to record topup log: " + err.Error())
 	}
+}
+
+func RecordTopupLog(userId int, content string, callerIp string, paymentMethod string, callbackPaymentMethod string) {
+	recordTopupLogWithAdminInfo(userId, content, callerIp, buildTopupAdminInfo(callerIp, paymentMethod, callbackPaymentMethod))
+}
+
+func RecordTopupAuditLog(userId int, content string, callerIp string, source string) {
+	adminInfo := buildTopupAdminInfo(callerIp, "", "")
+	adminInfo["event_source"] = source
+	recordTopupLogWithAdminInfo(userId, content, callerIp, adminInfo)
 }
 
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,

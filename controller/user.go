@@ -1128,7 +1128,9 @@ func TopUp(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	result, err := model.Redeem(req.Key, id)
+	result, err := model.RedeemWithAudit(req.Key, id, model.RedemptionAudit{
+		CallerIp: c.ClientIP(),
+	})
 	if err != nil {
 		if errors.Is(err, model.ErrRedemptionWelfareAlreadyRedeemed) {
 			common.ApiErrorI18n(c, i18n.MsgRedemptionWelfareAlreadyRedeemed)

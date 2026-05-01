@@ -746,6 +746,12 @@ export const useLogsData = () => {
       if (isAdminUser && logs[i].type === 1) {
         const adminInfo = other?.admin_info;
         if (adminInfo) {
+          if (adminInfo.event_source) {
+            expandDataLocal.push({
+              key: t('来源'),
+              value: adminInfo.event_source,
+            });
+          }
           if (adminInfo.payment_method) {
             expandDataLocal.push({
               key: t('订单支付方式'),

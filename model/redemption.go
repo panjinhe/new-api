@@ -232,7 +232,15 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
+type RedemptionAudit struct {
+	CallerIp string
+}
+
 func Redeem(key string, userId int) (*RedemptionResult, error) {
+	return RedeemWithAudit(key, userId, RedemptionAudit{})
+}
+
+func RedeemWithAudit(key string, userId int, audit RedemptionAudit) (*RedemptionResult, error) {
 	if key == "" {
 		return nil, errors.New("未提供兑换码")
 	}
@@ -301,13 +309,13 @@ func Redeem(key string, userId int) (*RedemptionResult, error) {
 		return nil, err
 	}
 	if redemption.RedemptionType == RedemptionTypePlan && result.Subscription != nil {
-		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码开通套餐 %s，兑换码ID %d", result.Subscription.PlanTitle, redemption.Id))
+		RecordTopupAuditLog(userId, fmt.Sprintf("通过兑换码开通套餐 %s，兑换码ID %d", result.Subscription.PlanTitle, redemption.Id), audit.CallerIp, TopupAuditSourceRedemption)
 		invalidateClassifiedUserCaches([]int{userId})
 	} else if redemption.RedemptionType == RedemptionTypeBucket && result.Bucket != nil {
-		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码开通一周畅用包 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
+		RecordTopupAuditLog(userId, fmt.Sprintf("通过兑换码开通一周畅用包 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id), audit.CallerIp, TopupAuditSourceRedemption)
 		promoteUserToPaidGroupIfRedemptionQualified(userId)
 	} else {
-		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
+		RecordTopupAuditLog(userId, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id), audit.CallerIp, TopupAuditSourceRedemption)
 		promoteUserToPaidGroupIfRedemptionQualified(userId)
 	}
 	return result, nil
