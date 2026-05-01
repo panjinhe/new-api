@@ -10,6 +10,11 @@ DB_BACKEND=""
 usage() {
   cat <<'EOF'
 Usage: ./deploy.sh [--env-name prod|dev] [--skip-backup] [--git-pull]
+
+Production deploys must be run from the local workstation with:
+  pwsh ./scripts/deploy-fast-prod.ps1
+
+Server-side production builds are intentionally disabled.
 EOF
 }
 
@@ -53,12 +58,10 @@ done
 
 case "$ENV_NAME" in
   prod)
-    DATA_DIR="$ROOT_DIR/data-prod"
-    LOG_DIR="$ROOT_DIR/logs-prod"
-    ENV_FILE="$ROOT_DIR/.env.prod"
-    COMPOSE_FILE="$ROOT_DIR/docker-compose.prod.yml"
-    HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3000/api/status}"
-    POSTGRES_COMPOSE_FILE="$ROOT_DIR/docker-compose.prod.postgres.yml"
+    echo "Server-side production builds are disabled." >&2
+    echo "Use the local fast deploy flow instead:" >&2
+    echo "  pwsh ./scripts/deploy-fast-prod.ps1" >&2
+    exit 2
     ;;
   dev)
     DATA_DIR="$ROOT_DIR/data-dev"

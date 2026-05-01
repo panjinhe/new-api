@@ -27,15 +27,33 @@
 ### 默认发布步骤
 
 ```powershell
-pwsh ./scripts/build-linux-release.ps1
+pwsh ./scripts/deploy-fast-prod.ps1
 ```
 
 - 这一步会自动：
-  - 重建前端
+  - 在 `web/dist` 已是最新时跳过前端构建
   - 编译 Linux `amd64` 二进制
   - 校验产物是 Linux `ELF`
+  - 打包并同步当前 `HEAD` 源码
+  - 上传二进制到 `aheapi-itdun`
+  - 替换 `new-api-prod` 容器内的 `/new-api`
+  - 提交容器为 `new-api-local:prod`
+  - 重启容器并等待 `/api/status` 健康检查
 
-然后同步源码包和二进制到服务器，再替换运行中的程序并重启容器。
+常用变体：
+
+```powershell
+# 前端已确认无变化时，直接跳过前端构建
+pwsh ./scripts/deploy-fast-prod.ps1 -SkipFrontendBuild
+
+# 已经手动构建过二进制，只发布现有产物
+pwsh ./scripts/deploy-fast-prod.ps1 -SkipBuild
+
+# 只替换二进制，不同步源码包
+pwsh ./scripts/deploy-fast-prod.ps1 -SkipSourceSync
+```
+
+生产环境禁止在服务器上执行 `./deploy.sh --env-name prod ...`；该命令会直接退出，避免误触发服务器端 Docker build。
 
 ### PowerShell 远程执行注意事项
 

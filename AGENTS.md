@@ -139,3 +139,21 @@ When the user asks to check real users, subscriptions, orders, quotas, billing, 
 - Prefer checking the running production containers and PostgreSQL database directly, for example via `ssh -F ops/ssh/config.local aheapi-prod` and `docker exec new-api-postgres psql -U newapi -d newapi`.
 - Local files such as `.env.prod`, `postgres-prod/`, `data-prod/`, local Docker containers, and local snapshots are only references or fallbacks. Do NOT present local database results as production truth.
 - If production access fails, clearly say that the server check could not be completed and separate any local/snapshot findings from real server findings.
+
+### Rule 8: Production Deploys — Local Fast Path Only
+
+Production deploys MUST default to the local fast deployment flow:
+
+```powershell
+pwsh ./scripts/deploy-fast-prod.ps1
+```
+
+This flow builds the Linux binary locally, uploads the source archive and binary, replaces `/new-api` inside the running production container, commits the container image, restarts the container, and waits for the production health check.
+
+Do NOT run production Docker builds on the server. In particular, do NOT use:
+
+```bash
+ssh ... "cd /opt/new-api/app && ./deploy.sh --env-name prod ..."
+```
+
+`deploy.sh --env-name prod` is intentionally disabled and should fail fast. Use the older server-side build flow only for non-production environments or if the user explicitly asks to redesign the production deployment mechanism.
