@@ -21,11 +21,18 @@ type BillingPreferenceRequest struct {
 	BillingPreference string `json:"billing_preference"`
 }
 
+const subscriptionPlanSalesEnabled = false
+
 // ---- User APIs ----
 
 func GetSubscriptionPlans(c *gin.Context) {
+	if !subscriptionPlanSalesEnabled {
+		common.ApiSuccess(c, []SubscriptionPlanDTO{})
+		return
+	}
+
 	var plans []model.SubscriptionPlan
-	if err := model.DB.Where("enabled = ?", true).Order("sort_order desc, id desc").Find(&plans).Error; err != nil {
+	if err := model.DB.Where("enabled = ? AND sort_order >= ?", true, 0).Order("sort_order desc, id desc").Find(&plans).Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}

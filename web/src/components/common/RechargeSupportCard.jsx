@@ -29,6 +29,7 @@ const { Text, Paragraph } = Typography;
 const QQ_GROUP = '217637139';
 const OFFICIAL_SITE = 'https://aheapi.com/';
 const FALLBACK_OFFICIAL_USD_RATE = 7.3;
+const SUBSCRIPTION_PLAN_SALES_ENABLED = false;
 
 const toolTags = ['Codex', 'CLI', 'VSCode', 'OpenClaw', '小龙虾', 'AstrBot'];
 
@@ -37,8 +38,8 @@ const modelTags = ['5.4', '5.3codex', '5.4mini', '5.2'];
 const pricingItems = [
   { quota: '50 刀', quotaValue: 50, price: '15 元', priceValue: 15 },
   { quota: '100 刀', quotaValue: 100, price: '25 元', priceValue: 25 },
-  { quota: '200 刀', quotaValue: 200, price: '48 元', priceValue: 48 },
-  { quota: '500 刀', quotaValue: 500, price: '108 元', priceValue: 108 },
+  { quota: '200 刀', quotaValue: 200, price: '45 元', priceValue: 45 },
+  { quota: '500 刀', quotaValue: 500, price: '100 元', priceValue: 100 },
 ];
 const starterUnitPrice =
   pricingItems[0].priceValue / pricingItems[0].quotaValue;
@@ -404,7 +405,7 @@ const RechargeSupportCard = ({
               {QQ_GROUP}
             </div>
             <div className='mt-1 text-xs text-[var(--semi-color-text-2)]'>
-              {t('兑换码和月卡都可通过淘宝购买，也可私聊客服确认。')}
+              {t('兑换码可通过淘宝购买，也可私聊客服确认。')}
             </div>
           </div>
           <Space wrap>
@@ -439,7 +440,13 @@ const RechargeSupportCard = ({
   }
 
   return (
-    <div className='w-full grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4 items-start'>
+    <div
+      className={
+        SUBSCRIPTION_PLAN_SALES_ENABLED
+          ? 'w-full grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4 items-start'
+          : 'w-full grid grid-cols-1 gap-4 items-start'
+      }
+    >
       <Card className='!rounded-2xl shadow-sm' bodyStyle={{ padding: 0 }}>
         <div className='p-5 flex flex-col'>
           <div className='flex flex-wrap items-start justify-between gap-3'>
@@ -696,269 +703,282 @@ const RechargeSupportCard = ({
         </div>
       </Card>
 
-      <Card className='!rounded-2xl shadow-sm' bodyStyle={{ padding: 0 }}>
-        <div className='p-5 flex flex-col'>
-          <div className='flex flex-wrap items-start justify-between gap-3'>
-            <div className='min-w-0'>
-              <div className='flex items-center gap-2 flex-wrap'>
-                <Sparkles size={18} color='var(--semi-color-primary)' />
-                <Text strong style={{ fontSize: 16 }}>
-                  {t('月卡套餐')}
-                </Text>
-                <Tag color='blue'>{t('每日额度')}</Tag>
+      {SUBSCRIPTION_PLAN_SALES_ENABLED && (
+        <Card className='!rounded-2xl shadow-sm' bodyStyle={{ padding: 0 }}>
+          <div className='p-5 flex flex-col'>
+            <div className='flex flex-wrap items-start justify-between gap-3'>
+              <div className='min-w-0'>
+                <div className='flex items-center gap-2 flex-wrap'>
+                  <Sparkles size={18} color='var(--semi-color-primary)' />
+                  <Text strong style={{ fontSize: 16 }}>
+                    {t('月卡套餐')}
+                  </Text>
+                  <Tag color='blue'>{t('每日额度')}</Tag>
+                </div>
+                <div className='mt-2 text-sm leading-6 text-[var(--semi-color-text-2)]'>
+                  {t('适合持续 Coding、自动化任务和团队项目，按天重置额度。')}
+                </div>
               </div>
-              <div className='mt-2 text-sm leading-6 text-[var(--semi-color-text-2)]'>
-                {t('适合持续 Coding、自动化任务和团队项目，按天重置额度。')}
+              <Tag color='blue'>{t('加群开通')}</Tag>
+            </div>
+
+            {subscriptionPlansLoading ? (
+              <div className='mt-5 space-y-4'>
+                <Skeleton.Title active style={{ width: '45%', height: 26 }} />
+                <Skeleton.Paragraph active rows={4} />
+                <Skeleton.Paragraph active rows={3} />
               </div>
-            </div>
-            <Tag color='blue'>{t('加群开通')}</Tag>
-          </div>
+            ) : subscriptionPlanItems.length > 0 ? (
+              <>
+                <div className='mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2'>
+                  {subscriptionPlanItems.map((plan, index) => {
+                    const { label: displayPrice } =
+                      getSubscriptionPriceDisplay(plan);
+                    const subtitleLabel = getPlanSubtitleLabel(plan);
+                    const totalAmount = Number(plan?.total_amount || 0);
+                    const isRecommended =
+                      (plan?.title || '').trim() === '前进三：巡航';
+                    const visual = getThemeAwareSubscriptionVisual(
+                      getSubscriptionPlanVisual(plan, index),
+                      isDarkMode,
+                    );
+                    const isPremium = Boolean(visual?.dark);
+                    const comparisonLabel = getPlanComparisonLabel(plan);
 
-          {subscriptionPlansLoading ? (
-            <div className='mt-5 space-y-4'>
-              <Skeleton.Title active style={{ width: '45%', height: 26 }} />
-              <Skeleton.Paragraph active rows={4} />
-              <Skeleton.Paragraph active rows={3} />
-            </div>
-          ) : subscriptionPlanItems.length > 0 ? (
-            <>
-              <div className='mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2'>
-                {subscriptionPlanItems.map((plan, index) => {
-                  const { label: displayPrice } =
-                    getSubscriptionPriceDisplay(plan);
-                  const subtitleLabel = getPlanSubtitleLabel(plan);
-                  const totalAmount = Number(plan?.total_amount || 0);
-                  const isRecommended =
-                    (plan?.title || '').trim() === '前进三：巡航';
-                  const visual = getThemeAwareSubscriptionVisual(
-                    getSubscriptionPlanVisual(plan, index),
-                    isDarkMode,
-                  );
-                  const isPremium = Boolean(visual?.dark);
-                  const comparisonLabel = getPlanComparisonLabel(plan);
-
-                  return (
-                    <div
-                      key={plan?.id || plan?.title}
-                      className='group relative flex min-h-[244px] flex-col overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 lg:aspect-[1.08/1]'
-                      style={{
-                        background: visual.background,
-                        border: `1px solid ${visual.border}`,
-                        boxShadow: visual.glow,
-                      }}
-                    >
+                    return (
                       <div
-                        className='absolute inset-x-0 top-0 h-1.5'
-                        style={{ background: visual.rail }}
-                      />
-                      <div
-                        className='pointer-events-none absolute inset-0'
+                        key={plan?.id || plan?.title}
+                        className='group relative flex min-h-[244px] flex-col overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5 lg:aspect-[1.08/1]'
                         style={{
-                          backgroundImage: getPlanVisualTexture(visual),
-                          opacity: isPremium ? 0.72 : 0.6,
+                          background: visual.background,
+                          border: `1px solid ${visual.border}`,
+                          boxShadow: visual.glow,
                         }}
-                      />
-                      <div className='relative flex flex-1 flex-col'>
-                        <div className='flex flex-wrap items-center gap-2'>
-                          <span
-                            className='rounded-full px-2.5 py-1 text-xs font-semibold'
-                            style={{
-                              background: getPlanVisualSurface(visual),
-                              border: `1px solid ${visual.border}`,
-                              color: visual.accent,
-                            }}
-                          >
-                            {visual.code}
-                          </span>
-                          {isPremium ? (
+                      >
+                        <div
+                          className='absolute inset-x-0 top-0 h-1.5'
+                          style={{ background: visual.rail }}
+                        />
+                        <div
+                          className='pointer-events-none absolute inset-0'
+                          style={{
+                            backgroundImage: getPlanVisualTexture(visual),
+                            opacity: isPremium ? 0.72 : 0.6,
+                          }}
+                        />
+                        <div className='relative flex flex-1 flex-col'>
+                          <div className='flex flex-wrap items-center gap-2'>
                             <span
-                              className='inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium'
+                              className='rounded-full px-2.5 py-1 text-xs font-semibold'
                               style={{
-                                background: 'rgba(245, 199, 108, 0.14)',
-                                border: '1px solid rgba(245, 199, 108, 0.32)',
-                                color: 'rgba(255, 244, 214, 0.94)',
+                                background: getPlanVisualSurface(visual),
+                                border: `1px solid ${visual.border}`,
+                                color: visual.accent,
                               }}
                             >
-                              {t('旗舰')}
+                              {visual.code}
                             </span>
-                          ) : isRecommended ? (
-                            <Tag color='blue' shape='circle' size='small'>
-                              {t('推荐')}
-                            </Tag>
-                          ) : null}
-                        </div>
+                            {isPremium ? (
+                              <span
+                                className='inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium'
+                                style={{
+                                  background: 'rgba(245, 199, 108, 0.14)',
+                                  border: '1px solid rgba(245, 199, 108, 0.32)',
+                                  color: 'rgba(255, 244, 214, 0.94)',
+                                }}
+                              >
+                                {t('旗舰')}
+                              </span>
+                            ) : isRecommended ? (
+                              <Tag color='blue' shape='circle' size='small'>
+                                {t('推荐')}
+                              </Tag>
+                            ) : null}
+                          </div>
 
-                        <div className='mt-3 flex items-start justify-between gap-3'>
-                          <div className='min-w-0'>
-                            <div
-                              className='line-clamp-1 break-words text-lg font-semibold leading-snug'
-                              style={{
-                                color: getPlanVisualHeadingText(visual),
-                              }}
-                            >
-                              {plan?.title || t('订阅套餐')}
-                            </div>
-                            {subtitleLabel && (
+                          <div className='mt-3 flex items-start justify-between gap-3'>
+                            <div className='min-w-0'>
                               <div
-                                className='mt-1 line-clamp-1 break-words text-sm leading-5'
+                                className='line-clamp-1 break-words text-lg font-semibold leading-snug'
+                                style={{
+                                  color: getPlanVisualHeadingText(visual),
+                                }}
+                              >
+                                {plan?.title || t('订阅套餐')}
+                              </div>
+                              {subtitleLabel && (
+                                <div
+                                  className='mt-1 line-clamp-1 break-words text-sm leading-5'
+                                  style={{
+                                    color: getPlanVisualMutedText(visual),
+                                  }}
+                                >
+                                  {subtitleLabel}
+                                </div>
+                              )}
+                            </div>
+                            <div className='shrink-0 text-right'>
+                              <div
+                                className='text-xs font-medium'
                                 style={{
                                   color: getPlanVisualMutedText(visual),
                                 }}
                               >
-                                {subtitleLabel}
+                                {t('月价')}
                               </div>
-                            )}
-                          </div>
-                          <div className='shrink-0 text-right'>
-                            <div
-                              className='text-xs font-medium'
-                              style={{ color: getPlanVisualMutedText(visual) }}
-                            >
-                              {t('月价')}
-                            </div>
-                            <div
-                              className='mt-1 text-[26px] font-semibold leading-none'
-                              style={{ color: visual.accent }}
-                            >
-                              {displayPrice}
+                              <div
+                                className='mt-1 text-[26px] font-semibold leading-none'
+                                style={{ color: visual.accent }}
+                              >
+                                {displayPrice}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className='mt-2 flex flex-wrap gap-2'>
-                          <div
-                            className='inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium leading-none'
-                            style={{
-                              background: getPlanVisualSurface(
-                                visual,
-                                'rgba(255, 255, 255, 0.66)',
-                              ),
-                              color: visual.accent,
-                            }}
-                          >
-                            <Sparkles size={12} />
-                            {t(visual.label)}
+                          <div className='mt-2 flex flex-wrap gap-2'>
+                            <div
+                              className='inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium leading-none'
+                              style={{
+                                background: getPlanVisualSurface(
+                                  visual,
+                                  'rgba(255, 255, 255, 0.66)',
+                                ),
+                                color: visual.accent,
+                              }}
+                            >
+                              <Sparkles size={12} />
+                              {t(visual.label)}
+                            </div>
                           </div>
-                        </div>
 
-                        {comparisonLabel && (
-                          <div
-                            className='mt-3 flex items-center gap-2 rounded-xl px-3 py-2'
-                            style={{
-                              background: getPlanVisualSurface(
-                                visual,
-                                'rgba(255, 255, 255, 0.82)',
-                              ),
-                              border: `1px solid ${visual.border}`,
-                              color: isPremium
-                                ? 'rgba(255, 244, 214, 0.98)'
-                                : visual.accent,
-                            }}
-                          >
-                            <CircleDollarSign size={17} className='shrink-0' />
-                            <span className='min-w-0 break-words text-base font-semibold leading-snug'>
-                              {t(comparisonLabel)}
-                            </span>
-                          </div>
-                        )}
+                          {comparisonLabel && (
+                            <div
+                              className='mt-3 flex items-center gap-2 rounded-xl px-3 py-2'
+                              style={{
+                                background: getPlanVisualSurface(
+                                  visual,
+                                  'rgba(255, 255, 255, 0.82)',
+                                ),
+                                border: `1px solid ${visual.border}`,
+                                color: isPremium
+                                  ? 'rgba(255, 244, 214, 0.98)'
+                                  : visual.accent,
+                              }}
+                            >
+                              <CircleDollarSign
+                                size={17}
+                                className='shrink-0'
+                              />
+                              <span className='min-w-0 break-words text-base font-semibold leading-snug'>
+                                {t(comparisonLabel)}
+                              </span>
+                            </div>
+                          )}
 
-                        <div className='mt-3 grid grid-cols-2 gap-2'>
-                          <div
-                            className='rounded-xl px-2.5 py-2'
-                            style={{ background: getPlanVisualPanel(visual) }}
-                          >
+                          <div className='mt-3 grid grid-cols-2 gap-2'>
                             <div
-                              className='flex items-center gap-1.5 text-xs'
-                              style={{ color: getPlanVisualMutedText(visual) }}
+                              className='rounded-xl px-2.5 py-2'
+                              style={{ background: getPlanVisualPanel(visual) }}
                             >
-                              <Gauge size={13} />
-                              {t('每日额度')}
+                              <div
+                                className='flex items-center gap-1.5 text-xs'
+                                style={{
+                                  color: getPlanVisualMutedText(visual),
+                                }}
+                              >
+                                <Gauge size={13} />
+                                {t('每日额度')}
+                              </div>
+                              <div
+                                className='mt-1 break-words text-base font-semibold leading-tight'
+                                style={{ color: getPlanVisualText(visual) }}
+                              >
+                                {totalAmount > 0
+                                  ? renderQuota(totalAmount)
+                                  : t('不限')}
+                              </div>
                             </div>
                             <div
-                              className='mt-1 break-words text-base font-semibold leading-tight'
-                              style={{ color: getPlanVisualText(visual) }}
+                              className='rounded-xl px-2.5 py-2'
+                              style={{ background: getPlanVisualPanel(visual) }}
                             >
-                              {totalAmount > 0
-                                ? renderQuota(totalAmount)
-                                : t('不限')}
-                            </div>
-                          </div>
-                          <div
-                            className='rounded-xl px-2.5 py-2'
-                            style={{ background: getPlanVisualPanel(visual) }}
-                          >
-                            <div
-                              className='flex items-center gap-1.5 text-xs'
-                              style={{ color: getPlanVisualMutedText(visual) }}
-                            >
-                              <RefreshCw size={13} />
-                              {t('重置')}
-                            </div>
-                            <div
-                              className='mt-1 break-words text-sm font-semibold leading-tight'
-                              style={{ color: getPlanVisualText(visual) }}
-                            >
-                              {getPlanResetLabel(plan, t)}
+                              <div
+                                className='flex items-center gap-1.5 text-xs'
+                                style={{
+                                  color: getPlanVisualMutedText(visual),
+                                }}
+                              >
+                                <RefreshCw size={13} />
+                                {t('重置')}
+                              </div>
+                              <div
+                                className='mt-1 break-words text-sm font-semibold leading-tight'
+                                style={{ color: getPlanVisualText(visual) }}
+                              >
+                                {getPlanResetLabel(plan, t)}
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
 
-              <div className='mt-auto pt-5'>
-                <div className='text-xs leading-6 text-[var(--semi-color-text-2)]'>
-                  {t('月卡介绍读取真实套餐数据；开通请加入 Q 群确认套餐档位。')}
+                <div className='mt-auto pt-5'>
+                  <div className='text-xs leading-6 text-[var(--semi-color-text-2)]'>
+                    {t(
+                      '月卡介绍读取真实套餐数据；开通请加入 Q 群确认套餐档位。',
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className='mt-5 rounded-2xl bg-[var(--semi-color-fill-0)] px-5 py-8 text-center'>
+                <div className='text-base font-semibold text-[var(--semi-color-text-0)]'>
+                  {t('暂无可购买月卡')}
+                </div>
+                <div className='mt-2 text-sm text-[var(--semi-color-text-2)]'>
+                  {t('当前未返回套餐数据，可加入 Q 群确认开放状态。')}
                 </div>
               </div>
-            </>
-          ) : (
-            <div className='mt-5 rounded-2xl bg-[var(--semi-color-fill-0)] px-5 py-8 text-center'>
-              <div className='text-base font-semibold text-[var(--semi-color-text-0)]'>
-                {t('暂无可购买月卡')}
-              </div>
-              <div className='mt-2 text-sm text-[var(--semi-color-text-2)]'>
-                {t('当前未返回套餐数据，可加入 Q 群确认开放状态。')}
-              </div>
-            </div>
-          )}
+            )}
 
-          <div className='mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-500/30 dark:bg-sky-500/10'>
-            <div className='flex flex-wrap items-center justify-between gap-3'>
-              <div>
-                <div className='flex items-center gap-2 text-sm font-medium text-sky-800 dark:text-sky-200'>
-                  <MessageCircle size={16} />
-                  {t('加群开通月卡')}
+            <div className='mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-500/30 dark:bg-sky-500/10'>
+              <div className='flex flex-wrap items-center justify-between gap-3'>
+                <div>
+                  <div className='flex items-center gap-2 text-sm font-medium text-sky-800 dark:text-sky-200'>
+                    <MessageCircle size={16} />
+                    {t('加群开通月卡')}
+                  </div>
+                  <div className='mt-1 text-xs text-sky-700 dark:text-sky-300'>
+                    {t('进群发送套餐名，客服按对应月卡处理。')}
+                  </div>
                 </div>
-                <div className='mt-1 text-xs text-sky-700 dark:text-sky-300'>
-                  {t('进群发送套餐名，客服按对应月卡处理。')}
-                </div>
+                <Space wrap>
+                  <Button
+                    theme='solid'
+                    type='warning'
+                    icon={<ExternalLink size={14} />}
+                    onClick={handleOpenRechargeLink}
+                  >
+                    {t('淘宝购买月卡')}
+                  </Button>
+                  <Paragraph
+                    copyable={{ content: QQ_GROUP }}
+                    className='!mb-0 !mt-0'
+                  >
+                    <span className='text-sm font-medium text-sky-800 dark:text-sky-200'>
+                      {t('Q群：')}
+                      {QQ_GROUP}
+                    </span>
+                  </Paragraph>
+                </Space>
               </div>
-              <Space wrap>
-                <Button
-                  theme='solid'
-                  type='warning'
-                  icon={<ExternalLink size={14} />}
-                  onClick={handleOpenRechargeLink}
-                >
-                  {t('淘宝购买月卡')}
-                </Button>
-                <Paragraph
-                  copyable={{ content: QQ_GROUP }}
-                  className='!mb-0 !mt-0'
-                >
-                  <span className='text-sm font-medium text-sky-800 dark:text-sky-200'>
-                    {t('Q群：')}
-                    {QQ_GROUP}
-                  </span>
-                </Paragraph>
-              </Space>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 };
