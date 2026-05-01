@@ -33,6 +33,7 @@ plans
 .codex-tmp/
 output/
 taobao_assets/
+exports/
 new-api-linux*
 
 electron/node_modules
