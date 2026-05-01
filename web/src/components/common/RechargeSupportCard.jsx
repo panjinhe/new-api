@@ -361,16 +361,16 @@ const RechargeSupportCard = ({
             <div className='flex items-center gap-2 flex-wrap'>
               <Rocket size={18} className='text-amber-500' />
               <Text strong style={{ fontSize: 16 }}>
-                {t('Codex API 7日额度包')}
+                {t('Codex API 一周畅用包')}
               </Text>
               <Tag color='orange'>
                 {t('单价低至')} {bestUnitPrice.toFixed(2)} {t('元 / 刀')}
               </Tag>
-              <Tag color='green'>{t('7天有效')}</Tag>
+              <Tag color='green'>{t('一周畅用')}</Tag>
             </div>
             <div className='mt-2 text-sm text-[var(--semi-color-text-1)]'>
               {t(
-                '购买后自动发唯一兑换码，兑换成功起 7 天内按实际调用消耗额度。',
+                '购买后自动发唯一兑换码，兑换成功起一周内按实际调用消耗额度。',
               )}
             </div>
           </div>
@@ -444,7 +444,7 @@ const RechargeSupportCard = ({
       className={
         SUBSCRIPTION_PLAN_SALES_ENABLED
           ? 'w-full grid grid-cols-1 xl:grid-cols-[0.9fr_1.1fr] gap-4 items-start'
-          : 'w-full grid grid-cols-1 gap-4 items-start'
+          : 'w-full max-w-6xl mx-auto grid grid-cols-1 gap-4 items-start'
       }
     >
       <Card className='!rounded-2xl shadow-sm' bodyStyle={{ padding: 0 }}>
@@ -454,14 +454,14 @@ const RechargeSupportCard = ({
               <div className='flex items-center gap-2 flex-wrap'>
                 <CircleDollarSign size={18} color='rgba(5, 150, 105, 1)' />
                 <Text strong style={{ fontSize: 16 }}>
-                  {t('Codex API 7日额度包')}
+                  {t('Codex API 一周畅用包')}
                 </Text>
                 <Tag color='green'>{t('兑换码发货')}</Tag>
-                <Tag color='orange'>{t('7天有效')}</Tag>
+                <Tag color='orange'>{t('一周畅用')}</Tag>
               </div>
               <div className='mt-2 text-sm leading-6 text-[var(--semi-color-text-2)]'>
                 {t(
-                  '购买对应面额 SKU 后自动发唯一兑换码；兑换成功起 7 天有效，按实际调用消耗额度。',
+                  '购买对应面额 SKU 后自动发唯一兑换码；兑换成功起一周内按实际调用消耗额度。',
                 )}
               </div>
             </div>
@@ -501,7 +501,13 @@ const RechargeSupportCard = ({
             ))}
           </div>
 
-          <div className='mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2'>
+          <div
+            className={
+              SUBSCRIPTION_PLAN_SALES_ENABLED
+                ? 'mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2'
+                : 'mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'
+            }
+          >
             {normalizedPricingPlans.map((item, index) => {
               const visual = getThemeAwareRechargeVisual(
                 getRechargePackVisual(item, index),
@@ -511,7 +517,7 @@ const RechargeSupportCard = ({
               return (
                 <div
                   key={item.quota}
-                  className='group relative overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5'
+                  className='group relative min-h-[216px] overflow-hidden rounded-2xl px-4 py-4 transition-all duration-200 hover:-translate-y-0.5'
                   style={{
                     background: visual.background,
                     border: `1px solid ${visual.border}`,
@@ -642,7 +648,7 @@ const RechargeSupportCard = ({
                         className='shrink-0 font-semibold'
                         style={{ color: visual.accent }}
                       >
-                        {t('7天有效')}
+                        {t('一周畅用')}
                       </span>
                     </div>
                   </div>
@@ -671,12 +677,12 @@ const RechargeSupportCard = ({
             />
             <div className='relative flex items-center gap-2 text-sm font-medium text-[var(--semi-color-text-0)]'>
               <Gift size={16} className='text-emerald-600' />
-              {t('7日兑换码补给站')}
+              {t('一周畅用兑换码')}
             </div>
             <div className='relative mt-2 text-xs leading-6 text-[var(--semi-color-text-2)]'>
               {t('主推')} {featuredPricingPlan.quota} · {t('单价低至')}{' '}
               {featuredPricingPlan.unitPrice.toFixed(2)} {t('元 / 刀')} ·{' '}
-              {t('兑换成功起 7 天有效')}
+              {t('兑换成功起一周畅用')}
             </div>
             <div className='relative mt-3'>
               <Button
@@ -686,7 +692,7 @@ const RechargeSupportCard = ({
                 icon={<ExternalLink size={14} />}
                 onClick={handleOpenRechargeLink}
               >
-                {t('淘宝购买7日额度包')}
+                {t('淘宝购买一周畅用包')}
               </Button>
             </div>
           </div>
