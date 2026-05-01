@@ -117,6 +117,48 @@ func (s *SubscriptionFunding) Refund() error {
 	})
 }
 
+// ---------------------------------------------------------------------------
+// BucketFunding — 限时额度包资金来源实现
+// ---------------------------------------------------------------------------
+
+type BucketFunding struct {
+	requestId      string
+	userId         int
+	amount         int64
+	preConsumed    int64
+	totalRemaining int64
+	nearestEndTime int64
+}
+
+func (b *BucketFunding) Source() string { return BillingSourceBucket }
+
+func (b *BucketFunding) PreConsume(_ int) error {
+	res, err := model.PreConsumeUserQuotaBuckets(b.requestId, b.userId, b.amount)
+	if err != nil {
+		return err
+	}
+	b.preConsumed = res.PreConsumed
+	b.totalRemaining = res.TotalRemaining
+	b.nearestEndTime = res.NearestEndTime
+	return nil
+}
+
+func (b *BucketFunding) Settle(delta int) error {
+	if delta == 0 {
+		return nil
+	}
+	return model.PostConsumeQuotaBucketDelta(b.requestId, int64(delta))
+}
+
+func (b *BucketFunding) Refund() error {
+	if b.preConsumed <= 0 {
+		return nil
+	}
+	return refundWithRetry(func() error {
+		return model.RefundQuotaBucketPreConsume(b.requestId)
+	})
+}
+
 // refundWithRetry 尝试多次执行退款操作以提高成功率，只能用于基于事务的退款函数！！！！！！
 // try to refund with retries, only for refund functions based on transactions!!!
 func refundWithRetry(fn func() error) error {

@@ -92,6 +92,14 @@ func AddRedemption(c *gin.Context) {
 			common.ApiErrorMsg(c, "套餐不存在或已下架")
 			return
 		}
+	} else if redemption.RedemptionType == model.RedemptionTypeBucket {
+		if redemption.Quota <= 0 {
+			common.ApiErrorMsg(c, "额度必须大于0")
+			return
+		}
+		if redemption.BucketDurationSeconds <= 0 {
+			redemption.BucketDurationSeconds = model.DefaultQuotaBucketDurationSeconds
+		}
 	} else if redemption.Quota <= 0 {
 		common.ApiErrorMsg(c, "额度必须大于0")
 		return
@@ -100,16 +108,17 @@ func AddRedemption(c *gin.Context) {
 	for i := 0; i < redemption.Count; i++ {
 		key := common.GetUUID()
 		cleanRedemption := model.Redemption{
-			UserId:         c.GetInt("id"),
-			Name:           redemption.Name,
-			Key:            key,
-			CreatedTime:    common.GetTimestamp(),
-			Quota:          redemption.Quota,
-			RedemptionType: redemption.RedemptionType,
-			PlanId:         redemption.PlanId,
-			BatchId:        redemption.BatchId,
-			Source:         redemption.Source,
-			ExpiredTime:    redemption.ExpiredTime,
+			UserId:                c.GetInt("id"),
+			Name:                  redemption.Name,
+			Key:                   key,
+			CreatedTime:           common.GetTimestamp(),
+			Quota:                 redemption.Quota,
+			RedemptionType:        redemption.RedemptionType,
+			PlanId:                redemption.PlanId,
+			BucketDurationSeconds: redemption.BucketDurationSeconds,
+			BatchId:               redemption.BatchId,
+			Source:                redemption.Source,
+			ExpiredTime:           redemption.ExpiredTime,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
@@ -174,6 +183,14 @@ func UpdateRedemption(c *gin.Context) {
 				common.ApiErrorMsg(c, "套餐不存在或已下架")
 				return
 			}
+		} else if redemption.RedemptionType == model.RedemptionTypeBucket {
+			if redemption.Quota <= 0 {
+				common.ApiErrorMsg(c, "额度必须大于0")
+				return
+			}
+			if redemption.BucketDurationSeconds <= 0 {
+				redemption.BucketDurationSeconds = model.DefaultQuotaBucketDurationSeconds
+			}
 		} else if redemption.Quota <= 0 {
 			common.ApiErrorMsg(c, "额度必须大于0")
 			return
@@ -184,6 +201,7 @@ func UpdateRedemption(c *gin.Context) {
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
 		cleanRedemption.RedemptionType = redemption.RedemptionType
 		cleanRedemption.PlanId = redemption.PlanId
+		cleanRedemption.BucketDurationSeconds = redemption.BucketDurationSeconds
 		cleanRedemption.BatchId = redemption.BatchId
 		cleanRedemption.Source = redemption.Source
 	}

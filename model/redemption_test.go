@@ -15,6 +15,9 @@ func resetRedemptionTestTables(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec("DELETE FROM redemptions").Error)
 	require.NoError(t, DB.Exec("DELETE FROM user_subscriptions").Error)
+	require.NoError(t, DB.Exec("DELETE FROM quota_bucket_pre_consume_allocations").Error)
+	require.NoError(t, DB.Exec("DELETE FROM quota_bucket_pre_consume_records").Error)
+	require.NoError(t, DB.Exec("DELETE FROM quota_buckets").Error)
 	require.NoError(t, DB.Exec("DELETE FROM subscription_plans").Error)
 	require.NoError(t, DB.Exec("DELETE FROM users").Error)
 }
@@ -58,6 +61,22 @@ func seedRedemptionCode(t *testing.T, key string, typ string, quota int, planId 
 		RedemptionType: typ,
 		PlanId:         planId,
 		CreatedTime:    common.GetTimestamp(),
+	}
+	require.NoError(t, redemption.Insert())
+	return redemption
+}
+
+func seedBucketRedemptionCode(t *testing.T, key string, quota int, durationSeconds int64) *Redemption {
+	t.Helper()
+	redemption := &Redemption{
+		UserId:                1,
+		Name:                  key,
+		Key:                   key,
+		Status:                common.RedemptionCodeStatusEnabled,
+		Quota:                 quota,
+		RedemptionType:        RedemptionTypeBucket,
+		BucketDurationSeconds: durationSeconds,
+		CreatedTime:           common.GetTimestamp(),
 	}
 	require.NoError(t, redemption.Insert())
 	return redemption
@@ -202,6 +221,72 @@ func TestRedeemPlanCodeCreatesSubscription(t *testing.T) {
 	assert.Equal(t, "active", sub.Status)
 	assert.Equal(t, "redemption", sub.Source)
 	assert.Equal(t, code.Id, sub.SourceRedemptionId)
+}
+
+func TestRedeemBucketCodeCreatesQuotaBucketOnly(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 110)
+	code := seedBucketRedemptionCode(t, "bucket-code", 7000, DefaultQuotaBucketDurationSeconds)
+
+	result, err := Redeem(code.Key, 110)
+	require.NoError(t, err)
+
+	require.NotNil(t, result)
+	require.NotNil(t, result.Bucket)
+	assert.Equal(t, RedemptionTypeBucket, result.Type)
+	assert.Equal(t, 7000, result.Quota)
+	assert.Equal(t, int64(7000), result.Bucket.Bucket.AmountTotal)
+	assert.Equal(t, int64(7000), result.Bucket.RemainingQuota)
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, code.Id))
+	assert.Equal(t, 0, getRedemptionUserQuota(t, 110))
+
+	var subCount int64
+	require.NoError(t, DB.Model(&UserSubscription{}).Where("user_id = ?", 110).Count(&subCount).Error)
+	assert.Zero(t, subCount)
+}
+
+func TestQuotaBucketsConsumeEarliestAndRefund(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 111)
+	now := common.GetTimestamp()
+	require.NoError(t, DB.Create(&QuotaBucket{
+		UserId:      111,
+		Title:       "later",
+		AmountTotal: 500,
+		StartTime:   now,
+		EndTime:     now + 7200,
+		Status:      QuotaBucketStatusActive,
+		Source:      QuotaBucketSourceRedemption,
+	}).Error)
+	require.NoError(t, DB.Create(&QuotaBucket{
+		UserId:      111,
+		Title:       "earlier",
+		AmountTotal: 300,
+		StartTime:   now,
+		EndTime:     now + 3600,
+		Status:      QuotaBucketStatusActive,
+		Source:      QuotaBucketSourceRedemption,
+	}).Error)
+
+	res, err := PreConsumeUserQuotaBuckets("bucket-request-1", 111, 600)
+	require.NoError(t, err)
+	assert.Equal(t, int64(600), res.PreConsumed)
+
+	var earlier QuotaBucket
+	require.NoError(t, DB.Where("user_id = ? AND title = ?", 111, "earlier").First(&earlier).Error)
+	assert.Equal(t, int64(300), earlier.AmountUsed)
+	assert.Equal(t, QuotaBucketStatusEmpty, earlier.Status)
+
+	var later QuotaBucket
+	require.NoError(t, DB.Where("user_id = ? AND title = ?", 111, "later").First(&later).Error)
+	assert.Equal(t, int64(300), later.AmountUsed)
+	assert.Equal(t, QuotaBucketStatusActive, later.Status)
+
+	require.NoError(t, PostConsumeQuotaBucketDelta("bucket-request-1", -200))
+	require.NoError(t, DB.Where("id = ?", later.Id).First(&later).Error)
+	assert.Equal(t, int64(100), later.AmountUsed)
 }
 
 func TestRedeemSamePlanCodeExtendsSubscription(t *testing.T) {

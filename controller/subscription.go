@@ -62,10 +62,16 @@ func GetSubscriptionSelf(c *gin.Context) {
 		activeSubscriptions = []model.SubscriptionSummary{}
 	}
 
+	buckets, err := model.GetUserQuotaBucketSelf(userId)
+	if err != nil || buckets == nil {
+		buckets = &model.QuotaBucketSelfSummary{}
+	}
+
 	common.ApiSuccess(c, gin.H{
 		"billing_preference": pref,
 		"subscriptions":      activeSubscriptions, // all active subscriptions
 		"all_subscriptions":  allSubscriptions,    // all subscriptions including expired
+		"quota_buckets":      buckets,
 	})
 }
 
@@ -351,6 +357,20 @@ func AdminListUserSubscriptions(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, subs)
+}
+
+func AdminListUserQuotaBuckets(c *gin.Context) {
+	userId, _ := strconv.Atoi(c.Param("id"))
+	if userId <= 0 {
+		common.ApiErrorMsg(c, "无效的用户ID")
+		return
+	}
+	buckets, err := model.GetUserQuotaBucketSelf(userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, buckets)
 }
 
 type AdminCreateUserSubscriptionRequest struct {

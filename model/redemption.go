@@ -15,30 +15,33 @@ import (
 )
 
 const (
-	RedemptionTypeQuota = "quota"
-	RedemptionTypePlan  = "plan"
+	RedemptionTypeQuota  = "quota"
+	RedemptionTypePlan   = "plan"
+	RedemptionTypeBucket = "bucket"
 
 	oneTimeWelfareRedemptionAmountUSD = 20.0
+	DefaultQuotaBucketDurationSeconds = int64(7 * 24 * 3600)
 )
 
 type Redemption struct {
-	Id             int               `json:"id"`
-	UserId         int               `json:"user_id"`
-	Key            string            `json:"key" gorm:"type:char(32);uniqueIndex"`
-	Status         int               `json:"status" gorm:"default:1"`
-	Name           string            `json:"name" gorm:"index"`
-	Quota          int               `json:"quota" gorm:"default:100"`
-	RedemptionType string            `json:"redemption_type" gorm:"type:varchar(16);default:'quota';index"`
-	PlanId         int               `json:"plan_id" gorm:"default:0;index"`
-	Plan           *SubscriptionPlan `json:"plan,omitempty" gorm:"foreignKey:PlanId;references:Id;constraint:-"`
-	BatchId        string            `json:"batch_id" gorm:"type:varchar(64);default:'';index"`
-	Source         string            `json:"source" gorm:"type:varchar(64);default:'manual';index"`
-	CreatedTime    int64             `json:"created_time" gorm:"bigint"`
-	RedeemedTime   int64             `json:"redeemed_time" gorm:"bigint"`
-	Count          int               `json:"count" gorm:"-:all"` // only for api request
-	UsedUserId     int               `json:"used_user_id"`
-	DeletedAt      gorm.DeletedAt    `gorm:"index"`
-	ExpiredTime    int64             `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+	Id                    int               `json:"id"`
+	UserId                int               `json:"user_id"`
+	Key                   string            `json:"key" gorm:"type:char(32);uniqueIndex"`
+	Status                int               `json:"status" gorm:"default:1"`
+	Name                  string            `json:"name" gorm:"index"`
+	Quota                 int               `json:"quota" gorm:"default:100"`
+	RedemptionType        string            `json:"redemption_type" gorm:"type:varchar(16);default:'quota';index"`
+	PlanId                int               `json:"plan_id" gorm:"default:0;index"`
+	Plan                  *SubscriptionPlan `json:"plan,omitempty" gorm:"foreignKey:PlanId;references:Id;constraint:-"`
+	BucketDurationSeconds int64             `json:"bucket_duration_seconds" gorm:"type:bigint;default:0"`
+	BatchId               string            `json:"batch_id" gorm:"type:varchar(64);default:'';index"`
+	Source                string            `json:"source" gorm:"type:varchar(64);default:'manual';index"`
+	CreatedTime           int64             `json:"created_time" gorm:"bigint"`
+	RedeemedTime          int64             `json:"redeemed_time" gorm:"bigint"`
+	Count                 int               `json:"count" gorm:"-:all"` // only for api request
+	UsedUserId            int               `json:"used_user_id"`
+	DeletedAt             gorm.DeletedAt    `gorm:"index"`
+	ExpiredTime           int64             `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
 }
 
 type RedemptionSubscriptionResult struct {
@@ -64,12 +67,15 @@ type RedemptionResult struct {
 	Quota        int                           `json:"quota,omitempty"`
 	RedemptionId int                           `json:"redemption_id"`
 	Subscription *RedemptionSubscriptionResult `json:"subscription,omitempty"`
+	Bucket       *QuotaBucketSummary           `json:"bucket,omitempty"`
 }
 
 func NormalizeRedemptionType(redemptionType string) string {
 	switch strings.TrimSpace(redemptionType) {
 	case RedemptionTypePlan:
 		return RedemptionTypePlan
+	case RedemptionTypeBucket:
+		return RedemptionTypeBucket
 	default:
 		return RedemptionTypeQuota
 	}
@@ -82,6 +88,13 @@ func (redemption *Redemption) Normalize() {
 	}
 	if redemption.RedemptionType == RedemptionTypeQuota {
 		redemption.PlanId = 0
+		redemption.BucketDurationSeconds = 0
+	} else if redemption.RedemptionType == RedemptionTypePlan {
+		redemption.BucketDurationSeconds = 0
+	} else if redemption.RedemptionType == RedemptionTypeBucket {
+		if redemption.BucketDurationSeconds <= 0 {
+			redemption.BucketDurationSeconds = DefaultQuotaBucketDurationSeconds
+		}
 	}
 }
 
@@ -254,6 +267,17 @@ func Redeem(key string, userId int) (*RedemptionResult, error) {
 				return err
 			}
 			result.Subscription = buildRedemptionSubscriptionResult(subscription, plan, redemption.Id, extended)
+		} else if redemption.RedemptionType == RedemptionTypeBucket {
+			bucket, err := CreateQuotaBucketFromRedemptionTx(tx, redemption, userId)
+			if err != nil {
+				return err
+			}
+			result.Bucket = &QuotaBucketSummary{
+				Bucket:         *bucket,
+				RemainingQuota: bucket.AmountTotal - bucket.AmountUsed,
+				Status:         effectiveQuotaBucketStatus(*bucket, common.GetTimestamp()),
+			}
+			result.Quota = redemption.Quota
 		} else {
 			if isOneTimeWelfareRedemption(redemption) {
 				if err := ensureUserCanRedeemOneTimeWelfareTx(tx, userId); err != nil {
@@ -279,6 +303,9 @@ func Redeem(key string, userId int) (*RedemptionResult, error) {
 	if redemption.RedemptionType == RedemptionTypePlan && result.Subscription != nil {
 		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码开通套餐 %s，兑换码ID %d", result.Subscription.PlanTitle, redemption.Id))
 		invalidateClassifiedUserCaches([]int{userId})
+	} else if redemption.RedemptionType == RedemptionTypeBucket && result.Bucket != nil {
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码开通一周畅用包 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
+		promoteUserToPaidGroupIfRedemptionQualified(userId)
 	} else {
 		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
 		promoteUserToPaidGroupIfRedemptionQualified(userId)
@@ -365,6 +392,7 @@ func (redemption *Redemption) Insert() error {
 		"Quota",
 		"RedemptionType",
 		"PlanId",
+		"BucketDurationSeconds",
 		"BatchId",
 		"Source",
 		"CreatedTime",
@@ -384,7 +412,7 @@ func (redemption *Redemption) SelectUpdate() error {
 func (redemption *Redemption) Update() error {
 	var err error
 	redemption.Normalize()
-	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time", "expired_time", "redemption_type", "plan_id", "batch_id", "source").Updates(redemption).Error
+	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time", "expired_time", "redemption_type", "plan_id", "bucket_duration_seconds", "batch_id", "source").Updates(redemption).Error
 	return err
 }
 

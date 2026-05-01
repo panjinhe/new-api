@@ -788,7 +788,7 @@ func GetAllUserSubscriptions(userId int) ([]SubscriptionSummary, error) {
 		return nil, errors.New("invalid userId")
 	}
 	var subs []UserSubscription
-	err := DB.Where("user_id = ?", userId).
+	err := DB.Where("user_id = ? AND status <> ?", userId, QuotaBucketStatusMigrated).
 		Order("end_time desc, id desc").
 		Find(&subs).Error
 	if err != nil {

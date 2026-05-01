@@ -161,6 +161,7 @@ func SetApiRouter(router *gin.Engine) {
 
 			// User subscription management (admin)
 			subscriptionAdminRoute.GET("/users/:id/subscriptions", controller.AdminListUserSubscriptions)
+			subscriptionAdminRoute.GET("/users/:id/quota_buckets", controller.AdminListUserQuotaBuckets)
 			subscriptionAdminRoute.POST("/users/:id/subscriptions", controller.AdminCreateUserSubscription)
 			subscriptionAdminRoute.POST("/user_subscriptions/:id/invalidate", controller.AdminInvalidateUserSubscription)
 			subscriptionAdminRoute.POST("/user_subscriptions/:id/reset_usage", controller.AdminResetUserSubscriptionCurrentUsage)

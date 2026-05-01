@@ -119,7 +119,7 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interf
 	if relayInfo == nil || other == nil {
 		return
 	}
-	// billing_source: "wallet" or "subscription"
+	// billing_source: "wallet", "bucket", or "subscription"
 	if relayInfo.BillingSource != "" {
 		other["billing_source"] = relayInfo.BillingSource
 	}
@@ -165,6 +165,10 @@ func appendBillingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interf
 			other["subscription_consumed"] = consumed
 		}
 		// Wallet quota is not deducted when billed from subscription.
+		other["wallet_quota_deducted"] = 0
+	} else if relayInfo.BillingSource == "bucket" {
+		other["billing_request_id"] = relayInfo.RequestId
+		other["bucket_consumed"] = relayInfo.FinalPreConsumedQuota
 		other["wallet_quota_deducted"] = 0
 	}
 }

@@ -48,6 +48,9 @@ func TestMain(m *testing.M) {
 		&UserSubscription{},
 		&SubscriptionPreConsumeRecord{},
 		&SubscriptionUsageDaily{},
+		&QuotaBucket{},
+		&QuotaBucketPreConsumeRecord{},
+		&QuotaBucketPreConsumeAllocation{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
@@ -72,6 +75,9 @@ func truncateTables(t *testing.T) {
 		DB.Exec("DELETE FROM user_subscriptions")
 		DB.Exec("DELETE FROM subscription_pre_consume_records")
 		DB.Exec("DELETE FROM subscription_usage_dailies")
+		DB.Exec("DELETE FROM quota_buckets")
+		DB.Exec("DELETE FROM quota_bucket_pre_consume_records")
+		DB.Exec("DELETE FROM quota_bucket_pre_consume_allocations")
 	})
 }
 

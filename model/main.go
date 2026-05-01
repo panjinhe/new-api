@@ -279,6 +279,9 @@ func migrateDB() error {
 		&UserSubscription{},
 		&SubscriptionPreConsumeRecord{},
 		&SubscriptionUsageDaily{},
+		&QuotaBucket{},
+		&QuotaBucketPreConsumeRecord{},
+		&QuotaBucketPreConsumeAllocation{},
 		&CustomOAuthProvider{},
 		&UserOAuthBinding{},
 	)
@@ -293,6 +296,9 @@ func migrateDB() error {
 		if err := DB.AutoMigrate(&SubscriptionPlan{}); err != nil {
 			return err
 		}
+	}
+	if err := migrateLegacyWeeklyQuotaPlansToBuckets(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -328,6 +334,9 @@ func migrateDBFast() error {
 		{&UserSubscription{}, "UserSubscription"},
 		{&SubscriptionPreConsumeRecord{}, "SubscriptionPreConsumeRecord"},
 		{&SubscriptionUsageDaily{}, "SubscriptionUsageDaily"},
+		{&QuotaBucket{}, "QuotaBucket"},
+		{&QuotaBucketPreConsumeRecord{}, "QuotaBucketPreConsumeRecord"},
+		{&QuotaBucketPreConsumeAllocation{}, "QuotaBucketPreConsumeAllocation"},
 		{&CustomOAuthProvider{}, "CustomOAuthProvider"},
 		{&UserOAuthBinding{}, "UserOAuthBinding"},
 	}
@@ -362,6 +371,9 @@ func migrateDBFast() error {
 		if err := DB.AutoMigrate(&SubscriptionPlan{}); err != nil {
 			return err
 		}
+	}
+	if err := migrateLegacyWeeklyQuotaPlansToBuckets(); err != nil {
+		return err
 	}
 	common.SysLog("database migrated")
 	return nil

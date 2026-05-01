@@ -62,6 +62,10 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 			other["subscription_plan_title"] = info.SubscriptionPlanTitle
 		}
 		other["subscription_consumed"] = info.PriceData.Quota
+	} else if info.BillingSource == BillingSourceBucket {
+		other["billing_source"] = BillingSourceBucket
+		other["billing_request_id"] = info.RequestId
+		other["bucket_consumed"] = info.PriceData.Quota
 	}
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
 		ChannelId: info.ChannelId,
@@ -97,10 +101,20 @@ func taskIsSubscription(task *model.Task) bool {
 	return task.PrivateData.BillingSource == BillingSourceSubscription && task.PrivateData.SubscriptionId > 0
 }
 
-// taskAdjustFunding 调整任务的资金来源（钱包或订阅），delta > 0 表示扣费，delta < 0 表示退还。
+func taskIsBucket(task *model.Task) bool {
+	return task.PrivateData.BillingSource == BillingSourceBucket && strings.TrimSpace(task.PrivateData.BillingRequestId) != ""
+}
+
+// taskAdjustFunding 调整任务的资金来源（钱包、限时额度包或订阅），delta > 0 表示扣费，delta < 0 表示退还。
 func taskAdjustFunding(task *model.Task, delta int) error {
 	if taskIsSubscription(task) {
 		return model.PostConsumeUserSubscriptionDelta(task.PrivateData.SubscriptionId, int64(delta))
+	}
+	if task.PrivateData.BillingSource == BillingSourceBucket {
+		if !taskIsBucket(task) {
+			return fmt.Errorf("quota bucket billing request id is missing for task %s", task.TaskID)
+		}
+		return model.PostConsumeQuotaBucketDelta(task.PrivateData.BillingRequestId, int64(delta))
 	}
 	if delta > 0 {
 		return model.DecreaseUserQuota(task.UserId, delta, false)
@@ -152,6 +166,9 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 	if taskIsSubscription(task) {
 		other["billing_source"] = BillingSourceSubscription
 		other["subscription_id"] = task.PrivateData.SubscriptionId
+	} else if taskIsBucket(task) {
+		other["billing_source"] = BillingSourceBucket
+		other["billing_request_id"] = task.PrivateData.BillingRequestId
 	}
 	return other
 }
@@ -187,6 +204,8 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	other["reason"] = reason
 	if taskIsSubscription(task) {
 		other["subscription_consumed"] = -quota
+	} else if taskIsBucket(task) {
+		other["bucket_consumed"] = -quota
 	}
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 		UserId:    task.UserId,
@@ -253,6 +272,8 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	other["actual_quota"] = actualQuota
 	if taskIsSubscription(task) {
 		other["subscription_consumed"] = quotaDelta
+	} else if taskIsBucket(task) {
+		other["bucket_consumed"] = quotaDelta
 	}
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 		UserId:    task.UserId,

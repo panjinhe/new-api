@@ -132,6 +132,9 @@ func (s *BillingSession) needsRefundLocked() bool {
 	if sub, ok := s.funding.(*SubscriptionFunding); ok && sub.preConsumed > 0 {
 		return true
 	}
+	if bucket, ok := s.funding.(*BucketFunding); ok && bucket.preConsumed > 0 {
+		return true
+	}
 	return false
 }
 
@@ -177,7 +180,9 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 		}
 		// TODO: model 层应定义哨兵错误（如 ErrNoActiveSubscription），用 errors.Is 替代字符串匹配
 		errMsg := err.Error()
-		if strings.Contains(errMsg, "no active subscription") || strings.Contains(errMsg, "subscription quota insufficient") {
+		if strings.Contains(errMsg, "no active subscription") ||
+			strings.Contains(errMsg, "subscription quota insufficient") ||
+			strings.Contains(errMsg, "quota bucket insufficient") {
 			return types.NewErrorWithStatusCode(fmt.Errorf("订阅额度不足或未配置订阅: %s", errMsg), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
 		return types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
@@ -222,6 +227,8 @@ func (s *BillingSession) shouldTrust(c *gin.Context) bool {
 		// 2. SubscriptionFunding.PreConsume 忽略参数，始终用 s.amount 预扣
 		// 3. 若信任旁路将 effectiveQuota 设为 0，会导致 preConsumedQuota 与实际订阅预扣不一致
 		return false
+	case BillingSourceBucket:
+		return false
 	default:
 		return false
 	}
@@ -241,6 +248,10 @@ func (s *BillingSession) syncRelayInfo() {
 		info.SubscriptionAmountUsedAfterPreConsume = sub.AmountUsedAfter
 		info.SubscriptionPlanId = sub.PlanId
 		info.SubscriptionPlanTitle = sub.PlanTitle
+	} else if _, ok := s.funding.(*BucketFunding); ok {
+		info.SubscriptionId = 0
+		info.SubscriptionPreConsumed = 0
+		info.SubscriptionPostDelta = 0
 	} else {
 		info.SubscriptionId = 0
 		info.SubscriptionPreConsumed = 0
@@ -311,15 +322,46 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		return session, nil
 	}
 
+	tryBucket := func() (*BillingSession, *types.NewAPIError) {
+		bucketConsume := int64(preConsumedQuota)
+		if bucketConsume <= 0 {
+			bucketConsume = 1
+		}
+		session := &BillingSession{
+			relayInfo: relayInfo,
+			funding: &BucketFunding{
+				requestId: relayInfo.RequestId,
+				userId:    relayInfo.UserId,
+				amount:    bucketConsume,
+			},
+		}
+		if apiErr := session.preConsume(c, int(bucketConsume)); apiErr != nil {
+			return nil, apiErr
+		}
+		return session, nil
+	}
+
 	switch pref {
 	case "subscription_only":
-		return trySubscription()
+		session, apiErr := tryBucket()
+		if apiErr == nil {
+			return session, nil
+		}
+		if apiErr.GetErrorCode() == types.ErrorCodeInsufficientUserQuota {
+			return trySubscription()
+		}
+		return nil, apiErr
 	case "wallet_only":
 		return tryWallet()
 	case "wallet_first":
 		session, err := tryWallet()
 		if err != nil {
 			if err.GetErrorCode() == types.ErrorCodeInsufficientUserQuota {
+				if bucketSession, bucketErr := tryBucket(); bucketErr == nil {
+					return bucketSession, nil
+				} else if bucketErr.GetErrorCode() != types.ErrorCodeInsufficientUserQuota {
+					return nil, bucketErr
+				}
 				return trySubscription()
 			}
 			return nil, err
@@ -328,6 +370,19 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	case "subscription_first":
 		fallthrough
 	default:
+		hasBucket, bucketCheckErr := model.HasActiveQuotaBucket(relayInfo.UserId)
+		if bucketCheckErr != nil {
+			return nil, types.NewError(bucketCheckErr, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		}
+		if hasBucket {
+			session, apiErr := tryBucket()
+			if apiErr == nil {
+				return session, nil
+			}
+			if apiErr.GetErrorCode() != types.ErrorCodeInsufficientUserQuota {
+				return nil, apiErr
+			}
+		}
 		hasSub, subCheckErr := model.HasActiveUserSubscription(relayInfo.UserId)
 		if subCheckErr != nil {
 			return nil, types.NewError(subCheckErr, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())

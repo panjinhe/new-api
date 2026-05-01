@@ -127,8 +127,8 @@ type RelayInfo struct {
 	// Billing 是计费会话，封装了预扣费/结算/退款的统一生命周期。
 	// 免费模型时为 nil。
 	Billing BillingSettler
-	// BillingSource indicates whether this request is billed from wallet quota or subscription.
-	// "" or "wallet" => wallet; "subscription" => subscription
+	// BillingSource indicates whether this request is billed from wallet quota, quota bucket, or subscription.
+	// "" or "wallet" => wallet; "bucket" => limited-time quota bucket; "subscription" => subscription
 	BillingSource string
 	// SubscriptionId is the user_subscriptions.id used when BillingSource == "subscription"
 	SubscriptionId int
