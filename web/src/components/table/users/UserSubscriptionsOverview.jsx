@@ -747,12 +747,11 @@ const QuotaBucketFilters = ({
   );
 };
 
-const UserSubscriptionsOverview = ({ tabsArea }) => {
+const UserSubscriptionsOverview = ({ tabsArea, view = 'subscriptions' }) => {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [compactMode, setCompactMode] =
     useTableCompactMode('user-subscriptions');
-  const [activeView, setActiveView] = useState('subscriptions');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activePage, setActivePage] = useState(1);
@@ -1015,7 +1014,7 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
     (sum, row) => sum + Number(row.remaining_quota || 0),
     0,
   );
-  const isBucketView = activeView === 'buckets';
+  const isBucketView = view === 'buckets';
 
   return (
     <>
@@ -1046,22 +1045,6 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
               )}
             </div>
             <div className='flex flex-wrap items-center gap-2'>
-              <Button
-                size='small'
-                type={activeView === 'subscriptions' ? 'primary' : 'tertiary'}
-                theme={activeView === 'subscriptions' ? 'solid' : 'light'}
-                onClick={() => setActiveView('subscriptions')}
-              >
-                {t('月卡套餐')}
-              </Button>
-              <Button
-                size='small'
-                type={activeView === 'buckets' ? 'primary' : 'tertiary'}
-                theme={activeView === 'buckets' ? 'solid' : 'light'}
-                onClick={() => setActiveView('buckets')}
-              >
-                {t('限时额度包')}
-              </Button>
               {!isBucketView ? (
                 <CompactModeToggle
                   compactMode={compactMode}

@@ -136,8 +136,10 @@ const UsersManagementPanel = ({ tabsArea }) => {
 const UsersPage = () => {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab =
-    searchParams.get('tab') === 'subscriptions' ? 'subscriptions' : 'users';
+  const tab = searchParams.get('tab');
+  const activeTab = ['subscriptions', 'buckets'].includes(tab)
+    ? tab
+    : 'users';
 
   const handleTabChange = (key) => {
     const next = new URLSearchParams(searchParams);
@@ -148,12 +150,17 @@ const UsersPage = () => {
   const tabsArea = (
     <Tabs type='line' activeKey={activeTab} onChange={handleTabChange}>
       <TabPane tab={t('用户管理')} itemKey='users' />
-      <TabPane tab={t('用户权益')} itemKey='subscriptions' />
+      <TabPane tab={t('月卡套餐')} itemKey='subscriptions' />
+      <TabPane tab={t('限时额度包')} itemKey='buckets' />
     </Tabs>
   );
 
   if (activeTab === 'subscriptions') {
-    return <UserSubscriptionsOverview tabsArea={tabsArea} />;
+    return <UserSubscriptionsOverview tabsArea={tabsArea} view='subscriptions' />;
+  }
+
+  if (activeTab === 'buckets') {
+    return <UserSubscriptionsOverview tabsArea={tabsArea} view='buckets' />;
   }
 
   return <UsersManagementPanel tabsArea={tabsArea} />;
