@@ -59,9 +59,11 @@ const Home = () => {
     },
     {
       code: t('02'),
-      label: t('Pro 号池'),
+      label: t('Plus / Pro 号池'),
       title: t('无 Free / 无 Team 号'),
-      description: t('优先使用 Pro 资源池，减少低权益账号带来的排队和波动。'),
+      description: t(
+        '优先使用 Plus / Pro 高权益资源池，减少低权益账号带来的排队和波动。',
+      ),
       visual: 'pool',
     },
     {
@@ -162,7 +164,7 @@ const Home = () => {
                 </div>
                 <p className='mx-auto mt-5 max-w-2xl text-base leading-8 text-semi-color-text-1 md:text-lg'>
                   {t(
-                    '快响应、Pro 号池、配置简单，打开网站就能清楚知道怎么接入，日常调用更省心。',
+                    '快响应、Plus / Pro 号池、配置简单，打开网站就能清楚知道怎么接入，日常调用更省心。',
                   )}
                 </p>
                 <div className='mt-8 flex flex-col justify-center gap-3 sm:flex-row sm:items-center'>
@@ -205,7 +207,7 @@ const Home = () => {
                       {advantage.visual === 'pool' && (
                         <div className='home-card-pool'>
                           <div className='home-card-pool-active'>
-                            {t('PRO')}
+                            {t('PLUS / PRO')}
                           </div>
                           <div>{t('FREE')} 0</div>
                           <div>{t('TEAM')} 0</div>
