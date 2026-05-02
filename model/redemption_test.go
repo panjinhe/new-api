@@ -136,6 +136,76 @@ func TestRedeemOneTimeWelfareCodeOnlyOncePerUser(t *testing.T) {
 	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 105))
 }
 
+func TestRedeemOneTimeWelfareQuotaHistoryBlocksBucket(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 112)
+	welfareQuota := oneTimeWelfareRedemptionQuota()
+	first := seedRedemptionCode(t, "welfare-quota-before-bucket", RedemptionTypeQuota, welfareQuota, 0)
+	second := seedBucketRedemptionCode(t, "welfare-bucket-after-quota", welfareQuota, int64(2*24*3600))
+
+	_, err := Redeem(first.Key, 112)
+	require.NoError(t, err)
+	result, err := Redeem(second.Key, 112)
+	require.Error(t, err)
+
+	require.Nil(t, result)
+	assert.True(t, errors.Is(err, ErrRedemptionWelfareAlreadyRedeemed))
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, first.Id))
+	assert.Equal(t, common.RedemptionCodeStatusEnabled, getRedemptionStatus(t, second.Id))
+	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 112))
+
+	var bucketCount int64
+	require.NoError(t, DB.Model(&QuotaBucket{}).Where("user_id = ?", 112).Count(&bucketCount).Error)
+	assert.Zero(t, bucketCount)
+}
+
+func TestRedeemOneTimeWelfareBucketHistoryBlocksQuota(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 113)
+	welfareQuota := oneTimeWelfareRedemptionQuota()
+	first := seedBucketRedemptionCode(t, "welfare-bucket-before-quota", welfareQuota, int64(2*24*3600))
+	second := seedRedemptionCode(t, "welfare-quota-after-bucket", RedemptionTypeQuota, welfareQuota, 0)
+
+	result, err := Redeem(first.Key, 113)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Bucket)
+	assert.Equal(t, int64(welfareQuota), result.Bucket.Bucket.AmountTotal)
+
+	result, err = Redeem(second.Key, 113)
+	require.Error(t, err)
+	require.Nil(t, result)
+	assert.True(t, errors.Is(err, ErrRedemptionWelfareAlreadyRedeemed))
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, first.Id))
+	assert.Equal(t, common.RedemptionCodeStatusEnabled, getRedemptionStatus(t, second.Id))
+	assert.Equal(t, 0, getRedemptionUserQuota(t, 113))
+}
+
+func TestRedeemOneTimeWelfareBucketDurationDoesNotAffectLimit(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+	seedRedemptionUser(t, 114)
+	welfareQuota := oneTimeWelfareRedemptionQuota()
+	first := seedBucketRedemptionCode(t, "welfare-bucket-two-days", welfareQuota, int64(2*24*3600))
+	second := seedBucketRedemptionCode(t, "welfare-bucket-seven-days", welfareQuota, DefaultQuotaBucketDurationSeconds)
+
+	_, err := Redeem(first.Key, 114)
+	require.NoError(t, err)
+	result, err := Redeem(second.Key, 114)
+	require.Error(t, err)
+
+	require.Nil(t, result)
+	assert.True(t, errors.Is(err, ErrRedemptionWelfareAlreadyRedeemed))
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, first.Id))
+	assert.Equal(t, common.RedemptionCodeStatusEnabled, getRedemptionStatus(t, second.Id))
+
+	var bucketCount int64
+	require.NoError(t, DB.Model(&QuotaBucket{}).Where("user_id = ?", 114).Count(&bucketCount).Error)
+	assert.Equal(t, int64(1), bucketCount)
+}
+
 func TestRedeemOneTimeWelfareCodeAllowsDifferentUsers(t *testing.T) {
 	truncateTables(t)
 	resetRedemptionTestTables(t)

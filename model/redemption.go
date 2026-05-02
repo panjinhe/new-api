@@ -113,7 +113,8 @@ func isOneTimeWelfareRedemption(redemption *Redemption) bool {
 	if redemption == nil {
 		return false
 	}
-	return redemption.RedemptionType == RedemptionTypeQuota && redemption.Quota == oneTimeWelfareRedemptionQuota()
+	return (redemption.RedemptionType == RedemptionTypeQuota || redemption.RedemptionType == RedemptionTypeBucket) &&
+		redemption.Quota == oneTimeWelfareRedemptionQuota()
 }
 
 func lockUserForRedemptionTx(tx *gorm.DB, userId int) error {
@@ -126,7 +127,7 @@ func userHasRedeemedOneTimeWelfareTx(tx *gorm.DB, userId int) (bool, error) {
 	err := tx.Unscoped().Model(&Redemption{}).
 		Where("used_user_id = ?", userId).
 		Where("status = ?", common.RedemptionCodeStatusUsed).
-		Where("redemption_type = ?", RedemptionTypeQuota).
+		Where("redemption_type IN ?", []string{RedemptionTypeQuota, RedemptionTypeBucket}).
 		Where("quota = ?", oneTimeWelfareRedemptionQuota()).
 		Count(&count).Error
 	return count > 0, err
@@ -269,6 +270,11 @@ func RedeemWithAudit(key string, userId int, audit RedemptionAudit) (*Redemption
 		redemption.Normalize()
 		result.Type = redemption.RedemptionType
 		result.RedemptionId = redemption.Id
+		if isOneTimeWelfareRedemption(redemption) {
+			if err := ensureUserCanRedeemOneTimeWelfareTx(tx, userId); err != nil {
+				return err
+			}
+		}
 		if redemption.RedemptionType == RedemptionTypePlan {
 			subscription, plan, extended, err := redeemSubscriptionTx(tx, redemption, userId)
 			if err != nil {
@@ -287,11 +293,6 @@ func RedeemWithAudit(key string, userId int, audit RedemptionAudit) (*Redemption
 			}
 			result.Quota = redemption.Quota
 		} else {
-			if isOneTimeWelfareRedemption(redemption) {
-				if err := ensureUserCanRedeemOneTimeWelfareTx(tx, userId); err != nil {
-					return err
-				}
-			}
 			err = tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
 			if err != nil {
 				return err
