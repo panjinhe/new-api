@@ -163,6 +163,26 @@ func TestClassifyGenericRoutingCooldownCoolsChineseQuota403UntilNextDay(t *testi
 	assert.Less(t, state.ResetAt, maxReset)
 }
 
+func TestClassifyGenericRoutingCooldownCoolsDailyLimit429UntilNextDay(t *testing.T) {
+	err := types.NewOpenAIError(
+		assert.AnError,
+		types.ErrorCodeBadResponseStatusCode,
+		http.StatusTooManyRequests,
+	)
+	err.SetMessage(`error: code=429 reason="DAILY_LIMIT_EXCEEDED" message="daily usage limit exceeded" metadata=map[]`)
+
+	state, ok := classifyGenericRoutingCooldown(constant.ChannelTypeOpenAI, err)
+	require.True(t, ok)
+	assert.Equal(t, channelRoutingCooldownKindQuota, state.Kind)
+	assert.Equal(t, channelRoutingCooldownSourceDailyQuota, state.Source)
+	assert.Contains(t, state.Reason, "DAILY_LIMIT_EXCEEDED")
+
+	now := time.Now()
+	maxReset := now.Add(24*time.Hour + dailyQuotaResetDelay).Unix()
+	assert.Greater(t, state.ResetAt, now.Unix()+int64(defaultChannelRoutingCooldown/time.Second))
+	assert.Less(t, state.ResetAt, maxReset)
+}
+
 func TestClassifyGenericRoutingCooldownDoesNotCoolGenericForbidden(t *testing.T) {
 	err := types.NewOpenAIError(
 		assert.AnError,

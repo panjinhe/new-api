@@ -139,7 +139,7 @@ func classifyGenericRoutingCooldown(channelType int, err *types.NewAPIError) (mo
 		return model.RoutingCooldownState{}, false
 	}
 	if !hasReset {
-		if hasQuotaSignal && err.StatusCode == http.StatusForbidden {
+		if isDailyQuotaMessage(lowerCode, lowerMessage) || (hasQuotaSignal && err.StatusCode == http.StatusForbidden) {
 			resetAt = nextDailyQuotaReset(time.Now()).Unix()
 			source = channelRoutingCooldownSourceDailyQuota
 		} else {
@@ -292,6 +292,24 @@ func isQuotaExhaustionMessage(lowerCode string, lowerMessage string) bool {
 		"每天限制",
 	} {
 		if strings.Contains(lowerMessage, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDailyQuotaMessage(lowerCode string, lowerMessage string) bool {
+	for _, marker := range []string{
+		"daily_limit",
+		"daily limit",
+		"daily usage limit",
+		"per day",
+		"day quota",
+		"日限额",
+		"每日限额",
+		"每天限制",
+	} {
+		if strings.Contains(lowerCode, marker) || strings.Contains(lowerMessage, marker) {
 			return true
 		}
 	}
