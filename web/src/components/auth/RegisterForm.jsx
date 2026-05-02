@@ -141,10 +141,10 @@ const RegisterForm = () => {
       hasCustomOAuthProviders,
   );
 
-  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [showEmailVerification, setShowEmailVerification] = useState(true);
 
   useEffect(() => {
-    setShowEmailVerification(!!status?.email_verification);
+    setShowEmailVerification(true);
     if (status?.turnstile_check) {
       setTurnstileEnabled(true);
       setTurnstileSiteKey(status.turnstile_site_key);
@@ -222,6 +222,10 @@ const RegisterForm = () => {
     }
     if (password !== password2) {
       showInfo('两次输入的密码不一致');
+      return;
+    }
+    if (!inputs.email || !inputs.verification_code) {
+      showInfo(t('请输入邮箱地址和验证码'));
       return;
     }
     if (username && password) {

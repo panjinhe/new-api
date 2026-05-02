@@ -174,7 +174,6 @@ const SystemSetting = () => {
             break;
           case 'PasswordLoginEnabled':
           case 'PasswordRegisterEnabled':
-          case 'EmailVerificationEnabled':
           case 'GitHubOAuthEnabled':
           case 'WeChatAuthEnabled':
           case 'TelegramOAuthEnabled':
@@ -191,6 +190,9 @@ const SystemSetting = () => {
           case 'passkey.allow_insecure_origin':
           case 'WorkerAllowHttpImageRequestEnabled':
             item.value = toBoolean(item.value);
+            break;
+          case 'EmailVerificationEnabled':
+            item.value = true;
             break;
           case 'passkey.origins':
             // origins是逗号分隔的字符串，直接使用
@@ -215,6 +217,7 @@ const SystemSetting = () => {
         }
         newInputs[item.key] = item.value;
       });
+      newInputs.EmailVerificationEnabled = true;
       setInputs(newInputs);
       setOriginInputs(newInputs);
       // 同步模式布尔到本地状态
@@ -1013,11 +1016,12 @@ const SystemSetting = () => {
                       <Form.Checkbox
                         field='EmailVerificationEnabled'
                         noLabel
+                        disabled
                         onChange={(e) =>
                           handleCheckboxChange('EmailVerificationEnabled', e)
                         }
                       >
-                        {t('通过密码注册时需要进行邮箱验证')}
+                        {t('注册时必须进行邮箱验证')}
                       </Form.Checkbox>
                       <Form.Checkbox
                         field='RegisterEnabled'

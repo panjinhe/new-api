@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
@@ -236,6 +237,14 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	if !common.RegisterEnabled {
 		return nil, &OAuthRegistrationDisabledError{}
 	}
+	if strings.TrimSpace(oauthUser.Email) == "" {
+		return nil, oauth.NewOAuthError(i18n.MsgOAuthEmailRequired, providerParams(provider.GetName()))
+	}
+	if exists, err := model.CheckUserExistOrDeleted("", strings.TrimSpace(oauthUser.Email)); err != nil {
+		return nil, err
+	} else if exists {
+		return nil, oauth.NewOAuthError(i18n.MsgUserExists, nil)
+	}
 
 	// Set up new user
 	user.Username = provider.GetProviderPrefix() + strconv.Itoa(model.GetMaxUserId()+1)
@@ -256,9 +265,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	} else {
 		user.DisplayName = provider.GetName() + " User"
 	}
-	if oauthUser.Email != "" {
-		user.Email = oauthUser.Email
-	}
+	user.Email = strings.TrimSpace(oauthUser.Email)
 	user.Role = common.RoleCommonUser
 	user.Status = common.UserStatusEnabled
 
