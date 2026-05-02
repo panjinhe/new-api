@@ -90,6 +90,13 @@ function renderBucketStatusTag(status, t) {
       </Tag>
     );
   }
+  if (status === 'cancelled') {
+    return (
+      <Tag color='red' shape='circle' size='small'>
+        {t('已作废')}
+      </Tag>
+    );
+  }
   if (status === 'migrated') {
     return (
       <Tag color='blue' shape='circle' size='small'>
@@ -390,6 +397,32 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
     });
   };
 
+  const invalidateQuotaBucket = (bucketId) => {
+    Modal.confirm({
+      title: t('确认作废'),
+      content: t('作废后该限时额度包将立即失效，已用量和兑换记录会保留。是否继续？'),
+      centered: true,
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const res = await API.post(
+            `/api/subscription/admin/quota_buckets/${bucketId}/invalidate`,
+          );
+          if (res.data?.success) {
+            const msg = res.data?.data?.message;
+            showSuccess(msg ? msg : t('已作废'));
+            await loadUserQuotaBuckets();
+            onSuccess?.();
+          } else {
+            showError(res.data?.message || t('操作失败'));
+          }
+        } catch (e) {
+          showError(t('请求失败'));
+        }
+      },
+    });
+  };
+
   const columns = useMemo(() => {
     return [
       {
@@ -604,6 +637,27 @@ const UserSubscriptionsModal = ({ visible, onCancel, user, t, onSuccess }) => {
                 {t('关联套餐')}: {planTitle || (planId ? `#${planId}` : '-')}
               </div>
             </div>
+          );
+        },
+      },
+      {
+        title: '',
+        key: 'operate',
+        width: 100,
+        fixed: 'right',
+        render: (_, record) => {
+          const bucket = record?.bucket || {};
+          const isActive = record?.status === 'active';
+          return (
+            <Button
+              size='small'
+              type='danger'
+              theme='light'
+              disabled={!isActive}
+              onClick={() => invalidateQuotaBucket(bucket.id)}
+            >
+              {t('作废')}
+            </Button>
           );
         },
       },

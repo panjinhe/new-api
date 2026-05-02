@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -10,10 +11,11 @@ import (
 )
 
 const (
-	QuotaBucketStatusActive   = "active"
-	QuotaBucketStatusExpired  = "expired"
-	QuotaBucketStatusEmpty    = "empty"
-	QuotaBucketStatusMigrated = "migrated"
+	QuotaBucketStatusActive    = "active"
+	QuotaBucketStatusExpired   = "expired"
+	QuotaBucketStatusEmpty     = "empty"
+	QuotaBucketStatusCancelled = "cancelled"
+	QuotaBucketStatusMigrated  = "migrated"
 
 	QuotaBucketSourceRedemption = "redemption"
 	QuotaBucketSourceMigration  = "migration"
@@ -110,6 +112,52 @@ type QuotaBucketSelfSummary struct {
 	ActiveBucketCount int                  `json:"active_bucket_count"`
 }
 
+type AdminQuotaBucketQuery struct {
+	Page     int
+	PageSize int
+	Keyword  string
+	Status   string
+	Sort     string
+	Order    string
+}
+
+type AdminQuotaBucketItem struct {
+	Bucket         QuotaBucket `json:"bucket"`
+	RemainingQuota int64       `json:"remaining_quota"`
+	Status         string      `json:"status"`
+	Username       string      `json:"username"`
+	DisplayName    string      `json:"display_name"`
+	Email          string      `json:"email"`
+	Remark         string      `json:"remark,omitempty"`
+	RedemptionKey  string      `json:"redemption_key,omitempty"`
+	RedemptionName string      `json:"redemption_name,omitempty"`
+	BatchId        string      `json:"batch_id,omitempty"`
+}
+
+type adminQuotaBucketRow struct {
+	Id                 int
+	UserId             int
+	Title              string
+	AmountTotal        int64
+	AmountUsed         int64
+	AmountUsedTotal    int64
+	StartTime          int64
+	EndTime            int64
+	Status             string
+	Source             string
+	SourceRedemptionId int
+	SourcePlanId       int
+	CreatedAt          int64
+	UpdatedAt          int64
+	Username           string
+	DisplayName        string
+	Email              string
+	Remark             string
+	RedemptionKey      string
+	RedemptionName     string
+	BatchId            string
+}
+
 type QuotaBucketPreConsumeResult struct {
 	RecordId        int
 	PreConsumed     int64
@@ -164,6 +212,207 @@ func GetUserQuotaBucketSelf(userId int) (*QuotaBucketSelfSummary, error) {
 		}
 	}
 	return result, nil
+}
+
+func ListAdminQuotaBuckets(query AdminQuotaBucketQuery) ([]AdminQuotaBucketItem, int64, error) {
+	query = normalizeAdminQuotaBucketQuery(query)
+	now := common.GetTimestamp()
+
+	db := DB.Table("quota_buckets AS qb").
+		Joins("LEFT JOIN users AS u ON u.id = qb.user_id").
+		Joins("LEFT JOIN redemptions AS r ON r.id = qb.source_redemption_id")
+	db = applyAdminQuotaBucketFilters(db, query, now)
+
+	var total int64
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	if total == 0 {
+		return []AdminQuotaBucketItem{}, 0, nil
+	}
+
+	var rows []adminQuotaBucketRow
+	err := db.Select(strings.Join([]string{
+		"qb.id",
+		"qb.user_id",
+		"qb.title",
+		"qb.amount_total",
+		"qb.amount_used",
+		"qb.amount_used_total",
+		"qb.start_time",
+		"qb.end_time",
+		"qb.status",
+		"qb.source",
+		"qb.source_redemption_id",
+		"qb.source_plan_id",
+		"qb.created_at",
+		"qb.updated_at",
+		"u.username",
+		"u.display_name",
+		"u.email",
+		"u.remark",
+		"r." + commonKeyCol + " AS redemption_key",
+		"r.name AS redemption_name",
+		"r.batch_id",
+	}, ", ")).
+		Order(adminQuotaBucketOrder(query.Sort, query.Order)).
+		Limit(query.PageSize).
+		Offset((query.Page - 1) * query.PageSize).
+		Find(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	items := make([]AdminQuotaBucketItem, 0, len(rows))
+	for _, row := range rows {
+		bucket := QuotaBucket{
+			Id:                 row.Id,
+			UserId:             row.UserId,
+			Title:              row.Title,
+			AmountTotal:        row.AmountTotal,
+			AmountUsed:         row.AmountUsed,
+			AmountUsedTotal:    row.AmountUsedTotal,
+			StartTime:          row.StartTime,
+			EndTime:            row.EndTime,
+			Status:             row.Status,
+			Source:             row.Source,
+			SourceRedemptionId: row.SourceRedemptionId,
+			SourcePlanId:       row.SourcePlanId,
+			CreatedAt:          row.CreatedAt,
+			UpdatedAt:          row.UpdatedAt,
+		}
+		items = append(items, AdminQuotaBucketItem{
+			Bucket:         bucket,
+			RemainingQuota: quotaBucketRemaining(bucket),
+			Status:         effectiveQuotaBucketStatus(bucket, now),
+			Username:       row.Username,
+			DisplayName:    row.DisplayName,
+			Email:          row.Email,
+			Remark:         row.Remark,
+			RedemptionKey:  row.RedemptionKey,
+			RedemptionName: row.RedemptionName,
+			BatchId:        row.BatchId,
+		})
+	}
+	return items, total, nil
+}
+
+func normalizeAdminQuotaBucketQuery(query AdminQuotaBucketQuery) AdminQuotaBucketQuery {
+	if query.Page < 1 {
+		query.Page = 1
+	}
+	if query.PageSize <= 0 {
+		query.PageSize = common.ItemsPerPage
+	}
+	if query.PageSize > 100 {
+		query.PageSize = 100
+	}
+	query.Keyword = strings.TrimSpace(query.Keyword)
+	query.Status = strings.TrimSpace(query.Status)
+	switch query.Status {
+	case "active", "expired", "empty", "cancelled", "all":
+	default:
+		query.Status = "active_expired"
+	}
+	query.Sort = strings.TrimSpace(query.Sort)
+	switch query.Sort {
+	case "id", "end_time", "created_at", "amount_used", "remaining_quota", "usage_percent":
+	default:
+		query.Sort = "end_time"
+	}
+	query.Order = strings.ToLower(strings.TrimSpace(query.Order))
+	if query.Order != "asc" {
+		query.Order = "desc"
+	}
+	return query
+}
+
+func applyAdminQuotaBucketFilters(db *gorm.DB, query AdminQuotaBucketQuery, now int64) *gorm.DB {
+	if query.Keyword != "" {
+		like := "%" + query.Keyword + "%"
+		if keywordId, err := strconv.Atoi(query.Keyword); err == nil {
+			db = db.Where(
+				"qb.id = ? OR qb.user_id = ? OR u.username LIKE ? OR u.email LIKE ? OR u.display_name LIKE ? OR qb.title LIKE ? OR r."+commonKeyCol+" LIKE ? OR r.batch_id LIKE ?",
+				keywordId, keywordId, like, like, like, like, like, like,
+			)
+		} else {
+			db = db.Where(
+				"u.username LIKE ? OR u.email LIKE ? OR u.display_name LIKE ? OR qb.title LIKE ? OR r."+commonKeyCol+" LIKE ? OR r.batch_id LIKE ?",
+				like, like, like, like, like, like,
+			)
+		}
+	}
+
+	activeExpr := "(qb.status = ? AND qb.end_time > ? AND qb.amount_total > qb.amount_used)"
+	expiredExpr := "(qb.status <> ? AND qb.end_time > 0 AND qb.end_time <= ?)"
+	switch query.Status {
+	case "active":
+		return db.Where(activeExpr, QuotaBucketStatusActive, now)
+	case "expired":
+		return db.Where(expiredExpr, QuotaBucketStatusCancelled, now)
+	case "empty":
+		return db.Where("qb.status = ? OR (qb.status <> ? AND qb.amount_total > 0 AND qb.amount_used >= qb.amount_total)", QuotaBucketStatusEmpty, QuotaBucketStatusCancelled)
+	case "cancelled":
+		return db.Where("qb.status = ?", QuotaBucketStatusCancelled)
+	case "all":
+		return db
+	default:
+		return db.Where(activeExpr+" OR "+expiredExpr, QuotaBucketStatusActive, now, QuotaBucketStatusCancelled, now)
+	}
+}
+
+func adminQuotaBucketOrder(sortKey string, order string) string {
+	direction := "DESC"
+	if strings.ToLower(order) == "asc" {
+		direction = "ASC"
+	}
+	switch sortKey {
+	case "id":
+		return "qb.id " + direction
+	case "created_at":
+		return "qb.created_at " + direction + ", qb.id DESC"
+	case "amount_used":
+		return "qb.amount_used " + direction + ", qb.id DESC"
+	case "remaining_quota":
+		return "(qb.amount_total - qb.amount_used) " + direction + ", qb.id DESC"
+	case "usage_percent":
+		return "(CASE WHEN qb.amount_total > 0 THEN qb.amount_used * 1.0 / qb.amount_total ELSE 0 END) " + direction + ", qb.id DESC"
+	default:
+		return "qb.end_time " + direction + ", qb.id DESC"
+	}
+}
+
+func AdminInvalidateQuotaBucket(bucketId int) (string, error) {
+	if bucketId <= 0 {
+		return "", errors.New("invalid quota bucket id")
+	}
+	now := common.GetTimestamp()
+	var userId int
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var bucket QuotaBucket
+		if err := withUpdateLock(tx).Where("id = ?", bucketId).First(&bucket).Error; err != nil {
+			return err
+		}
+		userId = bucket.UserId
+		if bucket.Status == QuotaBucketStatusMigrated {
+			return errors.New("migrated quota bucket cannot be invalidated")
+		}
+		if bucket.Status == QuotaBucketStatusCancelled {
+			return nil
+		}
+		return tx.Model(&bucket).Updates(map[string]interface{}{
+			"status":     QuotaBucketStatusCancelled,
+			"end_time":   now,
+			"updated_at": now,
+		}).Error
+	})
+	if err != nil {
+		return "", err
+	}
+	if userId > 0 {
+		return fmt.Sprintf("用户 %d 的限时额度包已作废", userId), nil
+	}
+	return "限时额度包已作废", nil
 }
 
 func CreateQuotaBucketFromRedemptionTx(tx *gorm.DB, redemption *Redemption, userId int) (*QuotaBucket, error) {
@@ -455,6 +704,9 @@ func quotaBucketRemaining(bucket QuotaBucket) int64 {
 func effectiveQuotaBucketStatus(bucket QuotaBucket, now int64) string {
 	if bucket.Status == QuotaBucketStatusMigrated {
 		return QuotaBucketStatusMigrated
+	}
+	if bucket.Status == QuotaBucketStatusCancelled {
+		return QuotaBucketStatusCancelled
 	}
 	if bucket.EndTime > 0 && bucket.EndTime <= now {
 		return QuotaBucketStatusExpired

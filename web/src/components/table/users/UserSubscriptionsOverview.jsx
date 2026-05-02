@@ -22,6 +22,7 @@ import {
   Button,
   Empty,
   Form,
+  Modal,
   Progress,
   Space,
   Tag,
@@ -33,7 +34,7 @@ import {
   IllustrationNoResult,
   IllustrationNoResultDark,
 } from '@douyinfe/semi-illustrations';
-import { Settings2 } from 'lucide-react';
+import { Ban, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import CardPro from '../../common/ui/CardPro';
 import CardTable from '../../common/ui/CardTable';
@@ -44,6 +45,7 @@ import {
   renderNumber,
   renderQuota,
   showError,
+  showSuccess,
 } from '../../../helpers';
 import {
   createCardProPagination,
@@ -57,6 +59,7 @@ import UserSubscriptionsModal from './modals/UserSubscriptionsModal';
 const { Text } = Typography;
 const USER_SUBSCRIPTIONS_PAGE_SIZE_STORAGE_KEY =
   'admin-user-subscriptions-page-size';
+const QUOTA_BUCKETS_PAGE_SIZE_STORAGE_KEY = 'admin-quota-buckets-page-size';
 
 const formatTs = (timestamp) => {
   const value = Number(timestamp || 0);
@@ -207,6 +210,115 @@ const renderActualUsageCell = (summary, t) => {
   );
 };
 
+const renderBucketStatusTag = (status, t) => {
+  if (status === 'active') {
+    return (
+      <Tag color='green' shape='circle'>
+        {t('生效中')}
+      </Tag>
+    );
+  }
+  if (status === 'empty') {
+    return (
+      <Tag color='orange' shape='circle'>
+        {t('已用完')}
+      </Tag>
+    );
+  }
+  if (status === 'cancelled') {
+    return (
+      <Tag color='red' shape='circle'>
+        {t('已作废')}
+      </Tag>
+    );
+  }
+  if (status === 'migrated') {
+    return (
+      <Tag color='blue' shape='circle'>
+        {t('已迁移')}
+      </Tag>
+    );
+  }
+  return (
+    <Tag color='grey' shape='circle'>
+      {t('已过期')}
+    </Tag>
+  );
+};
+
+const renderBucketUserCell = (record, t) => {
+  const bucket = record?.bucket || {};
+  return (
+    <div className='min-w-0'>
+      <div className='flex items-center gap-2'>
+        <Text strong ellipsis={{ showTooltip: true }} style={{ maxWidth: 180 }}>
+          {record.username || '-'}
+        </Text>
+        <Tag color='white' shape='circle' size='small'>
+          {t('ID')} {bucket.user_id || '-'}
+        </Tag>
+      </div>
+      <div className='text-xs text-[var(--semi-color-text-2)]'>
+        {record.display_name || record.email || t('无显示信息')}
+      </div>
+      {record.remark ? (
+        <Tooltip content={record.remark}>
+          <div className='text-xs text-[var(--semi-color-text-2)] truncate max-w-[220px]'>
+            {record.remark}
+          </div>
+        </Tooltip>
+      ) : null}
+    </div>
+  );
+};
+
+const renderBucketInfoCell = (record, t) => {
+  const bucket = record?.bucket || {};
+  return (
+    <div className='min-w-0'>
+      <div className='font-medium truncate'>
+        {bucket.title || `${t('限时额度包')} #${bucket.id}`}
+      </div>
+      <div className='text-xs text-[var(--semi-color-text-2)]'>
+        #{bucket.id} · {t('兑换码')} #{bucket.source_redemption_id || '-'}
+      </div>
+      {record.batch_id ? (
+        <div className='text-xs text-[var(--semi-color-text-2)] truncate'>
+          {t('批次')}: {record.batch_id}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const renderBucketUsageCell = (record, t) => {
+  const bucket = record?.bucket || {};
+  const total = Number(bucket.amount_total || 0);
+  const used = Number(bucket.amount_used || 0);
+  const remaining = Number(record?.remaining_quota || 0);
+  const percent =
+    total > 0 ? Math.min(100, Math.max(0, (used / total) * 100)) : 0;
+  return (
+    <div className='min-w-[180px]'>
+      <div className='flex justify-between gap-2 text-xs'>
+        <span>
+          {renderQuota(used)} / {renderQuota(total)}
+        </span>
+        <Text type='secondary'>{percent.toFixed(0)}%</Text>
+      </div>
+      <Progress
+        percent={percent}
+        aria-label='quota bucket usage'
+        format={() => ''}
+        style={{ marginTop: 2, marginBottom: 0 }}
+      />
+      <div className='text-xs text-[var(--semi-color-text-2)]'>
+        {t('剩余')}: {renderQuota(remaining)}
+      </div>
+    </div>
+  );
+};
+
 const buildColumns = ({ t, openSubscriptions }) => [
   {
     title: t('用户'),
@@ -296,6 +408,99 @@ const buildColumns = ({ t, openSubscriptions }) => [
         {t('权益管理')}
       </Button>
     ),
+  },
+];
+
+const buildBucketColumns = ({ t, openSubscriptions, invalidateQuotaBucket }) => [
+  {
+    title: t('用户'),
+    key: 'user',
+    width: 240,
+    render: (_, record) => renderBucketUserCell(record, t),
+  },
+  {
+    title: t('限时额度包'),
+    key: 'bucket',
+    width: 240,
+    render: (_, record) => renderBucketInfoCell(record, t),
+  },
+  {
+    title: t('状态'),
+    key: 'status',
+    width: 110,
+    render: (_, record) => renderBucketStatusTag(record.status, t),
+  },
+  {
+    title: t('使用情况'),
+    key: 'usage',
+    width: 240,
+    render: (_, record) => renderBucketUsageCell(record, t),
+  },
+  {
+    title: t('有效期'),
+    key: 'validity',
+    width: 220,
+    render: (_, record) => (
+      <div className='text-xs text-[var(--semi-color-text-2)]'>
+        <div>
+          {t('开始')}: {formatTs(record.bucket?.start_time)}
+        </div>
+        <div>
+          {t('到期')}: {formatTs(record.bucket?.end_time)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    title: t('来源'),
+    key: 'source',
+    width: 210,
+    render: (_, record) => (
+      <div className='text-xs text-[var(--semi-color-text-2)]'>
+        <div>{record.redemption_name || record.bucket?.source || '-'}</div>
+        <div className='truncate'>
+          {t('兑换码')}: {record.redemption_key || '-'}
+        </div>
+      </div>
+    ),
+  },
+  {
+    title: '',
+    key: 'operate',
+    width: 170,
+    fixed: 'right',
+    render: (_, record) => {
+      const bucket = record?.bucket || {};
+      const user = {
+        id: bucket.user_id,
+        username: record.username,
+        display_name: record.display_name,
+        email: record.email,
+        remark: record.remark,
+      };
+      return (
+        <Space wrap>
+          <Button
+            size='small'
+            type='tertiary'
+            icon={<Settings2 size={14} />}
+            onClick={() => openSubscriptions(user)}
+          >
+            {t('权益')}
+          </Button>
+          <Button
+            size='small'
+            type='danger'
+            theme='light'
+            icon={<Ban size={14} />}
+            disabled={record.status !== 'active'}
+            onClick={() => invalidateQuotaBucket(bucket.id)}
+          >
+            {t('作废')}
+          </Button>
+        </Space>
+      );
+    },
   },
 ];
 
@@ -438,11 +643,116 @@ const UserSubscriptionFilters = ({
   );
 };
 
+const QuotaBucketFilters = ({
+  formInitValues,
+  setFormApi,
+  loadData,
+  resetData,
+  pageSize,
+  loading,
+  t,
+}) => {
+  const formApiRef = useRef(null);
+  const submit = () => {
+    loadData(1, pageSize);
+  };
+  const reset = () => {
+    formApiRef.current?.reset();
+    setTimeout(() => resetData(), 100);
+  };
+
+  return (
+    <Form
+      initValues={formInitValues}
+      getFormApi={(api) => {
+        setFormApi(api);
+        formApiRef.current = api;
+      }}
+      onSubmit={submit}
+      allowEmpty
+      autoComplete='off'
+      layout='horizontal'
+      trigger='change'
+      stopValidateWithError={false}
+      className='w-full'
+    >
+      <div className='grid grid-cols-1 md:grid-cols-4 xl:grid-cols-6 gap-2 w-full'>
+        <Form.Input
+          field='keyword'
+          prefix={<IconSearch />}
+          placeholder={t('搜索用户、兑换码、批次')}
+          showClear
+          pure
+          size='small'
+        />
+        <Form.Select
+          field='status'
+          placeholder={t('额度包状态')}
+          optionList={[
+            { label: t('生效和已过期'), value: 'active_expired' },
+            { label: t('生效中'), value: 'active' },
+            { label: t('已过期'), value: 'expired' },
+            { label: t('已用完'), value: 'empty' },
+            { label: t('已作废'), value: 'cancelled' },
+            { label: t('全部'), value: 'all' },
+          ]}
+          pure
+          size='small'
+        />
+        <Form.Select
+          field='sort'
+          placeholder={t('排序')}
+          optionList={[
+            { label: t('到期时间'), value: 'end_time' },
+            { label: t('创建时间'), value: 'created_at' },
+            { label: t('额度包 ID'), value: 'id' },
+            { label: t('已用额度'), value: 'amount_used' },
+            { label: t('剩余额度'), value: 'remaining_quota' },
+            { label: t('使用率'), value: 'usage_percent' },
+          ]}
+          pure
+          size='small'
+        />
+        <Form.Select
+          field='order'
+          placeholder={t('顺序')}
+          optionList={[
+            { label: t('升序'), value: 'asc' },
+            { label: t('降序'), value: 'desc' },
+          ]}
+          pure
+          size='small'
+        />
+        <div className='flex gap-2 md:col-span-2'>
+          <Button
+            type='tertiary'
+            htmlType='submit'
+            loading={loading}
+            className='flex-1'
+            size='small'
+          >
+            {t('查询')}
+          </Button>
+          <Button
+            type='tertiary'
+            onClick={reset}
+            className='flex-1'
+            size='small'
+          >
+            {t('重置')}
+          </Button>
+        </div>
+      </div>
+    </Form>
+  );
+};
+
 const UserSubscriptionsOverview = ({ tabsArea }) => {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [compactMode, setCompactMode] =
     useTableCompactMode('user-subscriptions');
+  const [activeView, setActiveView] = useState('subscriptions');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activePage, setActivePage] = useState(1);
@@ -452,6 +762,15 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
   );
   const [total, setTotal] = useState(0);
   const [formApi, setFormApi] = useState(null);
+  const [bucketRows, setBucketRows] = useState([]);
+  const [bucketLoading, setBucketLoading] = useState(false);
+  const [bucketActivePage, setBucketActivePage] = useState(1);
+  const [bucketPageSize, setBucketPageSize] = useState(
+    parseInt(localStorage.getItem(QUOTA_BUCKETS_PAGE_SIZE_STORAGE_KEY)) ||
+      ADMIN_ITEMS_PER_PAGE,
+  );
+  const [bucketTotal, setBucketTotal] = useState(0);
+  const [bucketFormApi, setBucketFormApi] = useState(null);
   const [groupOptions, setGroupOptions] = useState([]);
   const [planOptions, setPlanOptions] = useState([]);
   const [modalUser, setModalUser] = useState(null);
@@ -467,8 +786,16 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
     usage_filter: '',
     sort: 'id',
   };
+  const bucketFormInitValues = {
+    keyword: '',
+    status: 'active_expired',
+    sort: 'end_time',
+    order: 'asc',
+  };
 
   const getFormValues = () => formApi?.getValues?.() || formInitValues;
+  const getBucketFormValues = () =>
+    bucketFormApi?.getValues?.() || bucketFormInitValues;
 
   const buildQuery = (page, size) => {
     const values = getFormValues();
@@ -523,9 +850,56 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
     }
   };
 
+  const buildBucketQuery = (page, size) => {
+    const values = getBucketFormValues();
+    const params = new URLSearchParams();
+    params.set('p', page);
+    params.set('page_size', size);
+    if (values.keyword) params.set('keyword', values.keyword);
+    params.set('status', values.status || 'active_expired');
+    params.set('sort', values.sort || 'end_time');
+    params.set('order', values.order || 'asc');
+    return params.toString();
+  };
+
+  const loadBucketData = async (
+    page = bucketActivePage,
+    size = bucketPageSize,
+  ) => {
+    setBucketLoading(true);
+    try {
+      const res = await API.get(
+        `/api/subscription/admin/quota-buckets?${buildBucketQuery(page, size)}`,
+      );
+      const { success, message, data } = res.data;
+      if (success) {
+        const items = data.items || [];
+        setBucketRows(
+          items.map((item) => ({
+            ...item,
+            key: item?.bucket?.id,
+          })),
+        );
+        setBucketActivePage(data.page);
+        setBucketTotal(data.total);
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError(error.message || t('请求失败'));
+    } finally {
+      setBucketLoading(false);
+    }
+  };
+
   const resetData = async () => {
     setActivePage(1);
     await loadData(1, pageSize);
+  };
+
+  const resetBucketData = async () => {
+    setBucketActivePage(1);
+    await loadBucketData(1, bucketPageSize);
   };
 
   const fetchGroups = async () => {
@@ -553,6 +927,7 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
 
   useEffect(() => {
     loadData(1, pageSize);
+    loadBucketData(1, bucketPageSize);
     fetchGroups();
     fetchPlans();
   }, []);
@@ -567,12 +942,52 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
     loadData(1, size);
   };
 
+  const handleBucketPageChange = (page) => {
+    loadBucketData(page, bucketPageSize);
+  };
+
+  const handleBucketPageSizeChange = (size) => {
+    localStorage.setItem(QUOTA_BUCKETS_PAGE_SIZE_STORAGE_KEY, `${size}`);
+    setBucketPageSize(size);
+    loadBucketData(1, size);
+  };
+
   const openSubscriptions = (record) => {
     setModalUser(record);
     setShowUserSubscriptionsModal(true);
   };
 
+  const invalidateQuotaBucket = (bucketId) => {
+    Modal.confirm({
+      title: t('确认作废'),
+      content: t('作废后该限时额度包将立即失效，已用量和兑换记录会保留。是否继续？'),
+      centered: true,
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const res = await API.post(
+            `/api/subscription/admin/quota_buckets/${bucketId}/invalidate`,
+          );
+          if (res.data?.success) {
+            const msg = res.data?.data?.message;
+            showSuccess(msg ? msg : t('已作废'));
+            await loadBucketData(bucketActivePage, bucketPageSize);
+            await loadData(activePage, pageSize);
+          } else {
+            showError(res.data?.message || t('操作失败'));
+          }
+        } catch (e) {
+          showError(t('请求失败'));
+        }
+      },
+    });
+  };
+
   const columns = useMemo(() => buildColumns({ t, openSubscriptions }), [t]);
+  const bucketColumns = useMemo(
+    () => buildBucketColumns({ t, openSubscriptions, invalidateQuotaBucket }),
+    [t, bucketActivePage, bucketPageSize],
+  );
 
   const tableColumns = useMemo(() => {
     return compactMode
@@ -593,6 +1008,14 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
     (sum, row) => sum + Number(row.subscription_summary?.today_used || 0),
     0,
   );
+  const activeBucketCount = bucketRows.filter(
+    (row) => row.status === 'active',
+  ).length;
+  const bucketRemaining = bucketRows.reduce(
+    (sum, row) => sum + Number(row.remaining_quota || 0),
+    0,
+  );
+  const isBucketView = activeView === 'buckets';
 
   return (
     <>
@@ -602,67 +1025,153 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
           <div className='flex flex-col md:flex-row justify-between items-start md:items-center gap-2 w-full'>
             <div className='flex items-center gap-2 text-blue-500'>
               <Text>{t('用户权益')}</Text>
-              <Tag color='white' shape='circle'>
-                {t('本页生效')}: {renderNumber(activeUsers)}
-              </Tag>
-              <Tag color='white' shape='circle'>
-                {t('本页今日')}: {renderQuota(todayUsed)}
-              </Tag>
+              {isBucketView ? (
+                <>
+                  <Tag color='white' shape='circle'>
+                    {t('本页生效')}: {renderNumber(activeBucketCount)}
+                  </Tag>
+                  <Tag color='white' shape='circle'>
+                    {t('本页剩余')}: {renderQuota(bucketRemaining)}
+                  </Tag>
+                </>
+              ) : (
+                <>
+                  <Tag color='white' shape='circle'>
+                    {t('本页生效')}: {renderNumber(activeUsers)}
+                  </Tag>
+                  <Tag color='white' shape='circle'>
+                    {t('本页今日')}: {renderQuota(todayUsed)}
+                  </Tag>
+                </>
+              )}
             </div>
-            <CompactModeToggle
-              compactMode={compactMode}
-              setCompactMode={setCompactMode}
-              t={t}
-            />
+            <div className='flex flex-wrap items-center gap-2'>
+              <Button
+                size='small'
+                type={activeView === 'subscriptions' ? 'primary' : 'tertiary'}
+                theme={activeView === 'subscriptions' ? 'solid' : 'light'}
+                onClick={() => setActiveView('subscriptions')}
+              >
+                {t('月卡套餐')}
+              </Button>
+              <Button
+                size='small'
+                type={activeView === 'buckets' ? 'primary' : 'tertiary'}
+                theme={activeView === 'buckets' ? 'solid' : 'light'}
+                onClick={() => setActiveView('buckets')}
+              >
+                {t('限时额度包')}
+              </Button>
+              {!isBucketView ? (
+                <CompactModeToggle
+                  compactMode={compactMode}
+                  setCompactMode={setCompactMode}
+                  t={t}
+                />
+              ) : null}
+            </div>
           </div>
         }
         tabsArea={tabsArea}
         actionsArea={
-          <UserSubscriptionFilters
-            formInitValues={formInitValues}
-            setFormApi={setFormApi}
-            loadData={loadData}
-            resetData={resetData}
-            pageSize={pageSize}
-            groupOptions={groupOptions}
-            planOptions={planOptions}
-            loading={loading}
-            t={t}
-          />
+          isBucketView ? (
+            <QuotaBucketFilters
+              formInitValues={bucketFormInitValues}
+              setFormApi={setBucketFormApi}
+              loadData={loadBucketData}
+              resetData={resetBucketData}
+              pageSize={bucketPageSize}
+              loading={bucketLoading}
+              t={t}
+            />
+          ) : (
+            <UserSubscriptionFilters
+              formInitValues={formInitValues}
+              setFormApi={setFormApi}
+              loadData={loadData}
+              resetData={resetData}
+              pageSize={pageSize}
+              groupOptions={groupOptions}
+              planOptions={planOptions}
+              loading={loading}
+              t={t}
+            />
+          )
         }
-        paginationArea={createCardProPagination({
-          currentPage: activePage,
-          pageSize,
-          total,
-          onPageChange: handlePageChange,
-          onPageSizeChange: handlePageSizeChange,
-          isMobile,
-          t,
-        })}
+        paginationArea={
+          isBucketView
+            ? createCardProPagination({
+                currentPage: bucketActivePage,
+                pageSize: bucketPageSize,
+                total: bucketTotal,
+                onPageChange: handleBucketPageChange,
+                onPageSizeChange: handleBucketPageSizeChange,
+                isMobile,
+                t,
+              })
+            : createCardProPagination({
+                currentPage: activePage,
+                pageSize,
+                total,
+                onPageChange: handlePageChange,
+                onPageSizeChange: handlePageSizeChange,
+                isMobile,
+                t,
+              })
+        }
         t={t}
       >
-        <CardTable
-          columns={tableColumns}
-          dataSource={rows}
-          scroll={compactMode ? undefined : { x: 'max-content' }}
-          pagination={false}
-          hidePagination
-          loading={loading}
-          empty={
-            <Empty
-              image={
-                <IllustrationNoResult style={{ width: 150, height: 150 }} />
-              }
-              darkModeImage={
-                <IllustrationNoResultDark style={{ width: 150, height: 150 }} />
-              }
-              description={t('搜索无结果')}
-              style={{ padding: 30 }}
-            />
-          }
-          className='overflow-hidden'
-          size='middle'
-        />
+        {isBucketView ? (
+          <CardTable
+            columns={bucketColumns}
+            dataSource={bucketRows}
+            scroll={{ x: 'max-content' }}
+            pagination={false}
+            hidePagination
+            loading={bucketLoading}
+            empty={
+              <Empty
+                image={
+                  <IllustrationNoResult style={{ width: 150, height: 150 }} />
+                }
+                darkModeImage={
+                  <IllustrationNoResultDark
+                    style={{ width: 150, height: 150 }}
+                  />
+                }
+                description={t('暂无限时额度包')}
+                style={{ padding: 30 }}
+              />
+            }
+            className='overflow-hidden'
+            size='middle'
+          />
+        ) : (
+          <CardTable
+            columns={tableColumns}
+            dataSource={rows}
+            scroll={compactMode ? undefined : { x: 'max-content' }}
+            pagination={false}
+            hidePagination
+            loading={loading}
+            empty={
+              <Empty
+                image={
+                  <IllustrationNoResult style={{ width: 150, height: 150 }} />
+                }
+                darkModeImage={
+                  <IllustrationNoResultDark
+                    style={{ width: 150, height: 150 }}
+                  />
+                }
+                description={t('搜索无结果')}
+                style={{ padding: 30 }}
+              />
+            }
+            className='overflow-hidden'
+            size='middle'
+          />
+        )}
       </CardPro>
 
       <UserSubscriptionsModal
@@ -670,7 +1179,10 @@ const UserSubscriptionsOverview = ({ tabsArea }) => {
         onCancel={() => setShowUserSubscriptionsModal(false)}
         user={modalUser}
         t={t}
-        onSuccess={() => loadData(activePage, pageSize)}
+        onSuccess={() => {
+          loadData(activePage, pageSize);
+          loadBucketData(bucketActivePage, bucketPageSize);
+        }}
       />
     </>
   );

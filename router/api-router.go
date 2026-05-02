@@ -158,11 +158,13 @@ func SetApiRouter(router *gin.Engine) {
 			subscriptionAdminRoute.PATCH("/plans/:id", controller.AdminUpdateSubscriptionPlanStatus)
 			subscriptionAdminRoute.POST("/bind", controller.AdminBindSubscription)
 			subscriptionAdminRoute.GET("/user-subscription-summaries", controller.AdminListUserSubscriptionSummaries)
+			subscriptionAdminRoute.GET("/quota-buckets", controller.AdminListQuotaBuckets)
 
 			// User subscription management (admin)
 			subscriptionAdminRoute.GET("/users/:id/subscriptions", controller.AdminListUserSubscriptions)
 			subscriptionAdminRoute.GET("/users/:id/quota_buckets", controller.AdminListUserQuotaBuckets)
 			subscriptionAdminRoute.POST("/users/:id/subscriptions", controller.AdminCreateUserSubscription)
+			subscriptionAdminRoute.POST("/quota_buckets/:id/invalidate", controller.AdminInvalidateQuotaBucket)
 			subscriptionAdminRoute.POST("/user_subscriptions/:id/invalidate", controller.AdminInvalidateUserSubscription)
 			subscriptionAdminRoute.POST("/user_subscriptions/:id/reset_usage", controller.AdminResetUserSubscriptionCurrentUsage)
 			subscriptionAdminRoute.DELETE("/user_subscriptions/:id", controller.AdminDeleteUserSubscription)

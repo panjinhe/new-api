@@ -343,6 +343,26 @@ func AdminListUserSubscriptionSummaries(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
+func AdminListQuotaBuckets(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	items, total, err := model.ListAdminQuotaBuckets(model.AdminQuotaBucketQuery{
+		Page:     pageInfo.GetPage(),
+		PageSize: pageInfo.GetPageSize(),
+		Keyword:  c.Query("keyword"),
+		Status:   c.Query("status"),
+		Sort:     c.Query("sort"),
+		Order:    c.Query("order"),
+	})
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
+}
+
 // ---- Admin: user subscription management ----
 
 func AdminListUserSubscriptions(c *gin.Context) {
@@ -371,6 +391,24 @@ func AdminListUserQuotaBuckets(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, buckets)
+}
+
+func AdminInvalidateQuotaBucket(c *gin.Context) {
+	bucketId, _ := strconv.Atoi(c.Param("id"))
+	if bucketId <= 0 {
+		common.ApiErrorMsg(c, "无效的限时额度包ID")
+		return
+	}
+	msg, err := model.AdminInvalidateQuotaBucket(bucketId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if msg != "" {
+		common.ApiSuccess(c, gin.H{"message": msg})
+		return
+	}
+	common.ApiSuccess(c, nil)
 }
 
 type AdminCreateUserSubscriptionRequest struct {
