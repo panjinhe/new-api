@@ -2,10 +2,12 @@ package channel
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"regexp"
 	"strings"
 	"sync"
@@ -483,6 +485,44 @@ func sendPingData(c *gin.Context, mutex *sync.Mutex) error {
 func DoRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	return doRequest(c, req, info)
 }
+
+func addUpstreamTrace(req *http.Request, info *common.RelayInfo) *http.Request {
+	if req == nil || info == nil {
+		return req
+	}
+	trace := &httptrace.ClientTrace{
+		DNSStart: func(httptrace.DNSStartInfo) {
+			info.SetUpstreamDNSStartTime(time.Now())
+		},
+		DNSDone: func(httptrace.DNSDoneInfo) {
+			info.SetUpstreamDNSDoneTime(time.Now())
+		},
+		ConnectStart: func(_, _ string) {
+			info.SetUpstreamConnectStartTime(time.Now())
+		},
+		ConnectDone: func(_, _ string, _ error) {
+			info.SetUpstreamConnectDoneTime(time.Now())
+		},
+		TLSHandshakeStart: func() {
+			info.SetUpstreamTLSHandshakeStartTime(time.Now())
+		},
+		TLSHandshakeDone: func(tls.ConnectionState, error) {
+			info.SetUpstreamTLSHandshakeDoneTime(time.Now())
+		},
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			info.SetUpstreamGotConnTime(time.Now(), connInfo.Reused)
+		},
+		WroteRequest: func(httptrace.WroteRequestInfo) {
+			info.SetUpstreamRequestWroteTime(time.Now())
+		},
+		GotFirstResponseByte: func() {
+			info.SetUpstreamFirstByteTime(time.Now())
+		},
+	}
+	ctx := httptrace.WithClientTrace(req.Context(), trace)
+	return req.WithContext(ctx)
+}
+
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	var client *http.Client
 	var err error
@@ -515,6 +555,8 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		}
 	}
 
+	info.BeginUpstreamRequest(time.Now())
+	req = addUpstreamTrace(req, info)
 	resp, err := client.Do(req)
 	if err != nil {
 		logger.LogError(c, "do request failed: "+err.Error())
@@ -523,6 +565,7 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	if resp == nil {
 		return nil, errors.New("resp is nil")
 	}
+	info.SetUpstreamResponseHeaderTime(time.Now())
 
 	_ = req.Body.Close()
 	_ = c.Request.Body.Close()

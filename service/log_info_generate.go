@@ -2,6 +2,7 @@ package service
 
 import (
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -75,10 +76,53 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendRequestPath(ctx, relayInfo, other)
 	appendRequestConversionChain(relayInfo, other)
 	appendFinalRequestFormat(relayInfo, other)
+	appendTimingInfo(relayInfo, other)
 	appendBillingInfo(relayInfo, other)
 	appendParamOverrideInfo(relayInfo, other)
 	appendStreamStatus(relayInfo, other)
 	return other
+}
+
+func durationMsSince(start, end time.Time) int64 {
+	if start.IsZero() || end.IsZero() {
+		return 0
+	}
+	return end.Sub(start).Milliseconds()
+}
+
+func appendTimingIfPositive(timing map[string]interface{}, key string, start, end time.Time) {
+	if timing == nil {
+		return
+	}
+	if start.IsZero() || end.IsZero() {
+		return
+	}
+	if ms := durationMsSince(start, end); ms >= 0 {
+		timing[key] = ms
+	}
+}
+
+func appendTimingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
+	if relayInfo == nil || other == nil {
+		return
+	}
+	timing := make(map[string]interface{})
+	appendTimingIfPositive(timing, "gateway_to_upstream_ms", relayInfo.StartTime, relayInfo.UpstreamRequestStartTime)
+	appendTimingIfPositive(timing, "upstream_request_write_ms", relayInfo.UpstreamRequestStartTime, relayInfo.UpstreamRequestWroteTime)
+	appendTimingIfPositive(timing, "upstream_header_ms", relayInfo.UpstreamRequestStartTime, relayInfo.UpstreamResponseHeaderTime)
+	appendTimingIfPositive(timing, "upstream_first_byte_ms", relayInfo.UpstreamRequestStartTime, relayInfo.UpstreamFirstByteTime)
+	appendTimingIfPositive(timing, "upstream_body_first_ms", relayInfo.UpstreamResponseHeaderTime, relayInfo.FirstResponseTime)
+	appendTimingIfPositive(timing, "total_first_response_ms", relayInfo.StartTime, relayInfo.FirstResponseTime)
+	appendTimingIfPositive(timing, "dns_ms", relayInfo.UpstreamDNSStartTime, relayInfo.UpstreamDNSDoneTime)
+	appendTimingIfPositive(timing, "connect_ms", relayInfo.UpstreamConnectStartTime, relayInfo.UpstreamConnectDoneTime)
+	appendTimingIfPositive(timing, "tls_ms", relayInfo.UpstreamTLSHandshakeStartTime, relayInfo.UpstreamTLSHandshakeDoneTime)
+	appendTimingIfPositive(timing, "got_conn_ms", relayInfo.UpstreamRequestStartTime, relayInfo.UpstreamGotConnTime)
+	if !relayInfo.UpstreamGotConnTime.IsZero() {
+		timing["upstream_reused_conn"] = relayInfo.UpstreamReusedConn
+	}
+	if len(timing) > 0 {
+		other["timing"] = timing
+	}
 }
 
 func appendParamOverrideInfo(relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {

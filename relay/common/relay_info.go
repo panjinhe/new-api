@@ -95,6 +95,20 @@ type RelayInfo struct {
 	StartTime         time.Time
 	FirstResponseTime time.Time
 	isFirstResponse   bool
+	// Upstream timing fields are used to split first-response latency into
+	// gateway overhead, upstream connection/request time, and stream body wait.
+	UpstreamRequestStartTime      time.Time
+	UpstreamRequestWroteTime      time.Time
+	UpstreamFirstByteTime         time.Time
+	UpstreamResponseHeaderTime    time.Time
+	UpstreamDNSStartTime          time.Time
+	UpstreamDNSDoneTime           time.Time
+	UpstreamConnectStartTime      time.Time
+	UpstreamConnectDoneTime       time.Time
+	UpstreamTLSHandshakeStartTime time.Time
+	UpstreamTLSHandshakeDoneTime  time.Time
+	UpstreamGotConnTime           time.Time
+	UpstreamReusedConn            bool
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -650,6 +664,102 @@ func (info *RelayInfo) SetFirstResponseTime() {
 		info.FirstResponseTime = time.Now()
 		info.isFirstResponse = false
 	}
+}
+
+func (info *RelayInfo) SetUpstreamRequestStartTime(t time.Time) {
+	if info == nil || !info.UpstreamRequestStartTime.IsZero() {
+		return
+	}
+	info.UpstreamRequestStartTime = t
+}
+
+func (info *RelayInfo) BeginUpstreamRequest(t time.Time) {
+	if info == nil {
+		return
+	}
+	info.UpstreamRequestStartTime = t
+	info.UpstreamRequestWroteTime = time.Time{}
+	info.UpstreamFirstByteTime = time.Time{}
+	info.UpstreamResponseHeaderTime = time.Time{}
+	info.UpstreamDNSStartTime = time.Time{}
+	info.UpstreamDNSDoneTime = time.Time{}
+	info.UpstreamConnectStartTime = time.Time{}
+	info.UpstreamConnectDoneTime = time.Time{}
+	info.UpstreamTLSHandshakeStartTime = time.Time{}
+	info.UpstreamTLSHandshakeDoneTime = time.Time{}
+	info.UpstreamGotConnTime = time.Time{}
+	info.UpstreamReusedConn = false
+}
+
+func (info *RelayInfo) SetUpstreamRequestWroteTime(t time.Time) {
+	if info == nil || !info.UpstreamRequestWroteTime.IsZero() {
+		return
+	}
+	info.UpstreamRequestWroteTime = t
+}
+
+func (info *RelayInfo) SetUpstreamFirstByteTime(t time.Time) {
+	if info == nil || !info.UpstreamFirstByteTime.IsZero() {
+		return
+	}
+	info.UpstreamFirstByteTime = t
+}
+
+func (info *RelayInfo) SetUpstreamResponseHeaderTime(t time.Time) {
+	if info == nil || !info.UpstreamResponseHeaderTime.IsZero() {
+		return
+	}
+	info.UpstreamResponseHeaderTime = t
+}
+
+func (info *RelayInfo) SetUpstreamDNSStartTime(t time.Time) {
+	if info == nil || !info.UpstreamDNSStartTime.IsZero() {
+		return
+	}
+	info.UpstreamDNSStartTime = t
+}
+
+func (info *RelayInfo) SetUpstreamDNSDoneTime(t time.Time) {
+	if info == nil || !info.UpstreamDNSDoneTime.IsZero() {
+		return
+	}
+	info.UpstreamDNSDoneTime = t
+}
+
+func (info *RelayInfo) SetUpstreamConnectStartTime(t time.Time) {
+	if info == nil || !info.UpstreamConnectStartTime.IsZero() {
+		return
+	}
+	info.UpstreamConnectStartTime = t
+}
+
+func (info *RelayInfo) SetUpstreamConnectDoneTime(t time.Time) {
+	if info == nil || !info.UpstreamConnectDoneTime.IsZero() {
+		return
+	}
+	info.UpstreamConnectDoneTime = t
+}
+
+func (info *RelayInfo) SetUpstreamTLSHandshakeStartTime(t time.Time) {
+	if info == nil || !info.UpstreamTLSHandshakeStartTime.IsZero() {
+		return
+	}
+	info.UpstreamTLSHandshakeStartTime = t
+}
+
+func (info *RelayInfo) SetUpstreamTLSHandshakeDoneTime(t time.Time) {
+	if info == nil || !info.UpstreamTLSHandshakeDoneTime.IsZero() {
+		return
+	}
+	info.UpstreamTLSHandshakeDoneTime = t
+}
+
+func (info *RelayInfo) SetUpstreamGotConnTime(t time.Time, reused bool) {
+	if info == nil || !info.UpstreamGotConnTime.IsZero() {
+		return
+	}
+	info.UpstreamGotConnTime = t
+	info.UpstreamReusedConn = reused
 }
 
 func (info *RelayInfo) HasSendResponse() bool {

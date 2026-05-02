@@ -2,6 +2,7 @@ package common
 
 import (
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/types"
 	"github.com/stretchr/testify/require"
@@ -37,4 +38,25 @@ func TestRelayInfoGetFinalRequestRelayFormatFallsBackToRelayFormat(t *testing.T)
 func TestRelayInfoGetFinalRequestRelayFormatNilReceiver(t *testing.T) {
 	var info *RelayInfo
 	require.Equal(t, types.RelayFormat(""), info.GetFinalRequestRelayFormat())
+}
+
+func TestRelayInfoBeginUpstreamRequestResetsAttemptTiming(t *testing.T) {
+	first := time.Unix(100, 0)
+	second := first.Add(time.Second)
+	info := &RelayInfo{}
+
+	info.BeginUpstreamRequest(first)
+	info.SetUpstreamRequestWroteTime(first.Add(10 * time.Millisecond))
+	info.SetUpstreamFirstByteTime(first.Add(20 * time.Millisecond))
+	info.SetUpstreamResponseHeaderTime(first.Add(30 * time.Millisecond))
+	info.SetUpstreamGotConnTime(first.Add(5*time.Millisecond), true)
+
+	info.BeginUpstreamRequest(second)
+
+	require.Equal(t, second, info.UpstreamRequestStartTime)
+	require.True(t, info.UpstreamRequestWroteTime.IsZero())
+	require.True(t, info.UpstreamFirstByteTime.IsZero())
+	require.True(t, info.UpstreamResponseHeaderTime.IsZero())
+	require.True(t, info.UpstreamGotConnTime.IsZero())
+	require.False(t, info.UpstreamReusedConn)
 }
