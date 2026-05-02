@@ -88,12 +88,20 @@ if (-not (Test-Path -LiteralPath $SshConfigPath)) {
 }
 
 if (-not $SkipBuild) {
-  $buildArgs = @("-Output", $BuildOutput)
+  $shortSha = (& git -C $RootDir rev-parse --short HEAD).Trim()
+  if ([string]::IsNullOrWhiteSpace($shortSha)) {
+    throw "Failed to read the current git short SHA."
+  }
+
+  $buildArgs = @{
+    Version = $shortSha
+    Output  = $BuildOutput
+  }
   if ($SkipFrontendBuild) {
-    $buildArgs += "-SkipFrontendBuild"
+    $buildArgs.SkipFrontendBuild = $true
   }
   elseif (-not $ForceFrontendBuild) {
-    $buildArgs += "-AutoSkipFrontendBuild"
+    $buildArgs.AutoSkipFrontendBuild = $true
   }
 
   Invoke-Checked -Description "Build Linux release binary" -Command {
@@ -106,9 +114,11 @@ else {
 
 Assert-ElfBinary -Path $BuildOutputPath
 
-$shortSha = (& git -C $RootDir rev-parse --short HEAD).Trim()
-if ([string]::IsNullOrWhiteSpace($shortSha)) {
-  throw "Failed to read the current git short SHA."
+if (-not (Get-Variable -Name shortSha -Scope Local -ErrorAction SilentlyContinue)) {
+  $shortSha = (& git -C $RootDir rev-parse --short HEAD).Trim()
+  if ([string]::IsNullOrWhiteSpace($shortSha)) {
+    throw "Failed to read the current git short SHA."
+  }
 }
 
 $remoteArchive = ""
@@ -143,6 +153,7 @@ Invoke-Checked -Description "Upload Linux binary" -Command {
 }
 
 $sourceSyncValue = if ($SkipSourceSync) { "0" } else { "1" }
+$remoteArchiveArg = if ([string]::IsNullOrEmpty($remoteArchive)) { "-" } else { $remoteArchive }
 $remoteScript = @'
 set -euo pipefail
 
@@ -208,13 +219,14 @@ $sshArgs = @(
   $RemoteTmpDir,
   $ContainerName,
   $ImageName,
-  $remoteArchive,
+  $remoteArchiveArg,
   $remoteBinary,
   $HealthUrl,
   "$RestartTimeoutSec",
   $sourceSyncValue
 )
 
+$remoteScript = $remoteScript -replace "`r`n", "`n"
 $remoteScript | & ssh @sshArgs
 if ($LASTEXITCODE -ne 0) {
   throw "Remote fast deployment failed with exit code $LASTEXITCODE"
