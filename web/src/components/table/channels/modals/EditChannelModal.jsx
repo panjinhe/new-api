@@ -110,6 +110,8 @@ const REGION_EXAMPLE = {
 const CODEX_ACCOUNT_VALID_DAYS = 30;
 const UPSTREAM_DETECTED_MODEL_PREVIEW_LIMIT = 8;
 const ADVANCED_SETTINGS_EXPANDED_KEY = 'channel-advanced-settings-expanded';
+const QUOTA_BILLING_PAY_AS_YOU_GO = 'pay_as_you_go';
+const QUOTA_BILLING_DAILY = 'daily';
 
 const PARAM_OVERRIDE_LEGACY_TEMPLATE = {
   temperature: 0,
@@ -218,6 +220,9 @@ const EditChannelModal = (props) => {
     allow_inference_geo: false,
     allow_speed: false,
     claude_beta_query: false,
+    quota_billing_mode: QUOTA_BILLING_PAY_AS_YOU_GO,
+    daily_quota_reset_time: '00:05',
+    daily_quota_reset_timezone: 'Asia/Shanghai',
     upstream_model_update_check_enabled: false,
     upstream_model_update_auto_sync_enabled: false,
     upstream_model_update_last_check_time: 0,
@@ -900,6 +905,12 @@ const EditChannelModal = (props) => {
             parsedSettings.allow_inference_geo || false;
           data.allow_speed = parsedSettings.allow_speed || false;
           data.claude_beta_query = parsedSettings.claude_beta_query || false;
+          data.quota_billing_mode =
+            parsedSettings.quota_billing_mode || QUOTA_BILLING_PAY_AS_YOU_GO;
+          data.daily_quota_reset_time =
+            parsedSettings.daily_quota_reset_time || '00:05';
+          data.daily_quota_reset_timezone =
+            parsedSettings.daily_quota_reset_timezone || 'Asia/Shanghai';
           data.upstream_model_update_check_enabled =
             parsedSettings.upstream_model_update_check_enabled === true;
           data.upstream_model_update_auto_sync_enabled =
@@ -930,6 +941,9 @@ const EditChannelModal = (props) => {
           data.allow_inference_geo = false;
           data.allow_speed = false;
           data.claude_beta_query = false;
+          data.quota_billing_mode = QUOTA_BILLING_PAY_AS_YOU_GO;
+          data.daily_quota_reset_time = '00:05';
+          data.daily_quota_reset_timezone = 'Asia/Shanghai';
           data.upstream_model_update_check_enabled = false;
           data.upstream_model_update_auto_sync_enabled = false;
           data.upstream_model_update_last_check_time = 0;
@@ -948,6 +962,9 @@ const EditChannelModal = (props) => {
         data.allow_inference_geo = false;
         data.allow_speed = false;
         data.claude_beta_query = false;
+        data.quota_billing_mode = QUOTA_BILLING_PAY_AS_YOU_GO;
+        data.daily_quota_reset_time = '00:05';
+        data.daily_quota_reset_timezone = 'Asia/Shanghai';
         data.upstream_model_update_check_enabled = false;
         data.upstream_model_update_auto_sync_enabled = false;
         data.upstream_model_update_last_check_time = 0;
@@ -1799,6 +1816,19 @@ const EditChannelModal = (props) => {
           localInputs.allow_safety_identifier === true;
         settings.allow_include_obfuscation =
           localInputs.allow_include_obfuscation === true;
+        settings.quota_billing_mode =
+          localInputs.quota_billing_mode === QUOTA_BILLING_DAILY
+            ? QUOTA_BILLING_DAILY
+            : QUOTA_BILLING_PAY_AS_YOU_GO;
+        if (settings.quota_billing_mode === QUOTA_BILLING_DAILY) {
+          settings.daily_quota_reset_time =
+            localInputs.daily_quota_reset_time || '00:05';
+          settings.daily_quota_reset_timezone =
+            localInputs.daily_quota_reset_timezone || 'Asia/Shanghai';
+        } else {
+          delete settings.daily_quota_reset_time;
+          delete settings.daily_quota_reset_timezone;
+        }
       }
       if (localInputs.type === 14) {
         settings.allow_inference_geo = localInputs.allow_inference_geo === true;
@@ -1852,6 +1882,9 @@ const EditChannelModal = (props) => {
     delete localInputs.allow_inference_geo;
     delete localInputs.allow_speed;
     delete localInputs.claude_beta_query;
+    delete localInputs.quota_billing_mode;
+    delete localInputs.daily_quota_reset_time;
+    delete localInputs.daily_quota_reset_timezone;
     delete localInputs.upstream_model_update_check_enabled;
     delete localInputs.upstream_model_update_auto_sync_enabled;
     delete localInputs.upstream_model_update_last_check_time;
@@ -2552,6 +2585,74 @@ const EditChannelModal = (props) => {
 
                   {inputs.type === 1 && (
                     <>
+                      <div className='mt-4 mb-2 text-sm font-medium text-gray-700'>
+                        {t('额度策略')}
+                      </div>
+                      <Form.Select
+                        field='quota_billing_mode'
+                        label={t('额度类型')}
+                        optionList={[
+                          {
+                            label: t('按量付费'),
+                            value: QUOTA_BILLING_PAY_AS_YOU_GO,
+                          },
+                          {
+                            label: t('每日额度'),
+                            value: QUOTA_BILLING_DAILY,
+                          },
+                        ]}
+                        onChange={(value) =>
+                          handleChannelOtherSettingsChange(
+                            'quota_billing_mode',
+                            value || QUOTA_BILLING_PAY_AS_YOU_GO,
+                          )
+                        }
+                        extraText={t(
+                          '每日额度渠道会在日限额错误且上游未返回 reset_at 时按设定时间解除冷却',
+                        )}
+                      />
+                      {inputs.quota_billing_mode === QUOTA_BILLING_DAILY && (
+                        <Row gutter={12}>
+                          <Col span={12}>
+                            <Form.Input
+                              field='daily_quota_reset_time'
+                              label={t('每日重置时间')}
+                              placeholder='08:00'
+                              maxLength={5}
+                              onChange={(value) =>
+                                handleChannelOtherSettingsChange(
+                                  'daily_quota_reset_time',
+                                  value,
+                                )
+                              }
+                              extraText={t(
+                                '格式 HH:MM。上游未返回 reset_at 时，用此时间解除每日额度冷却',
+                              )}
+                              showClear
+                            />
+                          </Col>
+                          <Col span={12}>
+                            <Form.Select
+                              field='daily_quota_reset_timezone'
+                              label={t('重置时区')}
+                              optionList={[
+                                {
+                                  label: t('北京时间'),
+                                  value: 'Asia/Shanghai',
+                                },
+                                { label: 'UTC', value: 'UTC' },
+                              ]}
+                              onChange={(value) =>
+                                handleChannelOtherSettingsChange(
+                                  'daily_quota_reset_timezone',
+                                  value || 'Asia/Shanghai',
+                                )
+                              }
+                              extraText={t('默认按北京时间计算')}
+                            />
+                          </Col>
+                        </Row>
+                      )}
                       <div className='mt-4 mb-2 text-sm font-medium text-gray-700'>
                         {t('字段透传控制')}
                       </div>

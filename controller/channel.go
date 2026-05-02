@@ -460,6 +460,20 @@ func validateChannel(ctx context.Context, channel *model.Channel, isAdd bool) er
 		}
 	}
 
+	otherSettings := channel.GetOtherSettings()
+	if channel.Type == constant.ChannelTypeOpenAI {
+		switch otherSettings.QuotaBillingMode {
+		case "", dto.ChannelQuotaBillingModePayAsYouGo, dto.ChannelQuotaBillingModeDaily:
+		default:
+			return fmt.Errorf("OpenAI 渠道额度策略无效")
+		}
+		if otherSettings.QuotaBillingMode == dto.ChannelQuotaBillingModeDaily {
+			if err := service.ValidateDailyQuotaResetConfig(otherSettings.DailyQuotaResetTime, otherSettings.DailyQuotaResetTimezone); err != nil {
+				return fmt.Errorf("OpenAI 每日额度重置时间配置无效：%s", err.Error())
+			}
+		}
+	}
+
 	// VertexAI 特殊校验
 	if channel.Type == constant.ChannelTypeVertexAi {
 		if channel.Other == "" {

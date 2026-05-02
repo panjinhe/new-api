@@ -10,6 +10,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
@@ -106,7 +107,7 @@ func HandleChannelRoutingCooldown(c *gin.Context, channelError types.ChannelErro
 		return true
 	}
 
-	state, ok := classifyGenericRoutingCooldown(channelError.ChannelType, err)
+	state, ok := classifyGenericRoutingCooldown(channelError, err)
 	if !ok {
 		return false
 	}
@@ -118,7 +119,7 @@ func HandleChannelRoutingCooldown(c *gin.Context, channelError types.ChannelErro
 	return true
 }
 
-func classifyGenericRoutingCooldown(channelType int, err *types.NewAPIError) (model.RoutingCooldownState, bool) {
+func classifyGenericRoutingCooldown(channelError types.ChannelError, err *types.NewAPIError) (model.RoutingCooldownState, bool) {
 	if err == nil || types.IsSkipRetryError(err) {
 		return model.RoutingCooldownState{}, false
 	}
@@ -129,7 +130,7 @@ func classifyGenericRoutingCooldown(channelType int, err *types.NewAPIError) (mo
 	isRateLimitStatus := err.StatusCode == http.StatusTooManyRequests
 	isForbiddenQuotaStatus := err.StatusCode == http.StatusForbidden &&
 		hasQuotaSignal &&
-		isOpenAIQuotaCooldownChannel(channelType)
+		isOpenAIQuotaCooldownChannel(channelError.ChannelType)
 	if !isRateLimitStatus && !isForbiddenQuotaStatus {
 		return model.RoutingCooldownState{}, false
 	}
@@ -140,7 +141,7 @@ func classifyGenericRoutingCooldown(channelType int, err *types.NewAPIError) (mo
 	}
 	if !hasReset {
 		if isDailyQuotaMessage(lowerCode, lowerMessage) || (hasQuotaSignal && err.StatusCode == http.StatusForbidden) {
-			resetAt = nextDailyQuotaReset(time.Now()).Unix()
+			resetAt = resolveDailyQuotaReset(channelError, time.Now()).Unix()
 			source = channelRoutingCooldownSourceDailyQuota
 		} else {
 			resetAt = common.GetTimestamp() + int64(defaultChannelRoutingCooldown/time.Second)
@@ -322,6 +323,85 @@ func nextDailyQuotaReset(now time.Time) time.Time {
 	}
 	nextDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
 	return nextDay.Add(dailyQuotaResetDelay)
+}
+
+func resolveDailyQuotaReset(channelError types.ChannelError, now time.Time) time.Time {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if channelError.ChannelType != constant.ChannelTypeOpenAI || channelError.ChannelId <= 0 {
+		return nextDailyQuotaReset(now)
+	}
+
+	channel, err := model.GetChannelById(channelError.ChannelId, false)
+	if err != nil || channel == nil {
+		return nextDailyQuotaReset(now)
+	}
+	settings := channel.GetOtherSettings()
+	if settings.QuotaBillingMode == dto.ChannelQuotaBillingModePayAsYouGo {
+		return now.Add(defaultChannelRoutingCooldown)
+	}
+	if settings.QuotaBillingMode != dto.ChannelQuotaBillingModeDaily {
+		return nextDailyQuotaReset(now)
+	}
+	reset, err := nextConfiguredDailyQuotaReset(now, settings.DailyQuotaResetTime, settings.DailyQuotaResetTimezone)
+	if err != nil {
+		common.SysLog(fmt.Sprintf("invalid daily quota reset config: channel_id=%d, reset_time=%q, timezone=%q, error=%v", channelError.ChannelId, settings.DailyQuotaResetTime, settings.DailyQuotaResetTimezone, err))
+		return nextDailyQuotaReset(now)
+	}
+	return reset
+}
+
+func nextConfiguredDailyQuotaReset(now time.Time, resetTime string, timezone string) (time.Time, error) {
+	hour, minute, location, err := parseDailyQuotaResetConfig(now.Location(), resetTime, timezone)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	localNow := now.In(location)
+	reset := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), hour, minute, 0, 0, location)
+	if !reset.After(localNow) {
+		reset = reset.AddDate(0, 0, 1)
+	}
+	return reset, nil
+}
+
+func ValidateDailyQuotaResetConfig(resetTime string, timezone string) error {
+	_, _, _, err := parseDailyQuotaResetConfig(time.Local, resetTime, timezone)
+	return err
+}
+
+func parseDailyQuotaResetConfig(defaultLocation *time.Location, resetTime string, timezone string) (int, int, *time.Location, error) {
+	resetTime = strings.TrimSpace(resetTime)
+	if resetTime == "" {
+		resetTime = "00:05"
+	}
+	parts := strings.Split(resetTime, ":")
+	if len(parts) != 2 {
+		return 0, 0, nil, fmt.Errorf("expected HH:MM")
+	}
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil || hour < 0 || hour > 23 {
+		return 0, 0, nil, fmt.Errorf("invalid hour")
+	}
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil || minute < 0 || minute > 59 {
+		return 0, 0, nil, fmt.Errorf("invalid minute")
+	}
+
+	location := defaultLocation
+	if location == nil {
+		location = time.Local
+	}
+	if trimmedTimezone := strings.TrimSpace(timezone); trimmedTimezone != "" {
+		loadedLocation, err := time.LoadLocation(trimmedTimezone)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		location = loadedLocation
+	}
+
+	return hour, minute, location, nil
 }
 
 func CleanupChannelRoutingCooldown(channelID int, now int64) error {

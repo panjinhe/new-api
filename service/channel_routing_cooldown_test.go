@@ -7,6 +7,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/stretchr/testify/assert"
@@ -151,7 +152,7 @@ func TestClassifyGenericRoutingCooldownCoolsChineseQuota403UntilNextDay(t *testi
 	)
 	err.SetMessage("用户额度不足, 剩余额度: ¥0.000000")
 
-	state, ok := classifyGenericRoutingCooldown(constant.ChannelTypeOpenAI, err)
+	state, ok := classifyGenericRoutingCooldown(*types.NewChannelError(0, constant.ChannelTypeOpenAI, "openai", false, "", -1, true), err)
 	require.True(t, ok)
 	assert.Equal(t, channelRoutingCooldownKindQuota, state.Kind)
 	assert.Equal(t, channelRoutingCooldownSourceDailyQuota, state.Source)
@@ -171,7 +172,7 @@ func TestClassifyGenericRoutingCooldownCoolsDailyLimit429UntilNextDay(t *testing
 	)
 	err.SetMessage(`error: code=429 reason="DAILY_LIMIT_EXCEEDED" message="daily usage limit exceeded" metadata=map[]`)
 
-	state, ok := classifyGenericRoutingCooldown(constant.ChannelTypeOpenAI, err)
+	state, ok := classifyGenericRoutingCooldown(*types.NewChannelError(0, constant.ChannelTypeOpenAI, "openai", false, "", -1, true), err)
 	require.True(t, ok)
 	assert.Equal(t, channelRoutingCooldownKindQuota, state.Kind)
 	assert.Equal(t, channelRoutingCooldownSourceDailyQuota, state.Source)
@@ -191,7 +192,7 @@ func TestClassifyGenericRoutingCooldownDoesNotCoolGenericForbidden(t *testing.T)
 	)
 	err.SetMessage("permission denied")
 
-	_, ok := classifyGenericRoutingCooldown(constant.ChannelTypeOpenAI, err)
+	_, ok := classifyGenericRoutingCooldown(*types.NewChannelError(0, constant.ChannelTypeOpenAI, "openai", false, "", -1, true), err)
 	assert.False(t, ok)
 }
 
@@ -203,6 +204,68 @@ func TestClassifyGenericRoutingCooldownDoesNotCoolCodexQuota403(t *testing.T) {
 	)
 	err.SetMessage("用户额度不足, 剩余额度: ¥0.000000")
 
-	_, ok := classifyGenericRoutingCooldown(constant.ChannelTypeCodex, err)
+	_, ok := classifyGenericRoutingCooldown(*types.NewChannelError(0, constant.ChannelTypeCodex, "codex", false, "", -1, true), err)
 	assert.False(t, ok)
+}
+
+func TestNextConfiguredDailyQuotaResetUsesConfiguredBeijingTime(t *testing.T) {
+	now := time.Date(2026, 5, 3, 7, 59, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+
+	reset, err := nextConfiguredDailyQuotaReset(now, "08:00", "Asia/Shanghai")
+	require.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 5, 3, 8, 0, 0, 0, reset.Location()).Unix(), reset.Unix())
+
+	reset, err = nextConfiguredDailyQuotaReset(now.Add(2*time.Minute), "08:00", "Asia/Shanghai")
+	require.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 5, 4, 8, 0, 0, 0, reset.Location()).Unix(), reset.Unix())
+}
+
+func TestValidateDailyQuotaResetConfigRejectsInvalidTime(t *testing.T) {
+	assert.Error(t, ValidateDailyQuotaResetConfig("24:00", "Asia/Shanghai"))
+	assert.Error(t, ValidateDailyQuotaResetConfig("08:99", "Asia/Shanghai"))
+	assert.Error(t, ValidateDailyQuotaResetConfig("8", "Asia/Shanghai"))
+	assert.Error(t, ValidateDailyQuotaResetConfig("08:00", "Invalid/Timezone"))
+	assert.NoError(t, ValidateDailyQuotaResetConfig("08:00", "Asia/Shanghai"))
+}
+
+func TestResolveDailyQuotaResetUsesOpenAIChannelDailyConfig(t *testing.T) {
+	truncate(t)
+	channel := &model.Channel{
+		Id:     401,
+		Type:   constant.ChannelTypeOpenAI,
+		Name:   "daily-openai",
+		Key:    "sk-test",
+		Status: common.ChannelStatusEnabled,
+	}
+	channel.SetOtherSettings(dto.ChannelOtherSettings{
+		QuotaBillingMode:        dto.ChannelQuotaBillingModeDaily,
+		DailyQuotaResetTime:     "08:00",
+		DailyQuotaResetTimezone: "Asia/Shanghai",
+	})
+	require.NoError(t, model.DB.Create(channel).Error)
+
+	now := time.Date(2026, 5, 3, 0, 6, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+	reset := resolveDailyQuotaReset(*types.NewChannelError(channel.Id, channel.Type, channel.Name, false, channel.Key, -1, true), now)
+
+	assert.Equal(t, time.Date(2026, 5, 3, 8, 0, 0, 0, reset.Location()).Unix(), reset.Unix())
+}
+
+func TestResolveDailyQuotaResetUsesShortFallbackForPayAsYouGoOpenAI(t *testing.T) {
+	truncate(t)
+	channel := &model.Channel{
+		Id:     402,
+		Type:   constant.ChannelTypeOpenAI,
+		Name:   "paygo-openai",
+		Key:    "sk-test",
+		Status: common.ChannelStatusEnabled,
+	}
+	channel.SetOtherSettings(dto.ChannelOtherSettings{
+		QuotaBillingMode: dto.ChannelQuotaBillingModePayAsYouGo,
+	})
+	require.NoError(t, model.DB.Create(channel).Error)
+
+	now := time.Date(2026, 5, 3, 0, 6, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+	reset := resolveDailyQuotaReset(*types.NewChannelError(channel.Id, channel.Type, channel.Name, false, channel.Key, -1, true), now)
+
+	assert.Equal(t, now.Add(defaultChannelRoutingCooldown).Unix(), reset.Unix())
 }
