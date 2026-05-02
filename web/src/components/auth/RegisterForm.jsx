@@ -144,7 +144,7 @@ const RegisterForm = () => {
   const [showEmailVerification, setShowEmailVerification] = useState(true);
 
   useEffect(() => {
-    setShowEmailVerification(true);
+    setShowEmailVerification(status?.email_verification ?? true);
     if (status?.turnstile_check) {
       setTurnstileEnabled(true);
       setTurnstileSiteKey(status.turnstile_site_key);
@@ -224,7 +224,10 @@ const RegisterForm = () => {
       showInfo('两次输入的密码不一致');
       return;
     }
-    if (!inputs.email || !inputs.verification_code) {
+    if (
+      showEmailVerification &&
+      (!inputs.email || !inputs.verification_code)
+    ) {
       showInfo(t('请输入邮箱地址和验证码'));
       return;
     }
