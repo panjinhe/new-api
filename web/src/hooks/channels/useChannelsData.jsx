@@ -205,6 +205,7 @@ export const useChannelsData = () => {
     STATUS: 'status',
     RESPONSE_TIME: 'response_time',
     BALANCE: 'balance',
+    OPENAI_QUOTA_BILLING: 'openai_quota_billing',
     CODEX_FIVE_HOUR: 'codex_five_hour',
     CODEX_WEEKLY: 'codex_weekly',
     CODEX_ACCOUNT_EXPIRES: 'codex_account_expires',
@@ -250,6 +251,7 @@ export const useChannelsData = () => {
       [COLUMN_KEYS.STATUS]: true,
       [COLUMN_KEYS.RESPONSE_TIME]: true,
       [COLUMN_KEYS.BALANCE]: true,
+      [COLUMN_KEYS.OPENAI_QUOTA_BILLING]: true,
       [COLUMN_KEYS.CODEX_FIVE_HOUR]: true,
       [COLUMN_KEYS.CODEX_WEEKLY]: true,
       [COLUMN_KEYS.CODEX_ACCOUNT_EXPIRES]: true,
@@ -399,7 +401,8 @@ export const useChannelsData = () => {
         }
 
         if (tagChannelDates.concurrency_limit === -1) {
-          tagChannelDates.concurrency_limit = channels[i].concurrency_limit || 0;
+          tagChannelDates.concurrency_limit =
+            channels[i].concurrency_limit || 0;
         } else {
           if (
             tagChannelDates.concurrency_limit !==

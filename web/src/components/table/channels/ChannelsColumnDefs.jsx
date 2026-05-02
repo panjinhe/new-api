@@ -59,6 +59,9 @@ import { FaRandom } from 'react-icons/fa';
 import { clampPercent, CODEX_CHANNEL_TYPE } from './codexUsageUtils';
 
 const CODEX_ACCOUNT_VALID_DAYS = 30;
+const OPENAI_CHANNEL_TYPE = 1;
+const QUOTA_BILLING_DAILY = 'daily';
+const QUOTA_BILLING_PAY_AS_YOU_GO = 'pay_as_you_go';
 
 // Render functions
 const renderType = (type, record = {}, t) => {
@@ -335,6 +338,61 @@ const renderResponseTime = (responseTime, t) => {
       </Tag>
     );
   }
+};
+
+const parseChannelSettings = (record) => {
+  if (!record?.settings) {
+    return {};
+  }
+  if (typeof record.settings === 'object') {
+    return record.settings;
+  }
+  if (typeof record.settings !== 'string') {
+    return {};
+  }
+  try {
+    return JSON.parse(record.settings);
+  } catch (error) {
+    return {};
+  }
+};
+
+const renderOpenAIQuotaBilling = (record, t) => {
+  if (record.children !== undefined || record.type !== OPENAI_CHANNEL_TYPE) {
+    return '-';
+  }
+
+  const settings = parseChannelSettings(record);
+  const billingMode =
+    settings.quota_billing_mode === QUOTA_BILLING_DAILY
+      ? QUOTA_BILLING_DAILY
+      : QUOTA_BILLING_PAY_AS_YOU_GO;
+
+  if (billingMode !== QUOTA_BILLING_DAILY) {
+    return (
+      <Tooltip content={t('按量付费渠道遇到限额冷却时使用较短 fallback')}>
+        <Tag color='green' shape='circle' type='light'>
+          {t('按量付费')}
+        </Tag>
+      </Tooltip>
+    );
+  }
+
+  const resetTime = settings.daily_quota_reset_time || '00:05';
+  const timezone = settings.daily_quota_reset_timezone || 'Asia/Shanghai';
+
+  return (
+    <Tooltip content={`${t('每日重置时间')}: ${resetTime} (${timezone})`}>
+      <Space spacing={4} align='center'>
+        <Tag color='blue' shape='circle' type='light'>
+          {t('每日额度')}
+        </Tag>
+        <Tag color='white' shape='circle' type='ghost'>
+          {resetTime}
+        </Tag>
+      </Space>
+    </Tooltip>
+  );
 };
 
 const pickCodexUsageStroke = (percent) => {
@@ -785,6 +843,12 @@ export const getChannelsColumns = ({
       },
     },
     {
+      key: COLUMN_KEYS.OPENAI_QUOTA_BILLING,
+      title: t('额度类型'),
+      dataIndex: 'settings',
+      render: (text, record) => renderOpenAIQuotaBilling(record, t),
+    },
+    {
       key: COLUMN_KEYS.CODEX_FIVE_HOUR,
       title: t('Codex 5小时'),
       dataIndex: 'codex_usage',
@@ -1218,4 +1282,36 @@ export const getChannelsColumns = ({
       },
     },
   ];
+};
+
+export const filterChannelColumnsForType = ({
+  columns,
+  visibleColumns,
+  activeTypeKey,
+  COLUMN_KEYS,
+}) => {
+  const showOpenAIQuotaBilling =
+    activeTypeKey === 'all' || activeTypeKey === String(OPENAI_CHANNEL_TYPE);
+  const showCodexColumns = activeTypeKey === String(CODEX_CHANNEL_TYPE);
+  const codexOnlyColumnKeys = new Set([
+    COLUMN_KEYS.CODEX_FIVE_HOUR,
+    COLUMN_KEYS.CODEX_WEEKLY,
+    COLUMN_KEYS.CODEX_ACCOUNT_EXPIRES,
+  ]);
+
+  return columns.filter((column) => {
+    if (visibleColumns && !visibleColumns[column.key]) {
+      return false;
+    }
+    if (
+      column.key === COLUMN_KEYS.OPENAI_QUOTA_BILLING &&
+      !showOpenAIQuotaBilling
+    ) {
+      return false;
+    }
+    if (codexOnlyColumnKeys.has(column.key) && !showCodexColumns) {
+      return false;
+    }
+    return true;
+  });
 };

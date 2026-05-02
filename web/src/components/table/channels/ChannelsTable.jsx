@@ -24,7 +24,10 @@ import {
   IllustrationNoResult,
   IllustrationNoResultDark,
 } from '@douyinfe/semi-illustrations';
-import { getChannelsColumns } from './ChannelsColumnDefs';
+import {
+  filterChannelColumnsForType,
+  getChannelsColumns,
+} from './ChannelsColumnDefs';
 
 const ChannelsTable = (channelsData) => {
   const {
@@ -37,6 +40,7 @@ const ChannelsTable = (channelsData) => {
     enableBatchDelete,
     compactMode,
     visibleColumns,
+    activeTypeKey,
     setSelectedChannels,
     handlePageChange,
     handlePageSizeChange,
@@ -118,12 +122,17 @@ const ChannelsTable = (channelsData) => {
 
   // Filter columns based on visibility settings
   const getVisibleColumns = () => {
-    return allColumns.filter((column) => visibleColumns[column.key]);
+    return filterChannelColumnsForType({
+      columns: allColumns,
+      visibleColumns,
+      activeTypeKey,
+      COLUMN_KEYS,
+    });
   };
 
   const visibleColumnsList = useMemo(() => {
     return getVisibleColumns();
-  }, [visibleColumns, allColumns]);
+  }, [visibleColumns, allColumns, activeTypeKey, COLUMN_KEYS]);
 
   const tableColumns = useMemo(() => {
     return compactMode

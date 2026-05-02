@@ -19,7 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React from 'react';
 import { Modal, Button, Checkbox } from '@douyinfe/semi-ui';
-import { getChannelsColumns } from '../ChannelsColumnDefs';
+import {
+  filterChannelColumnsForType,
+  getChannelsColumns,
+} from '../ChannelsColumnDefs';
 
 const ColumnSelectorModal = ({
   showColumnSelector,
@@ -46,6 +49,7 @@ const ColumnSelectorModal = ({
   refresh,
   activePage,
   channels,
+  activeTypeKey,
 }) => {
   // Get all columns for display in selector
   const allColumns = getChannelsColumns({
@@ -66,6 +70,12 @@ const ColumnSelectorModal = ({
     refresh,
     activePage,
     channels,
+  });
+
+  const selectableColumns = filterChannelColumnsForType({
+    columns: allColumns,
+    activeTypeKey,
+    COLUMN_KEYS,
   });
 
   return (
@@ -101,7 +111,7 @@ const ColumnSelectorModal = ({
         className='flex flex-wrap max-h-96 overflow-y-auto rounded-lg p-4'
         style={{ border: '1px solid var(--semi-color-border)' }}
       >
-        {allColumns.map((column) => {
+        {selectableColumns.map((column) => {
           // Skip columns without title
           if (!column.title) {
             return null;
