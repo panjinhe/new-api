@@ -45,6 +45,7 @@ type Channel struct {
 	StatusCodeMapping *string `json:"status_code_mapping" gorm:"type:varchar(1024);default:''"`
 	Priority          *int64  `json:"priority" gorm:"bigint;default:0"`
 	AutoBan           *int    `json:"auto_ban" gorm:"default:1"`
+	ConcurrencyLimit  *int    `json:"concurrency_limit" gorm:"default:0"`
 	OtherInfo         string  `json:"other_info"`
 	Tag               *string `json:"tag" gorm:"index"`
 	Setting           *string `json:"setting" gorm:"type:text"` // 渠道额外设置
@@ -398,6 +399,9 @@ func BatchInsertChannels(channels []Channel) error {
 		return nil
 	}
 	for i := range channels {
+		if channels[i].ConcurrencyLimit != nil && *channels[i].ConcurrencyLimit < 0 {
+			*channels[i].ConcurrencyLimit = 0
+		}
 		ApplyDefaultProxyForNewChannel(&channels[i])
 		ApplyDefaultParamOverrideForNewChannel(&channels[i])
 	}
@@ -462,6 +466,16 @@ func (channel *Channel) GetWeight() int {
 	return int(*channel.Weight)
 }
 
+func (channel *Channel) GetConcurrencyLimit() int {
+	if channel == nil || channel.ConcurrencyLimit == nil {
+		return 0
+	}
+	if *channel.ConcurrencyLimit < 0 {
+		return 0
+	}
+	return *channel.ConcurrencyLimit
+}
+
 func (channel *Channel) GetBaseURL() string {
 	if channel.BaseURL == nil {
 		return ""
@@ -498,6 +512,9 @@ func (channel *Channel) Insert() error {
 }
 
 func (channel *Channel) Update() error {
+	if channel.ConcurrencyLimit != nil && *channel.ConcurrencyLimit < 0 {
+		*channel.ConcurrencyLimit = 0
+	}
 	// If this is a multi-key channel, recalculate MultiKeySize based on the current key list to avoid inconsistency after editing keys
 	if channel.ChannelInfo.IsMultiKey {
 		var keyStr string
@@ -755,7 +772,7 @@ func DisableChannelByTag(tag string) error {
 	return err
 }
 
-func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint, paramOverride *string, headerOverride *string) error {
+func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint, concurrencyLimit *int, paramOverride *string, headerOverride *string) error {
 	updateData := Channel{}
 	shouldReCreateAbilities := false
 	updatedTag := tag
@@ -780,6 +797,12 @@ func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *
 	}
 	if weight != nil {
 		updateData.Weight = weight
+	}
+	if concurrencyLimit != nil {
+		if *concurrencyLimit < 0 {
+			*concurrencyLimit = 0
+		}
+		updateData.ConcurrencyLimit = concurrencyLimit
 	}
 	if paramOverride != nil {
 		updateData.ParamOverride = paramOverride

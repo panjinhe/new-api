@@ -64,3 +64,13 @@ func TestResetRuntimeStateClearsOtherInfoWhenOnlyRuntimeKeysRemain(t *testing.T)
 	require.Empty(t, channel.OtherInfo)
 	require.Empty(t, channel.GetOtherInfo())
 }
+
+func TestGetConcurrencyLimitDefaultsAndClampsNegative(t *testing.T) {
+	require.Zero(t, (&Channel{}).GetConcurrencyLimit())
+
+	negative := -3
+	require.Zero(t, (&Channel{ConcurrencyLimit: &negative}).GetConcurrencyLimit())
+
+	limit := 8
+	require.Equal(t, 8, (&Channel{ConcurrencyLimit: &limit}).GetConcurrencyLimit())
+}

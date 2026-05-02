@@ -61,6 +61,7 @@ const (
 	ErrorCodeChannelInvalidKey            ErrorCode = "channel:invalid_key"
 	ErrorCodeChannelResponseTimeExceeded  ErrorCode = "channel:response_time_exceeded"
 	ErrorCodeChannelCodexQuotaExhausted   ErrorCode = "channel:codex_quota_exhausted"
+	ErrorCodeChannelConcurrencySaturated  ErrorCode = "channel:concurrency_saturated"
 
 	// client request error
 	ErrorCodeReadRequestBodyFailed ErrorCode = "read_request_body_failed"

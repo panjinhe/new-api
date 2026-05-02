@@ -644,6 +644,9 @@ func shouldAllowChannelAffinityRetry(err *types.NewAPIError) bool {
 	if types.IsSkipRetryError(err) {
 		return false
 	}
+	if err.GetErrorCode() == types.ErrorCodeChannelConcurrencySaturated {
+		return true
+	}
 	if operation_setting.IsAlwaysSkipRetryCode(err.GetErrorCode()) {
 		return false
 	}

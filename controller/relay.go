@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
@@ -212,6 +213,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			attemptIndex++
 
 			addUsedChannel(c, channel.Id)
+			releaseChannelConcurrency, concurrencyErr := acquireRelayChannelConcurrency(c, channel)
+			if concurrencyErr != nil {
+				newAPIError = concurrencyErr
+				relayInfo.LastError = newAPIError
+				if relayInfo.ChannelMeta == nil {
+					relayInfo.InitChannelMeta(c)
+				}
+				break
+			}
 			bodyStorage, bodyErr := common.GetBodyStorage(c)
 			if bodyErr != nil {
 				// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
@@ -220,6 +230,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 				} else {
 					newAPIError = types.NewErrorWithStatusCode(bodyErr, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 				}
+				releaseChannelConcurrency()
 				break
 			}
 			c.Request.Body = io.NopCloser(bodyStorage)
@@ -234,6 +245,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			default:
 				newAPIError = relayHandler(c, relayInfo)
 			}
+			releaseChannelConcurrency()
 
 			if newAPIError == nil {
 				relayInfo.LastError = nil
@@ -329,6 +341,29 @@ func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
 	return meta
 }
 
+func acquireRelayChannelConcurrency(c *gin.Context, channel *model.Channel) (service.ChannelConcurrencyRelease, *types.NewAPIError) {
+	limit := channel.GetConcurrencyLimit()
+	release, err := service.TryAcquireChannelConcurrency(channel.Id, limit)
+	if err == nil {
+		return release, nil
+	}
+	if errors.Is(err, service.ErrChannelConcurrencySaturated) {
+		message := i18n.T(c, i18n.MsgChannelUpstreamSaturated)
+		return nil, types.NewErrorWithStatusCode(
+			fmt.Errorf("%s (channel #%d concurrency limit %d)", message, channel.Id, limit),
+			types.ErrorCodeChannelConcurrencySaturated,
+			http.StatusServiceUnavailable,
+			types.ErrOptionWithNoRecordErrorLog(),
+		)
+	}
+	return nil, types.NewErrorWithStatusCode(
+		err,
+		types.ErrorCodeChannelConcurrencySaturated,
+		http.StatusServiceUnavailable,
+		types.ErrOptionWithNoRecordErrorLog(),
+	)
+}
+
 func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service.RetryParam) (*model.Channel, *types.NewAPIError) {
 	if info.ChannelMeta == nil {
 		autoBan := c.GetBool("auto_ban")
@@ -337,10 +372,11 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 			autoBanInt = 0
 		}
 		return &model.Channel{
-			Id:      c.GetInt("channel_id"),
-			Type:    c.GetInt("channel_type"),
-			Name:    c.GetString("channel_name"),
-			AutoBan: &autoBanInt,
+			Id:               c.GetInt("channel_id"),
+			Type:             c.GetInt("channel_type"),
+			Name:             c.GetString("channel_name"),
+			AutoBan:          &autoBanInt,
+			ConcurrencyLimit: common.GetPointer(common.GetContextKeyInt(c, constant.ContextKeyChannelConcurrencyLimit)),
 		}, nil
 	}
 	channel, selectGroup, err := service.CacheGetRandomSatisfiedChannel(retryParam)
@@ -471,6 +507,7 @@ func isSameChannelRetryBlockedErrorCode(code types.ErrorCode) bool {
 		types.ErrorCodeChannelParamOverrideInvalid,
 		types.ErrorCodeChannelHeaderOverrideInvalid,
 		types.ErrorCodeChannelModelMappedError,
+		types.ErrorCodeChannelConcurrencySaturated,
 		types.ErrorCodeChannelInvalidKey,
 		types.ErrorCodeChannelNoAvailableKey,
 		types.ErrorCodeModelNotFound,

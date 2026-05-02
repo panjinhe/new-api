@@ -926,6 +926,66 @@ export const getChannelsColumns = ({
       },
     },
     {
+      key: COLUMN_KEYS.CONCURRENCY_LIMIT,
+      title: t('并发上限'),
+      dataIndex: 'concurrency_limit',
+      render: (text, record, index) => {
+        if (record.children === undefined) {
+          return (
+            <div>
+              <InputNumber
+                style={{ width: 86 }}
+                name='concurrency_limit'
+                onBlur={(e) => {
+                  manageChannel(
+                    record.id,
+                    'concurrency_limit',
+                    record,
+                    e.target.value,
+                  );
+                }}
+                keepFocus={true}
+                innerButtons
+                defaultValue={record.concurrency_limit || 0}
+                min={0}
+                size='small'
+              />
+            </div>
+          );
+        } else {
+          return (
+            <InputNumber
+              style={{ width: 86 }}
+              name='concurrency_limit'
+              keepFocus={true}
+              onBlur={(e) => {
+                Modal.warning({
+                  title: t('修改子渠道并发上限'),
+                  content:
+                    t('确定要修改所有子渠道并发上限为 ') +
+                    e.target.value +
+                    t(' 吗？'),
+                  onOk: () => {
+                    if (e.target.value === '') {
+                      return;
+                    }
+                    submitTagEdit('concurrency_limit', {
+                      tag: record.key,
+                      concurrency_limit: e.target.value,
+                    });
+                  },
+                });
+              }}
+              innerButtons
+              defaultValue={record.concurrency_limit || 0}
+              min={0}
+              size='small'
+            />
+          );
+        }
+      },
+    },
+    {
       key: COLUMN_KEYS.OPERATE,
       title: '',
       dataIndex: 'operate',
