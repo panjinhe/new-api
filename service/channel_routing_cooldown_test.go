@@ -1,7 +1,9 @@
 package service
 
 import (
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -139,4 +141,48 @@ func TestShouldExcludeChannelAfterFailureAvoidsFailedMultiKeyChannel(t *testing.
 
 	channelError := *types.NewChannelError(301, constant.ChannelTypeCodex, "codex-multi", true, "key-b", 1, true)
 	assert.True(t, ShouldExcludeChannelAfterFailure(channelError, ctx))
+}
+
+func TestClassifyGenericRoutingCooldownCoolsChineseQuota403UntilNextDay(t *testing.T) {
+	err := types.NewOpenAIError(
+		assert.AnError,
+		types.ErrorCodeBadResponseStatusCode,
+		http.StatusForbidden,
+	)
+	err.SetMessage("用户额度不足, 剩余额度: ¥0.000000")
+
+	state, ok := classifyGenericRoutingCooldown(constant.ChannelTypeOpenAI, err)
+	require.True(t, ok)
+	assert.Equal(t, channelRoutingCooldownKindQuota, state.Kind)
+	assert.Equal(t, channelRoutingCooldownSourceDailyQuota, state.Source)
+	assert.Contains(t, state.Reason, "用户额度不足")
+
+	now := time.Now()
+	maxReset := now.Add(24*time.Hour + dailyQuotaResetDelay).Unix()
+	assert.Greater(t, state.ResetAt, now.Unix())
+	assert.Less(t, state.ResetAt, maxReset)
+}
+
+func TestClassifyGenericRoutingCooldownDoesNotCoolGenericForbidden(t *testing.T) {
+	err := types.NewOpenAIError(
+		assert.AnError,
+		types.ErrorCodeBadResponseStatusCode,
+		http.StatusForbidden,
+	)
+	err.SetMessage("permission denied")
+
+	_, ok := classifyGenericRoutingCooldown(constant.ChannelTypeOpenAI, err)
+	assert.False(t, ok)
+}
+
+func TestClassifyGenericRoutingCooldownDoesNotCoolCodexQuota403(t *testing.T) {
+	err := types.NewOpenAIError(
+		assert.AnError,
+		types.ErrorCodeBadResponseStatusCode,
+		http.StatusForbidden,
+	)
+	err.SetMessage("用户额度不足, 剩余额度: ¥0.000000")
+
+	_, ok := classifyGenericRoutingCooldown(constant.ChannelTypeCodex, err)
+	assert.False(t, ok)
 }

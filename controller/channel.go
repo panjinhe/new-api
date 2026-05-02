@@ -711,6 +711,27 @@ func DeleteDisabledChannel(c *gin.Context) {
 	return
 }
 
+func ClearChannelRoutingCooldown(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	channel, err := service.ClearChannelRoutingCooldown(id)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	channel.Key = ""
+	clearChannelInfo(channel)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    channel,
+	})
+}
+
 type ChannelTag struct {
 	Tag            string  `json:"tag"`
 	NewTag         *string `json:"new_tag"`

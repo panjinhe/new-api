@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
@@ -26,8 +27,10 @@ const (
 	channelRoutingCooldownSourceMetadata   = "metadata"
 	channelRoutingCooldownSourceUsageProbe = "usage_probe"
 	channelRoutingCooldownSourceFallback   = "fallback"
+	channelRoutingCooldownSourceDailyQuota = "daily_quota_fallback"
 
 	defaultChannelRoutingCooldown = 15 * time.Minute
+	dailyQuotaResetDelay          = 5 * time.Minute
 )
 
 type routingCooldownAdminInfo struct {
@@ -103,7 +106,7 @@ func HandleChannelRoutingCooldown(c *gin.Context, channelError types.ChannelErro
 		return true
 	}
 
-	state, ok := classifyGenericRoutingCooldown(err)
+	state, ok := classifyGenericRoutingCooldown(channelError.ChannelType, err)
 	if !ok {
 		return false
 	}
@@ -115,24 +118,38 @@ func HandleChannelRoutingCooldown(c *gin.Context, channelError types.ChannelErro
 	return true
 }
 
-func classifyGenericRoutingCooldown(err *types.NewAPIError) (model.RoutingCooldownState, bool) {
-	if err == nil || err.StatusCode != http.StatusTooManyRequests || types.IsSkipRetryError(err) {
+func classifyGenericRoutingCooldown(channelType int, err *types.NewAPIError) (model.RoutingCooldownState, bool) {
+	if err == nil || types.IsSkipRetryError(err) {
 		return model.RoutingCooldownState{}, false
 	}
 
 	lowerCode := strings.ToLower(string(err.GetErrorCode()))
 	lowerMessage := strings.ToLower(err.Error())
+	hasQuotaSignal := isQuotaExhaustionMessage(lowerCode, lowerMessage)
+	isRateLimitStatus := err.StatusCode == http.StatusTooManyRequests
+	isForbiddenQuotaStatus := err.StatusCode == http.StatusForbidden &&
+		hasQuotaSignal &&
+		isOpenAIQuotaCooldownChannel(channelType)
+	if !isRateLimitStatus && !isForbiddenQuotaStatus {
+		return model.RoutingCooldownState{}, false
+	}
+
 	resetAt, source, hasReset := resolveChannelRoutingCooldownReset(err.Metadata)
-	if !hasReset && !isRateLimitMessage(lowerCode, lowerMessage) {
+	if !hasReset && !isRateLimitMessage(lowerCode, lowerMessage) && !hasQuotaSignal {
 		return model.RoutingCooldownState{}, false
 	}
 	if !hasReset {
-		resetAt = common.GetTimestamp() + int64(defaultChannelRoutingCooldown/time.Second)
-		source = channelRoutingCooldownSourceFallback
+		if hasQuotaSignal && err.StatusCode == http.StatusForbidden {
+			resetAt = nextDailyQuotaReset(time.Now()).Unix()
+			source = channelRoutingCooldownSourceDailyQuota
+		} else {
+			resetAt = common.GetTimestamp() + int64(defaultChannelRoutingCooldown/time.Second)
+			source = channelRoutingCooldownSourceFallback
+		}
 	}
 
 	kind := channelRoutingCooldownKindRateLimit
-	if strings.Contains(lowerMessage, "quota") || strings.Contains(lowerMessage, "usage limit") || strings.Contains(lowerCode, "quota") {
+	if hasQuotaSignal {
 		kind = channelRoutingCooldownKindQuota
 	}
 
@@ -242,6 +259,53 @@ func isRateLimitMessage(lowerCode string, lowerMessage string) bool {
 	return false
 }
 
+func isOpenAIQuotaCooldownChannel(channelType int) bool {
+	switch channelType {
+	case constant.ChannelTypeOpenAI:
+		return true
+	default:
+		return false
+	}
+}
+
+func isQuotaExhaustionMessage(lowerCode string, lowerMessage string) bool {
+	if strings.Contains(lowerCode, "quota") ||
+		strings.Contains(lowerCode, "insufficient_quota") ||
+		strings.Contains(lowerCode, "billing") {
+		return true
+	}
+	for _, marker := range []string{
+		"quota",
+		"usage limit",
+		"credit balance",
+		"insufficient balance",
+		"insufficient quota",
+		"limit reached",
+		"daily limit",
+		"per day",
+		"额度不足",
+		"剩余额度",
+		"余额不足",
+		"可用额度不足",
+		"日限额",
+		"每日限额",
+		"每天限制",
+	} {
+		if strings.Contains(lowerMessage, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func nextDailyQuotaReset(now time.Time) time.Time {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	nextDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	return nextDay.Add(dailyQuotaResetDelay)
+}
+
 func CleanupChannelRoutingCooldown(channelID int, now int64) error {
 	channel, err := model.GetChannelById(channelID, true)
 	if err != nil {
@@ -257,6 +321,22 @@ func CleanupChannelRoutingCooldown(channelID int, now int64) error {
 		model.CacheUpdateChannel(channel)
 	}
 	return nil
+}
+
+func ClearChannelRoutingCooldown(channelID int) (*model.Channel, error) {
+	channel, err := model.GetChannelById(channelID, true)
+	if err != nil {
+		return nil, err
+	}
+	channel.SetRoutingCooldownStates(map[string]model.RoutingCooldownState{})
+	if err := channel.SaveWithoutKey(); err != nil {
+		return nil, err
+	}
+	if common.MemoryCacheEnabled {
+		model.CacheUpdateChannel(channel)
+	}
+	channel.ApplyRoutingCooldownView(common.GetTimestamp())
+	return channel, nil
 }
 
 func RunChannelRoutingCooldownCleanupPass(now int64) error {

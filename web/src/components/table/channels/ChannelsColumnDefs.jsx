@@ -1057,6 +1057,18 @@ export const getChannelsColumns = ({
                 </Button>
               )}
 
+              {record.routing_cooldown_active ? (
+                <Button
+                  size='small'
+                  type='warning'
+                  onClick={() =>
+                    manageChannel(record.id, 'clear_routing_cooldown', record)
+                  }
+                >
+                  {t('清除冷却')}
+                </Button>
+              ) : null}
+
               {record.channel_info?.is_multi_key ? (
                 <SplitButtonGroup aria-label={t('多密钥渠道操作项目组')}>
                   <Button

@@ -629,6 +629,9 @@ export const useChannelsData = () => {
         data.status = 2;
         res = await API.put('/api/channel/', data);
         break;
+      case 'clear_routing_cooldown':
+        res = await API.post(`/api/channel/${id}/routing_cooldown/clear`);
+        break;
       case 'priority':
         if (value === '') return;
         data.priority = parseInt(value);
@@ -657,6 +660,10 @@ export const useChannelsData = () => {
       let newChannels = [...channels];
       if (action !== 'delete') {
         record.status = channel.status;
+        record.routing_cooldown_active = channel.routing_cooldown_active;
+        record.routing_cooldown_reset_at = channel.routing_cooldown_reset_at;
+        record.routing_cooldown_reason = channel.routing_cooldown_reason;
+        record.routing_cooldown_key_index = channel.routing_cooldown_key_index;
       }
       if (action === 'account_expired_time') {
         record.account_expired_time = channel.account_expired_time || 0;
