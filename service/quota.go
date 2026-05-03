@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"html"
 	"log"
 	"math"
 	"strings"
@@ -447,26 +448,55 @@ func buildQuotaNotifyContent(prompt string, remainingQuota int, notifyType strin
 	default:
 		topUpLink := buildQuotaPublicURL("/console/topup")
 		promoImageURL := buildQuotaPublicURL(quotaNotifyPromoImagePath)
-		return fmt.Sprintf(
-			"%s，当前剩余额度为 %s，为了不影响您的使用，请及时充值。<br/>"+
-				"站内充值链接：<a href='%s'>%s</a><br/>"+
-				"淘宝充值（复制链接打开淘宝）：<a href='%s'>%s</a><br/>"+
-				"淘宝口令：%s<br/>"+
-				"打开方式：点击链接直接打开，或者在淘宝搜索商品标题。<br/>"+
-				"技术支持 QQ 群：%s<br/>"+
-				"<img src='%s' alt='%s' style='display:block;max-width:420px;width:100%%;height:auto;margin-top:12px;border-radius:8px;'/>",
-			prompt,
-			remainingText,
-			topUpLink,
-			topUpLink,
-			quotaNotifyTaobaoURL,
-			quotaNotifyTaobaoURL,
-			quotaNotifyTaobaoCommand,
-			quotaNotifySupportQQGroup,
-			promoImageURL,
-			quotaNotifyTaobaoTitle,
-		)
+		return buildQuotaNotifyEmailContent(prompt, remainingText, topUpLink, promoImageURL)
 	}
+}
+
+func buildQuotaNotifyEmailContent(prompt string, remainingText string, topUpLink string, promoImageURL string) string {
+	escapedPrompt := html.EscapeString(prompt)
+	escapedRemainingText := html.EscapeString(remainingText)
+	escapedTopUpLink := html.EscapeString(topUpLink)
+	escapedTaobaoURL := html.EscapeString(quotaNotifyTaobaoURL)
+	escapedTaobaoCommand := html.EscapeString(quotaNotifyTaobaoCommand)
+	escapedTaobaoTitle := html.EscapeString(quotaNotifyTaobaoTitle)
+	escapedSupportGroup := html.EscapeString(quotaNotifySupportQQGroup)
+	escapedPromoImageURL := html.EscapeString(promoImageURL)
+
+	return fmt.Sprintf(`
+<p style="margin:0 0 18px;color:#334155;font-size:16px;line-height:1.7;">%s。为了不影响您的 API 调用，请及时补充额度。</p>
+<div style="margin:22px 0 24px;padding:22px 18px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;text-align:center;">
+  <div style="margin:0 0 10px;color:#2563eb;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">当前剩余额度</div>
+  <div style="font-family:Menlo,Consolas,'Courier New',monospace;font-size:32px;line-height:1.25;font-weight:800;color:#0f172a;">%s</div>
+</div>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px;width:100%%;">
+  <tr>
+    <td align="center">
+      <a href="%s" style="display:inline-block;padding:13px 24px;border-radius:8px;background:#2563eb;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">前往站内充值</a>
+    </td>
+  </tr>
+</table>
+<div style="margin:0 0 18px;padding:16px;border:1px solid #d1fae5;border-radius:8px;background:#f0fdf4;">
+  <div style="margin:0 0 10px;color:#047857;font-size:14px;font-weight:800;">淘宝充值（复制链接打开淘宝）</div>
+  <p style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.7;">复制链接打开淘宝，或在淘宝搜索商品标题。</p>
+  <div style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.6;">充值链接</div>
+  <a href="%s" style="display:block;margin:0 0 12px;color:#2563eb;font-size:13px;line-height:1.6;word-break:break-all;text-decoration:underline;">%s</a>
+  <div style="margin:0 0 8px;color:#64748b;font-size:13px;line-height:1.6;">淘宝口令</div>
+  <div style="margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#ffffff;border:1px solid #bbf7d0;color:#0f172a;font-family:Menlo,Consolas,'Courier New',monospace;font-size:14px;line-height:1.5;word-break:break-all;">%s</div>
+  <div style="margin:0;color:#64748b;font-size:13px;line-height:1.6;">商品标题：%s</div>
+</div>
+<div style="margin:0 0 18px;padding:14px 16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#475569;font-size:14px;line-height:1.7;">技术支持 QQ 群：<strong style="color:#0f172a;">%s</strong></div>
+<img src="%s" alt="%s" style="display:block;max-width:420px;width:100%%;height:auto;margin:0 auto;border-radius:8px;border:1px solid #e2e8f0;" />`,
+		escapedPrompt,
+		escapedRemainingText,
+		escapedTopUpLink,
+		escapedTaobaoURL,
+		escapedTaobaoURL,
+		escapedTaobaoCommand,
+		escapedTaobaoTitle,
+		escapedSupportGroup,
+		escapedPromoImageURL,
+		escapedTaobaoTitle,
+	)
 }
 
 func checkAndSendQuotaNotify(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int) {
