@@ -31,6 +31,7 @@ plans
 .claude
 .playwright-cli/
 .codex-tmp/
+codex-tmp/
 output/
 taobao_assets/
 exports/
