@@ -51,6 +51,12 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 		other["gateway_fast_token_estimate_tokens"] = relayInfo.FastTokenEstimateTokens
 		other["gateway_fast_token_estimate_ratio"] = relayInfo.FastTokenEstimateRatio
 	}
+	if relayInfo.UpstreamRequestGzipEnabled {
+		other["upstream_request_gzip"] = true
+		other["upstream_request_gzip_bytes_in"] = relayInfo.UpstreamRequestGzipBytesIn
+		other["upstream_request_gzip_bytes_out"] = relayInfo.UpstreamRequestGzipBytesOut
+		other["upstream_request_gzip_ratio"] = relayInfo.UpstreamRequestGzipRatio
+	}
 	if relayInfo.IsModelMapped {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = relayInfo.UpstreamModelName

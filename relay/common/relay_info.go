@@ -113,6 +113,10 @@ type RelayInfo struct {
 	FastTokenEstimateEnabled      bool
 	FastTokenEstimateTokens       int
 	FastTokenEstimateRatio        float64
+	UpstreamRequestGzipEnabled    bool
+	UpstreamRequestGzipBytesIn    int
+	UpstreamRequestGzipBytesOut   int
+	UpstreamRequestGzipRatio      float64
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool

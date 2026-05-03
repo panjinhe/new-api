@@ -132,6 +132,12 @@ var RelayTimeout int // unit is second
 
 var RelayMaxIdleConns int
 var RelayMaxIdleConnsPerHost int
+var RelayWriteBufferSize int
+
+var UpstreamRequestGzipEnabled bool
+var UpstreamRequestGzipMinBytes int
+var UpstreamRequestGzipChannelIDs string
+var UpstreamRequestGzipLevel int
 
 var GeminiSafetySetting string
 

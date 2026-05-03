@@ -40,6 +40,9 @@ func InitHttpClient() {
 		ForceAttemptHTTP2:   true,
 		Proxy:               http.ProxyFromEnvironment, // Support HTTP_PROXY, HTTPS_PROXY, NO_PROXY env vars
 	}
+	if common.RelayWriteBufferSize > 0 {
+		transport.WriteBufferSize = common.RelayWriteBufferSize
+	}
 	if common.TLSInsecureSkipVerify {
 		transport.TLSClientConfig = common.InsecureTLSConfig
 	}
@@ -111,6 +114,9 @@ func NewProxyHttpClient(proxyURL string) (*http.Client, error) {
 			ForceAttemptHTTP2:   true,
 			Proxy:               http.ProxyURL(parsedURL),
 		}
+		if common.RelayWriteBufferSize > 0 {
+			transport.WriteBufferSize = common.RelayWriteBufferSize
+		}
 		if common.TLSInsecureSkipVerify {
 			transport.TLSClientConfig = common.InsecureTLSConfig
 		}
@@ -151,6 +157,9 @@ func NewProxyHttpClient(proxyURL string) (*http.Client, error) {
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return dialer.Dial(network, addr)
 			},
+		}
+		if common.RelayWriteBufferSize > 0 {
+			transport.WriteBufferSize = common.RelayWriteBufferSize
 		}
 		if common.TLSInsecureSkipVerify {
 			transport.TLSClientConfig = common.InsecureTLSConfig

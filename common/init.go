@@ -104,6 +104,11 @@ func InitEnv() {
 	RelayTimeout = GetEnvOrDefault("RELAY_TIMEOUT", 0)
 	RelayMaxIdleConns = GetEnvOrDefault("RELAY_MAX_IDLE_CONNS", 500)
 	RelayMaxIdleConnsPerHost = GetEnvOrDefault("RELAY_MAX_IDLE_CONNS_PER_HOST", 100)
+	RelayWriteBufferSize = GetEnvOrDefault("RELAY_WRITE_BUFFER_SIZE", 64*1024)
+	UpstreamRequestGzipEnabled = GetEnvOrDefaultBool("UPSTREAM_REQUEST_GZIP_ENABLED", false)
+	UpstreamRequestGzipMinBytes = GetEnvOrDefault("UPSTREAM_REQUEST_GZIP_MIN_BYTES", 256*1024)
+	UpstreamRequestGzipChannelIDs = GetEnvOrDefaultString("UPSTREAM_REQUEST_GZIP_CHANNEL_IDS", "")
+	UpstreamRequestGzipLevel = GetEnvOrDefault("UPSTREAM_REQUEST_GZIP_LEVEL", 1)
 	LoadSMTPEnvOptions()
 
 	// Initialize string variables with GetEnvOrDefaultString

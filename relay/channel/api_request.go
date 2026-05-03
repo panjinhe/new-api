@@ -1,6 +1,8 @@
 package channel
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -9,11 +11,13 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	common2 "github.com/QuantumNous/new-api/common"
+	appconstant "github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/constant"
@@ -26,6 +30,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
+
+const defaultUpstreamRequestGzipMinBytes = 256 * 1024
 
 func SetupApiRequestHeader(info *common.RelayInfo, c *gin.Context, req *http.Header) {
 	if info.RelayMode == constant.RelayModeAudioTranscription || info.RelayMode == constant.RelayModeAudioTranslation {
@@ -313,11 +319,140 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, err
 	}
 	applyHeaderOverrideToRequest(req, headerOverride)
+	if err := maybeCompressUpstreamRequestBody(req, info); err != nil {
+		return nil, err
+	}
 	resp, err := doRequest(c, req, info)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
 	}
 	return resp, nil
+}
+
+func maybeCompressUpstreamRequestBody(req *http.Request, info *common.RelayInfo) error {
+	stageStart := time.Now()
+	applied := false
+	defer func() {
+		if applied {
+			info.RecordGatewayStage("upstream_gzip", stageStart)
+		}
+	}()
+	if !shouldCompressUpstreamRequestBody(req, info) {
+		return nil
+	}
+	if req.GetBody == nil {
+		return nil
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return fmt.Errorf("get request body failed for gzip: %w", err)
+	}
+	defer body.Close()
+
+	original, err := io.ReadAll(body)
+	if err != nil {
+		return fmt.Errorf("read request body failed for gzip: %w", err)
+	}
+	minBytes := common2.UpstreamRequestGzipMinBytes
+	if minBytes <= 0 {
+		minBytes = defaultUpstreamRequestGzipMinBytes
+	}
+	if len(original) < minBytes {
+		return nil
+	}
+
+	level := common2.UpstreamRequestGzipLevel
+	if level < gzip.HuffmanOnly || level > gzip.BestCompression {
+		level = gzip.BestSpeed
+	}
+
+	var compressed bytes.Buffer
+	zw, err := gzip.NewWriterLevel(&compressed, level)
+	if err != nil {
+		return fmt.Errorf("create gzip writer failed: %w", err)
+	}
+	if _, err = zw.Write(original); err != nil {
+		_ = zw.Close()
+		return fmt.Errorf("gzip request body failed: %w", err)
+	}
+	if err = zw.Close(); err != nil {
+		return fmt.Errorf("close gzip writer failed: %w", err)
+	}
+	if compressed.Len() >= len(original) {
+		return nil
+	}
+
+	compressedBytes := compressed.Bytes()
+	req.Body = io.NopCloser(bytes.NewReader(compressedBytes))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(compressedBytes)), nil
+	}
+	req.ContentLength = int64(len(compressedBytes))
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Del("Content-Length")
+
+	info.UpstreamRequestGzipEnabled = true
+	info.UpstreamRequestGzipBytesIn = len(original)
+	info.UpstreamRequestGzipBytesOut = len(compressedBytes)
+	info.UpstreamRequestGzipRatio = float64(len(compressedBytes)) / float64(len(original))
+	applied = true
+	return nil
+}
+
+func shouldCompressUpstreamRequestBody(req *http.Request, info *common.RelayInfo) bool {
+	if req == nil || info == nil || info.ChannelMeta == nil {
+		return false
+	}
+	if !common2.UpstreamRequestGzipEnabled {
+		return false
+	}
+	if info.RelayMode != constant.RelayModeResponses {
+		return false
+	}
+	if info.ApiType != appconstant.APITypeOpenAI {
+		return false
+	}
+	if !isChannelAllowedForUpstreamGzip(info.ChannelId, common2.UpstreamRequestGzipChannelIDs) {
+		return false
+	}
+	if req.Method != http.MethodPost {
+		return false
+	}
+	contentType := strings.ToLower(req.Header.Get("Content-Type"))
+	if !strings.HasPrefix(contentType, "application/json") {
+		return false
+	}
+	if req.Header.Get("Content-Encoding") != "" {
+		return false
+	}
+	if req.Body == nil || req.ContentLength == 0 {
+		return false
+	}
+	return true
+}
+
+func isChannelAllowedForUpstreamGzip(channelID int, allowList string) bool {
+	allowList = strings.TrimSpace(allowList)
+	if allowList == "" {
+		return false
+	}
+	for _, part := range strings.Split(allowList, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if part == "*" {
+			return true
+		}
+		id, err := strconv.Atoi(part)
+		if err != nil {
+			continue
+		}
+		if id == channelID {
+			return true
+		}
+	}
+	return false
 }
 
 func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
