@@ -156,6 +156,10 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
 		return
 	}
+	if user.Email != "" && common.IsDisposableEmail(user.Email) {
+		common.ApiErrorMsg(c, "不支持临时邮箱，请使用常用邮箱地址。")
+		return
+	}
 	if common.EmailVerificationEnabled {
 		if user.Email == "" || user.VerificationCode == "" {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailVerificationRequired)
@@ -1138,6 +1142,10 @@ func TopUp(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, model.ErrRedemptionWelfareAlreadyRedeemed) {
 			common.ApiErrorI18n(c, i18n.MsgRedemptionWelfareAlreadyRedeemed)
+			return
+		}
+		if errors.Is(err, model.ErrRedemptionWelfareDailyLimit) {
+			common.ApiErrorI18n(c, i18n.MsgRedemptionWelfareDailyLimit)
 			return
 		}
 		if errors.Is(err, model.ErrRedeemFailed) {

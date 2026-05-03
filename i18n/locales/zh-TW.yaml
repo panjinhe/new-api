@@ -61,6 +61,7 @@ redemption.failed: "兌換失敗，請稍後重試"
 redemption.not_provided: "未提供兌換碼"
 redemption.expire_time_invalid: "過期時間不能早於當前時間"
 redemption.welfare_already_redeemed: "你已領取過20刀福利兌換碼"
+redemption.welfare_daily_limit: "同一使用者、IP 或信箱網域每天只能領取一次福利兌換碼"
 
 # User messages
 user.password_login_disabled: "管理員關閉了密碼登錄"

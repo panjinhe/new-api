@@ -246,11 +246,25 @@ func SendEmailVerification(c *gin.Context) {
 		return
 	}
 	localPart := parts[0]
-	domainPart := parts[1]
+	domainPart, ok := common.NormalizeEmailDomain(email)
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "无效的邮箱地址",
+		})
+		return
+	}
+	if common.IsDisposableEmailDomain(domainPart) {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "不支持临时邮箱，请使用常用邮箱地址。",
+		})
+		return
+	}
 	if common.EmailDomainRestrictionEnabled {
 		allowed := false
 		for _, domain := range common.EmailDomainWhitelist {
-			if domainPart == domain {
+			if domainPart == strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".") {
 				allowed = true
 				break
 			}

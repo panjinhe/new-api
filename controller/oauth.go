@@ -240,6 +240,9 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	if strings.TrimSpace(oauthUser.Email) == "" {
 		return nil, oauth.NewOAuthError(i18n.MsgOAuthEmailRequired, providerParams(provider.GetName()))
 	}
+	if common.IsDisposableEmail(oauthUser.Email) {
+		return nil, oauth.NewOAuthError(i18n.MsgInvalidInput, nil)
+	}
 	if exists, err := model.CheckUserExistOrDeleted("", strings.TrimSpace(oauthUser.Email)); err != nil {
 		return nil, err
 	} else if exists {

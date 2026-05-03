@@ -24,5 +24,7 @@ var ErrRedeemFailed = errors.New("redeem.failed")
 
 var ErrRedemptionWelfareAlreadyRedeemed = errors.New("redemption.welfare_already_redeemed")
 
+var ErrRedemptionWelfareDailyLimit = errors.New("redemption.welfare_daily_limit")
+
 // 2FA errors
 var ErrTwoFANotEnabled = errors.New("2fa not enabled")

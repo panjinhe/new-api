@@ -61,6 +61,7 @@ redemption.failed: "兑换失败，请稍后重试"
 redemption.not_provided: "未提供兑换码"
 redemption.expire_time_invalid: "过期时间不能早于当前时间"
 redemption.welfare_already_redeemed: "你已领取过20刀福利兑换码"
+redemption.welfare_daily_limit: "同一用户、IP 或邮箱域名每天只能领取一次福利兑换码"
 
 # User messages
 user.password_login_disabled: "管理员关闭了密码登录"

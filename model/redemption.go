@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -42,6 +43,16 @@ type Redemption struct {
 	UsedUserId            int               `json:"used_user_id"`
 	DeletedAt             gorm.DeletedAt    `gorm:"index"`
 	ExpiredTime           int64             `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+}
+
+type WelfareRedemptionDailyClaim struct {
+	Id             int    `json:"id"`
+	ClaimDate      string `json:"claim_date" gorm:"type:varchar(10);uniqueIndex:idx_welfare_daily_claim,priority:1;index"`
+	DimensionType  string `json:"dimension_type" gorm:"type:varchar(32);uniqueIndex:idx_welfare_daily_claim,priority:2;index"`
+	DimensionValue string `json:"dimension_value" gorm:"type:varchar(255);uniqueIndex:idx_welfare_daily_claim,priority:3;index"`
+	UserId         int    `json:"user_id" gorm:"index"`
+	RedemptionId   int    `json:"redemption_id" gorm:"index"`
+	CreatedAt      int64  `json:"created_at" gorm:"bigint;index"`
 }
 
 type RedemptionSubscriptionResult struct {
@@ -143,6 +154,86 @@ func ensureUserCanRedeemOneTimeWelfareTx(tx *gorm.DB, userId int) error {
 	}
 	if redeemed {
 		return ErrRedemptionWelfareAlreadyRedeemed
+	}
+	return nil
+}
+
+func welfareRedemptionClaimDate() string {
+	return time.Now().Format("2006-01-02")
+}
+
+func userEmailDomainForWelfareTx(tx *gorm.DB, userId int) (string, error) {
+	var user User
+	if err := tx.Select("email").Where("id = ?", userId).First(&user).Error; err != nil {
+		return "", err
+	}
+	domain, ok := common.NormalizeEmailDomain(user.Email)
+	if !ok {
+		return "", nil
+	}
+	return domain, nil
+}
+
+func isUniqueConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "unique constraint") ||
+		strings.Contains(message, "duplicate entry") ||
+		strings.Contains(message, "duplicate key")
+}
+
+func claimWelfareRedemptionDailyDimensionTx(tx *gorm.DB, claimDate string, dimensionType string, dimensionValue string, userId int, redemptionId int) error {
+	dimensionValue = strings.TrimSpace(dimensionValue)
+	if dimensionValue == "" {
+		return nil
+	}
+	var count int64
+	err := tx.Model(&WelfareRedemptionDailyClaim{}).
+		Where("claim_date = ? AND dimension_type = ? AND dimension_value = ?", claimDate, dimensionType, dimensionValue).
+		Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return ErrRedemptionWelfareDailyLimit
+	}
+	claim := &WelfareRedemptionDailyClaim{
+		ClaimDate:      claimDate,
+		DimensionType:  dimensionType,
+		DimensionValue: dimensionValue,
+		UserId:         userId,
+		RedemptionId:   redemptionId,
+		CreatedAt:      common.GetTimestamp(),
+	}
+	if err := tx.Create(claim).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return ErrRedemptionWelfareDailyLimit
+		}
+		return err
+	}
+	return nil
+}
+
+func claimWelfareRedemptionDailyLimitsTx(tx *gorm.DB, userId int, redemptionId int, audit RedemptionAudit) error {
+	claimDate := welfareRedemptionClaimDate()
+	domain, err := userEmailDomainForWelfareTx(tx, userId)
+	if err != nil {
+		return err
+	}
+	claims := []struct {
+		typ   string
+		value string
+	}{
+		{typ: "user", value: strconv.Itoa(userId)},
+		{typ: "ip", value: strings.TrimSpace(audit.CallerIp)},
+		{typ: "email_domain", value: domain},
+	}
+	for _, claim := range claims {
+		if err := claimWelfareRedemptionDailyDimensionTx(tx, claimDate, claim.typ, claim.value, userId, redemptionId); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -272,6 +363,9 @@ func RedeemWithAudit(key string, userId int, audit RedemptionAudit) (*Redemption
 		result.RedemptionId = redemption.Id
 		if isOneTimeWelfareRedemption(redemption) {
 			if err := ensureUserCanRedeemOneTimeWelfareTx(tx, userId); err != nil {
+				return err
+			}
+			if err := claimWelfareRedemptionDailyLimitsTx(tx, userId, redemption.Id, audit); err != nil {
 				return err
 			}
 		}

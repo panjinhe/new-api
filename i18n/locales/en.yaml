@@ -60,6 +60,7 @@ redemption.failed: "Redemption failed, please try again later"
 redemption.not_provided: "Redemption code not provided"
 redemption.expire_time_invalid: "Expiration time cannot be earlier than current time"
 redemption.welfare_already_redeemed: "You have already claimed a $20 welfare redemption code"
+redemption.welfare_daily_limit: "Each user, IP address, or email domain can claim a welfare redemption code only once per day"
 
 # User messages
 user.password_login_disabled: "Password login has been disabled by administrator"

@@ -70,6 +70,7 @@ const (
 	MsgRedemptionNotProvided            = "redemption.not_provided"
 	MsgRedemptionExpireTimeInvalid      = "redemption.expire_time_invalid"
 	MsgRedemptionWelfareAlreadyRedeemed = "redemption.welfare_already_redeemed"
+	MsgRedemptionWelfareDailyLimit      = "redemption.welfare_daily_limit"
 )
 
 // User related messages
