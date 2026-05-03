@@ -50,6 +50,8 @@ type User struct {
 	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
 	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	RegisterIp       string         `json:"register_ip" gorm:"type:varchar(45);column:register_ip;index"`
+	LastLoginIp      string         `json:"last_login_ip" gorm:"type:varchar(45);column:last_login_ip"`
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -242,7 +244,8 @@ func SearchUsers(keyword string, group string, startIdx int, num int) ([]*User, 
 	query := tx.Unscoped().Model(&User{})
 
 	// 构建搜索条件
-	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
+	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ? OR register_ip LIKE ? OR last_login_ip LIKE ?"
+	likeArgs := []interface{}{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
 
 	// 尝试将关键字转换为整数ID
 	keywordInt, err := strconv.Atoi(keyword)
@@ -250,20 +253,20 @@ func SearchUsers(keyword string, group string, startIdx int, num int) ([]*User, 
 		// 如果是数字，同时搜索ID和其他字段
 		likeCondition = "id = ? OR " + likeCondition
 		if group != "" {
-			query = query.Where("("+likeCondition+") AND "+commonGroupCol+" = ?",
-				keywordInt, "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", group)
+			args := append([]interface{}{keywordInt}, likeArgs...)
+			args = append(args, group)
+			query = query.Where("("+likeCondition+") AND "+commonGroupCol+" = ?", args...)
 		} else {
-			query = query.Where(likeCondition,
-				keywordInt, "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+			args := append([]interface{}{keywordInt}, likeArgs...)
+			query = query.Where(likeCondition, args...)
 		}
 	} else {
 		// 非数字关键字，只搜索字符串字段
 		if group != "" {
-			query = query.Where("("+likeCondition+") AND "+commonGroupCol+" = ?",
-				"%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", group)
+			args := append(likeArgs, group)
+			query = query.Where("("+likeCondition+") AND "+commonGroupCol+" = ?", args...)
 		} else {
-			query = query.Where(likeCondition,
-				"%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+			query = query.Where(likeCondition, likeArgs...)
 		}
 	}
 
@@ -717,6 +720,13 @@ func ResetUserPasswordByEmail(email string, password string) error {
 	}
 	err = DB.Model(&User{}).Where("email = ?", email).Update("password", hashedPassword).Error
 	return err
+}
+
+func UpdateUserLastLoginIp(id int, ip string) error {
+	if id == 0 || ip == "" {
+		return nil
+	}
+	return DB.Model(&User{}).Where("id = ?", id).Update("last_login_ip", ip).Error
 }
 
 func IsAdmin(userId int) bool {

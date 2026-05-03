@@ -195,6 +195,35 @@ const renderInviteInfo = (text, record, t) => {
   );
 };
 
+const IpText = ({ ip }) => {
+  if (!ip) {
+    return <span>-</span>;
+  }
+  return (
+    <Typography.Text
+      copyable={{ content: ip }}
+      ellipsis={{ showTooltip: true }}
+    >
+      {ip}
+    </Typography.Text>
+  );
+};
+
+const renderUserIps = (record, t) => {
+  return (
+    <div className='flex flex-col gap-1 text-xs leading-tight'>
+      <div className='flex items-center gap-1'>
+        <span className='text-gray-500'>{t('注册')}:</span>
+        <IpText ip={record.register_ip} />
+      </div>
+      <div className='flex items-center gap-1'>
+        <span className='text-gray-500'>{t('登录')}:</span>
+        <IpText ip={record.last_login_ip} />
+      </div>
+    </div>
+  );
+};
+
 /**
  * Render operations column
  */
@@ -346,6 +375,12 @@ export const getUsersColumns = ({
       render: (text, record, index) => {
         return <div>{renderRole(text, t)}</div>;
       },
+    },
+    {
+      title: t('注册/登录IP'),
+      dataIndex: 'ip_info',
+      width: 190,
+      render: (text, record) => renderUserIps(record, t),
     },
     {
       title: t('邀请信息'),

@@ -103,6 +103,9 @@ func setupLogin(user *model.User, c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserSessionSaveFailed)
 		return
 	}
+	if err := model.UpdateUserLastLoginIp(user.Id, c.ClientIP()); err != nil {
+		common.SysLog(fmt.Sprintf("failed to update last login ip for user %d: %s", user.Id, err.Error()))
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "",
 		"success": true,
@@ -181,6 +184,7 @@ func Register(c *gin.Context) {
 		DisplayName: user.Username,
 		InviterId:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
+		RegisterIp:  c.ClientIP(),
 	}
 	cleanUser.Email = user.Email
 	if err := cleanUser.Insert(inviterId); err != nil {
@@ -861,6 +865,7 @@ func CreateUser(c *gin.Context) {
 		Password:    user.Password,
 		DisplayName: user.DisplayName,
 		Role:        user.Role, // 保持管理员设置的角色
+		RegisterIp:  c.ClientIP(),
 	}
 	if err := cleanUser.Insert(0); err != nil {
 		common.ApiError(c, err)
