@@ -156,11 +156,23 @@ const UsersPage = () => {
   );
 
   if (activeTab === 'subscriptions') {
-    return <UserSubscriptionsOverview tabsArea={tabsArea} view='subscriptions' />;
+    return (
+      <UserSubscriptionsOverview
+        key='subscriptions'
+        tabsArea={tabsArea}
+        view='subscriptions'
+      />
+    );
   }
 
   if (activeTab === 'buckets') {
-    return <UserSubscriptionsOverview tabsArea={tabsArea} view='buckets' />;
+    return (
+      <UserSubscriptionsOverview
+        key='buckets'
+        tabsArea={tabsArea}
+        view='buckets'
+      />
+    );
   }
 
   return <UsersManagementPanel tabsArea={tabsArea} />;

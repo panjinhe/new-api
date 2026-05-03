@@ -543,7 +543,7 @@ const UserSubscriptionFilters = ({
       stopValidateWithError={false}
       className='w-full'
     >
-      <div className='grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-2 w-full'>
+      <div className='grid grid-cols-1 md:grid-cols-4 xl:grid-cols-7 gap-2 w-full'>
         <Form.Input
           field='keyword'
           prefix={<IconSearch />}
@@ -578,17 +578,6 @@ const UserSubscriptionFilters = ({
             { label: t('无生效套餐'), value: 'none' },
             { label: t('已过期套餐'), value: 'expired' },
             { label: t('即将到期'), value: 'expiring' },
-          ]}
-          pure
-          size='small'
-        />
-        <Form.Select
-          field='expire_days'
-          placeholder={t('到期窗口')}
-          optionList={[
-            { label: `3 ${t('天')}`, value: 3 },
-            { label: `7 ${t('天')}`, value: 7 },
-            { label: `30 ${t('天')}`, value: 30 },
           ]}
           pure
           size='small'
@@ -781,7 +770,6 @@ const UserSubscriptionsOverview = ({ tabsArea, view = 'subscriptions' }) => {
     group: '',
     plan_id: undefined,
     status: 'active',
-    expire_days: 7,
     usage_filter: '',
     sort: 'id',
   };
@@ -808,7 +796,6 @@ const UserSubscriptionsOverview = ({ tabsArea, view = 'subscriptions' }) => {
     const status =
       keyword && values.status === 'active' ? 'all' : values.status;
     params.set('status', status || 'active');
-    params.set('expire_days', values.expire_days || 7);
     if (values.usage_filter === 'today_gt_zero') {
       params.set('min_today_used', 1);
     }
@@ -1106,6 +1093,7 @@ const UserSubscriptionsOverview = ({ tabsArea, view = 'subscriptions' }) => {
       >
         {isBucketView ? (
           <CardTable
+            key='quota-buckets-table'
             columns={bucketColumns}
             dataSource={bucketRows}
             scroll={{ x: 'max-content' }}
@@ -1131,6 +1119,7 @@ const UserSubscriptionsOverview = ({ tabsArea, view = 'subscriptions' }) => {
           />
         ) : (
           <CardTable
+            key='user-subscriptions-table'
             columns={tableColumns}
             dataSource={rows}
             scroll={compactMode ? undefined : { x: 'max-content' }}
