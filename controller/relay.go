@@ -106,6 +106,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 	}()
 
+	stageStart := time.Now()
 	request, err := helper.GetAndValidateRequest(c, relayFormat)
 	if err != nil {
 		// Map "request body too large" to 413 so clients can handle it correctly
@@ -116,25 +117,33 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 		return
 	}
+	requestValidationDuration := time.Since(stageStart)
 
+	stageStart = time.Now()
 	relayInfo, err := relaycommon.GenRelayInfo(c, relayFormat, request, ws)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
 	}
+	relayInfo.AddGatewayStageDuration("request_validate", requestValidationDuration)
+	relayInfo.RecordGatewayStage("gen_relay_info", stageStart)
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
+	stageStart = time.Now()
 	if needSensitiveCheck || needCountToken {
 		meta = request.GetTokenCountMeta()
 	} else {
 		meta = fastTokenCountMetaForPricing(request)
 	}
+	relayInfo.RecordGatewayStage("token_meta", stageStart)
 
 	if needSensitiveCheck && meta != nil {
+		stageStart = time.Now()
 		contains, words := service.CheckSensitiveText(meta.CombineText)
+		relayInfo.RecordGatewayStage("sensitive_check", stageStart)
 		if contains {
 			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s", strings.Join(words, ", ")))
 			newAPIError = types.NewError(err, types.ErrorCodeSensitiveWordsDetected)
@@ -142,7 +151,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 	}
 
+	stageStart = time.Now()
 	tokens, err := service.EstimateRequestToken(c, meta, relayInfo)
+	relayInfo.RecordGatewayStage("token_count", stageStart)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeCountTokenFailed)
 		return
@@ -150,7 +161,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	relayInfo.SetEstimatePromptTokens(tokens)
 
+	stageStart = time.Now()
 	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
+	relayInfo.RecordGatewayStage("price", stageStart)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
 		return
@@ -161,7 +174,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	if priceData.FreeModel {
 		logger.LogInfo(c, fmt.Sprintf("模型 %s 免费，跳过预扣费", relayInfo.OriginModelName))
 	} else {
+		stageStart = time.Now()
 		newAPIError = service.PreConsumeBilling(c, priceData.QuotaToPreConsume, relayInfo)
+		relayInfo.RecordGatewayStage("preconsume", stageStart)
 		if newAPIError != nil {
 			return
 		}
@@ -192,7 +207,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	attemptIndex := 0
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
 		relayInfo.RetryIndex = retryParam.GetRetry()
+		stageStart = time.Now()
 		channel, channelErr := getChannel(c, relayInfo, retryParam)
+		relayInfo.RecordGatewayStage("select_channel", stageStart)
 		if channelErr != nil {
 			logger.LogError(c, channelErr.Error())
 			newAPIError = channelErr
@@ -213,7 +230,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			attemptIndex++
 
 			addUsedChannel(c, channel.Id)
+			stageStart = time.Now()
 			releaseChannelConcurrency, concurrencyErr := acquireRelayChannelConcurrency(c, channel)
+			relayInfo.RecordGatewayStage("channel_concurrency", stageStart)
 			if concurrencyErr != nil {
 				newAPIError = concurrencyErr
 				relayInfo.LastError = newAPIError
@@ -222,7 +241,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 				}
 				break
 			}
+			stageStart = time.Now()
 			bodyStorage, bodyErr := common.GetBodyStorage(c)
+			relayInfo.RecordGatewayStage("restore_body", stageStart)
 			if bodyErr != nil {
 				// Ensure consistent 413 for oversized bodies even when error occurs later (e.g., retry path)
 				if common.IsRequestBodyTooLargeError(bodyErr) || errors.Is(bodyErr, common.ErrRequestBodyTooLarge) {

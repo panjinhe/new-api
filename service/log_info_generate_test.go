@@ -28,8 +28,12 @@ func TestGenerateTextOtherInfoIncludesTimingBreakdown(t *testing.T) {
 		UpstreamFirstByteTime:      start.Add(880 * time.Millisecond),
 		UpstreamGotConnTime:        start.Add(120 * time.Millisecond),
 		UpstreamReusedConn:         true,
-		ChannelMeta:                &relaycommon.ChannelMeta{},
-		Request:                    &dto.GeneralOpenAIRequest{},
+		GatewayStageTimings: map[string]int64{
+			"token_count": 720,
+			"preconsume":  35,
+		},
+		ChannelMeta: &relaycommon.ChannelMeta{},
+		Request:     &dto.GeneralOpenAIRequest{},
 	}
 
 	other := GenerateTextOtherInfo(ctx, info, 1, 1, 1, 0, 0, -1, -1)
@@ -43,4 +47,6 @@ func TestGenerateTextOtherInfoIncludesTimingBreakdown(t *testing.T) {
 	require.EqualValues(t, 2500, timing["total_first_response_ms"])
 	require.EqualValues(t, 20, timing["got_conn_ms"])
 	require.Equal(t, true, timing["upstream_reused_conn"])
+	require.EqualValues(t, 720, timing["gateway_token_count_ms"])
+	require.EqualValues(t, 35, timing["gateway_preconsume_ms"])
 }

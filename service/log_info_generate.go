@@ -117,6 +117,11 @@ func appendTimingInfo(relayInfo *relaycommon.RelayInfo, other map[string]interfa
 	appendTimingIfPositive(timing, "connect_ms", relayInfo.UpstreamConnectStartTime, relayInfo.UpstreamConnectDoneTime)
 	appendTimingIfPositive(timing, "tls_ms", relayInfo.UpstreamTLSHandshakeStartTime, relayInfo.UpstreamTLSHandshakeDoneTime)
 	appendTimingIfPositive(timing, "got_conn_ms", relayInfo.UpstreamRequestStartTime, relayInfo.UpstreamGotConnTime)
+	for stage, ms := range relayInfo.GatewayStageTimings {
+		if ms >= 0 && strings.TrimSpace(stage) != "" {
+			timing["gateway_"+stage+"_ms"] = ms
+		}
+	}
 	if !relayInfo.UpstreamGotConnTime.IsZero() {
 		timing["upstream_reused_conn"] = relayInfo.UpstreamReusedConn
 	}

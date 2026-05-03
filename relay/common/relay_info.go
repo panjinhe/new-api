@@ -109,6 +109,7 @@ type RelayInfo struct {
 	UpstreamTLSHandshakeDoneTime  time.Time
 	UpstreamGotConnTime           time.Time
 	UpstreamReusedConn            bool
+	GatewayStageTimings           map[string]int64
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -657,6 +658,31 @@ func (info *RelayInfo) SetEstimatePromptTokens(promptTokens int) {
 
 func (info *RelayInfo) GetEstimatePromptTokens() int {
 	return info.estimatePromptTokens
+}
+
+func (info *RelayInfo) AddGatewayStageDuration(name string, duration time.Duration) {
+	if info == nil {
+		return
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	ms := duration.Milliseconds()
+	if ms < 0 {
+		return
+	}
+	if info.GatewayStageTimings == nil {
+		info.GatewayStageTimings = make(map[string]int64)
+	}
+	info.GatewayStageTimings[name] += ms
+}
+
+func (info *RelayInfo) RecordGatewayStage(name string, start time.Time) {
+	if start.IsZero() {
+		return
+	}
+	info.AddGatewayStageDuration(name, time.Since(start))
 }
 
 func (info *RelayInfo) SetFirstResponseTime() {

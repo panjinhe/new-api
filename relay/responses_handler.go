@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	appconstant "github.com/QuantumNous/new-api/constant"
@@ -21,7 +22,9 @@ import (
 )
 
 func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
+	stageStart := time.Now()
 	info.InitChannelMeta(c)
+	info.RecordGatewayStage("init_channel_meta", stageStart)
 	if info.RelayMode == relayconstant.RelayModeResponsesCompact {
 		switch info.ApiType {
 		case appconstant.APITypeOpenAI, appconstant.APITypeCodex:
@@ -58,12 +61,16 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 		)
 	}
 
+	stageStart = time.Now()
 	request, err := common.DeepCopy(responsesReq)
+	info.RecordGatewayStage("request_deepcopy", stageStart)
 	if err != nil {
 		return types.NewError(fmt.Errorf("failed to copy request to GeneralOpenAIRequest: %w", err), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
 
+	stageStart = time.Now()
 	err = helper.ModelMappedHelper(c, info, request)
+	info.RecordGatewayStage("model_map", stageStart)
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeChannelModelMappedError, types.ErrOptionWithSkipRetry())
 	}
@@ -75,31 +82,41 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	adaptor.Init(info)
 	var requestBody io.Reader
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
+		stageStart = time.Now()
 		storage, err := common.GetBodyStorage(c)
+		info.RecordGatewayStage("pass_through_body", stageStart)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeReadRequestBodyFailed, types.ErrOptionWithSkipRetry())
 		}
 		requestBody = common.ReaderOnly(storage)
 	} else {
+		stageStart = time.Now()
 		convertedRequest, err := adaptor.ConvertOpenAIResponsesRequest(c, info, *request)
+		info.RecordGatewayStage("responses_convert", stageStart)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 		relaycommon.AppendRequestConversionFromRequest(info, convertedRequest)
+		stageStart = time.Now()
 		jsonData, err := common.Marshal(convertedRequest)
+		info.RecordGatewayStage("marshal_request", stageStart)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 
 		// remove disabled fields for OpenAI Responses API
+		stageStart = time.Now()
 		jsonData, err = relaycommon.RemoveDisabledFields(jsonData, info.ChannelOtherSettings, info.ChannelSetting.PassThroughBodyEnabled)
+		info.RecordGatewayStage("remove_disabled_fields", stageStart)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 
 		// apply param override
 		if len(info.ParamOverride) > 0 {
+			stageStart = time.Now()
 			jsonData, err = relaycommon.ApplyParamOverrideWithRelayInfo(jsonData, info)
+			info.RecordGatewayStage("param_override", stageStart)
 			if err != nil {
 				return newAPIErrorFromParamOverride(err)
 			}

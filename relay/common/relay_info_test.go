@@ -60,3 +60,16 @@ func TestRelayInfoBeginUpstreamRequestResetsAttemptTiming(t *testing.T) {
 	require.True(t, info.UpstreamGotConnTime.IsZero())
 	require.False(t, info.UpstreamReusedConn)
 }
+
+func TestRelayInfoGatewayStageDurationsAccumulate(t *testing.T) {
+	info := &RelayInfo{}
+
+	info.AddGatewayStageDuration("token_count", 150*time.Millisecond)
+	info.AddGatewayStageDuration("token_count", 25*time.Millisecond)
+	info.AddGatewayStageDuration(" ", 500*time.Millisecond)
+	info.AddGatewayStageDuration("ignored", -time.Millisecond)
+
+	require.EqualValues(t, 175, info.GatewayStageTimings["token_count"])
+	_, ok := info.GatewayStageTimings["ignored"]
+	require.False(t, ok)
+}
