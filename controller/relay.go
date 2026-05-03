@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -133,7 +134,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
 	stageStart = time.Now()
-	if needSensitiveCheck || needCountToken {
+	if fastMeta, ok := maybeFastResponsesTokenMeta(c, request, relayInfo, needSensitiveCheck); ok {
+		meta = fastMeta
+	} else if needSensitiveCheck || needCountToken {
 		meta = request.GetTokenCountMeta()
 	} else {
 		meta = fastTokenCountMetaForPricing(request)
@@ -320,6 +323,8 @@ var upgrader = websocket.Upgrader{
 const (
 	sameChannelRetryTimes         = 2
 	clientClosedRequestStatusCode = 499
+	largeResponsesFastTokenBytes  = 256 * 1024
+	fastTokenPreconsumeRatio      = 1.25
 )
 
 var sameChannelRetryBackoffs = []time.Duration{
@@ -360,6 +365,38 @@ func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
 		// Best-effort: leave CombineText empty to avoid large allocations.
 	}
 	return meta
+}
+
+func maybeFastResponsesTokenMeta(c *gin.Context, request dto.Request, relayInfo *relaycommon.RelayInfo, needSensitiveCheck bool) (*types.TokenCountMeta, bool) {
+	if needSensitiveCheck || relayInfo == nil || request == nil {
+		return nil, false
+	}
+	if _, ok := request.(*dto.OpenAIResponsesRequest); !ok {
+		return nil, false
+	}
+	if relayInfo.RelayMode != relayconstant.RelayModeResponses || relayInfo.RelayFormat != types.RelayFormatOpenAIResponses {
+		return nil, false
+	}
+	storage, err := common.GetBodyStorage(c)
+	if err != nil || storage == nil || storage.Size() < largeResponsesFastTokenBytes {
+		return nil, false
+	}
+	estimateTokens := int(math.Ceil(float64(storage.Size()) / 4.0))
+	if estimateTokens <= 0 {
+		return nil, false
+	}
+	meta := &types.TokenCountMeta{
+		TokenType:           types.TokenTypeTokenizer,
+		FastEstimatedTokens: estimateTokens,
+		MaxTokens:           0,
+	}
+	if req, ok := request.(*dto.OpenAIResponsesRequest); ok {
+		meta.MaxTokens = int(lo.FromPtrOr(req.MaxOutputTokens, uint(0)))
+	}
+	relayInfo.FastTokenEstimateEnabled = true
+	relayInfo.FastTokenEstimateTokens = estimateTokens
+	relayInfo.FastTokenEstimateRatio = fastTokenPreconsumeRatio
+	return meta, true
 }
 
 func acquireRelayChannelConcurrency(c *gin.Context, channel *model.Channel) (service.ChannelConcurrencyRelease, *types.NewAPIError) {

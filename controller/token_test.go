@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -11,7 +12,14 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/relay/helper"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -272,4 +280,128 @@ func TestGetTokenKeyRequiresOwnershipAndReturnsFullKey(t *testing.T) {
 	if strings.Contains(unauthorizedRecorder.Body.String(), token.Key) {
 		t.Fatalf("unauthorized key response leaked raw token key: %s", unauthorizedRecorder.Body.String())
 	}
+}
+
+func TestMaybeFastResponsesTokenMetaLargeRequestUsesBodyEstimate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	largeInput := strings.Repeat("a", largeResponsesFastTokenBytes)
+	body := fmt.Sprintf(`{"model":"gpt-5.5","input":"%s","max_output_tokens":123}`, largeInput)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+	req := &dto.OpenAIResponsesRequest{
+		Model:           "gpt-5.5",
+		Input:           []byte(fmt.Sprintf(`"%s"`, largeInput)),
+		MaxOutputTokens: common.GetPointer[uint](123),
+	}
+	info := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeResponses,
+		RelayFormat: types.RelayFormatOpenAIResponses,
+	}
+
+	meta, ok := maybeFastResponsesTokenMeta(ctx, req, info, false)
+	if !ok {
+		t.Fatalf("expected fast token estimate for large responses request")
+	}
+	expected := int(math.Ceil(float64(len(body)) / 4.0))
+	if meta.FastEstimatedTokens != expected {
+		t.Fatalf("expected %d fast estimate tokens, got %d", expected, meta.FastEstimatedTokens)
+	}
+	if meta.MaxTokens != 123 {
+		t.Fatalf("expected max output tokens to be preserved, got %d", meta.MaxTokens)
+	}
+	if meta.CombineText != "" {
+		t.Fatalf("expected fast path to avoid CombineText allocation")
+	}
+	if !info.FastTokenEstimateEnabled || info.FastTokenEstimateTokens != expected || info.FastTokenEstimateRatio != fastTokenPreconsumeRatio {
+		t.Fatalf("unexpected relay fast estimate metadata: %+v", info)
+	}
+}
+
+func TestMaybeFastResponsesTokenMetaSkipsSmallRequestAndSensitiveCheck(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := `{"model":"gpt-5.5","input":"hello"}`
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+	req := &dto.OpenAIResponsesRequest{Model: "gpt-5.5", Input: []byte(`"hello"`)}
+	info := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeResponses,
+		RelayFormat: types.RelayFormatOpenAIResponses,
+	}
+
+	if _, ok := maybeFastResponsesTokenMeta(ctx, req, info, false); ok {
+		t.Fatalf("expected small responses request to use exact token meta")
+	}
+	if _, ok := maybeFastResponsesTokenMeta(ctx, req, info, true); ok {
+		t.Fatalf("expected sensitive check to force exact token meta")
+	}
+}
+
+func TestFastResponsesTokenEstimateUsesSafetyRatioForPreConsume(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	previousModelPrice := ratio_setting.ModelPrice2JSONString()
+	t.Cleanup(func() {
+		_ = ratio_setting.UpdateModelPriceByJSONString(previousModelPrice)
+	})
+	if err := ratio_setting.UpdateModelPriceByJSONString(`{}`); err != nil {
+		t.Fatalf("failed to clear model price settings: %v", err)
+	}
+
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Set(string(constant.ContextKeyUserGroup), "default")
+	ctx.Set(string(constant.ContextKeyUsingGroup), "default")
+	ctx.Set(string(constant.ContextKeyOriginalModel), "gpt-5.5")
+	info := &relaycommon.RelayInfo{
+		OriginModelName:          "gpt-5.5",
+		UserGroup:                "default",
+		UsingGroup:               "default",
+		FastTokenEstimateEnabled: true,
+		FastTokenEstimateTokens:  1000,
+		FastTokenEstimateRatio:   fastTokenPreconsumeRatio,
+		UserSetting:              dto.UserSetting{AcceptUnsetRatioModel: true},
+	}
+
+	priceData, err := helper.ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{})
+	if err != nil {
+		t.Fatalf("ModelPriceHelper returned error: %v", err)
+	}
+	expected := int(float64(1000) * fastTokenPreconsumeRatio * priceData.ModelRatio * priceData.GroupRatioInfo.GroupRatio)
+	if priceData.QuotaToPreConsume != expected {
+		t.Fatalf("expected quota %d with safety ratio, got %d", expected, priceData.QuotaToPreConsume)
+	}
+}
+
+func BenchmarkOpenAIResponsesTokenMetaLargeExactVsFast(b *testing.B) {
+	gin.SetMode(gin.TestMode)
+	largeInput := strings.Repeat("a", largeResponsesFastTokenBytes)
+	body := fmt.Sprintf(`{"model":"gpt-5.5","input":"%s","max_output_tokens":1024}`, largeInput)
+	req := &dto.OpenAIResponsesRequest{
+		Model:           "gpt-5.5",
+		Input:           []byte(fmt.Sprintf(`"%s"`, largeInput)),
+		MaxOutputTokens: common.GetPointer[uint](1024),
+	}
+
+	b.Run("exact_meta", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			meta := req.GetTokenCountMeta()
+			if meta.CombineText == "" {
+				b.Fatal("expected exact meta to build combined text")
+			}
+		}
+	})
+
+	b.Run("fast_meta", func(b *testing.B) {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+		info := &relaycommon.RelayInfo{
+			RelayMode:   relayconstant.RelayModeResponses,
+			RelayFormat: types.RelayFormatOpenAIResponses,
+		}
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			meta, ok := maybeFastResponsesTokenMeta(ctx, req, info, false)
+			if !ok || meta.FastEstimatedTokens == 0 {
+				b.Fatal("expected fast token estimate")
+			}
+		}
+	})
 }

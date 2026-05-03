@@ -79,6 +79,10 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	var freeModel bool
 	if !usePrice {
 		preConsumedTokens := common.Max(promptTokens, common.PreConsumedQuota)
+		if info.FastTokenEstimateEnabled {
+			fastPreConsumedTokens := int(float64(info.FastTokenEstimateTokens) * info.FastTokenEstimateRatio)
+			preConsumedTokens = common.Max(preConsumedTokens, fastPreConsumedTokens)
+		}
 		if meta.MaxTokens != 0 {
 			preConsumedTokens += meta.MaxTokens
 		}

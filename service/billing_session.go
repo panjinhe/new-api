@@ -370,18 +370,12 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	case "subscription_first":
 		fallthrough
 	default:
-		hasBucket, bucketCheckErr := model.HasActiveQuotaBucket(relayInfo.UserId)
-		if bucketCheckErr != nil {
-			return nil, types.NewError(bucketCheckErr, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		session, bucketErr := tryBucket()
+		if bucketErr == nil {
+			return session, nil
 		}
-		if hasBucket {
-			session, apiErr := tryBucket()
-			if apiErr == nil {
-				return session, nil
-			}
-			if apiErr.GetErrorCode() != types.ErrorCodeInsufficientUserQuota {
-				return nil, apiErr
-			}
+		if bucketErr.GetErrorCode() != types.ErrorCodeInsufficientUserQuota {
+			return nil, bucketErr
 		}
 		hasSub, subCheckErr := model.HasActiveUserSubscription(relayInfo.UserId)
 		if subCheckErr != nil {

@@ -46,6 +46,11 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	if relayInfo.ReasoningEffort != "" {
 		other["reasoning_effort"] = relayInfo.ReasoningEffort
 	}
+	if relayInfo.FastTokenEstimateEnabled {
+		other["gateway_fast_token_estimate"] = true
+		other["gateway_fast_token_estimate_tokens"] = relayInfo.FastTokenEstimateTokens
+		other["gateway_fast_token_estimate_ratio"] = relayInfo.FastTokenEstimateRatio
+	}
 	if relayInfo.IsModelMapped {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = relayInfo.UpstreamModelName

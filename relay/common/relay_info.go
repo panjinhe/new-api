@@ -110,6 +110,9 @@ type RelayInfo struct {
 	UpstreamGotConnTime           time.Time
 	UpstreamReusedConn            bool
 	GatewayStageTimings           map[string]int64
+	FastTokenEstimateEnabled      bool
+	FastTokenEstimateTokens       int
+	FastTokenEstimateRatio        float64
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool

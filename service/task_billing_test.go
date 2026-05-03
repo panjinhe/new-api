@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,6 +48,9 @@ func TestMain(m *testing.M) {
 		&model.TopUp{},
 		&model.UserSubscription{},
 		&model.SubscriptionUsageDaily{},
+		&model.QuotaBucket{},
+		&model.QuotaBucketPreConsumeRecord{},
+		&model.QuotaBucketPreConsumeAllocation{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
@@ -69,6 +74,9 @@ func truncate(t *testing.T) {
 		model.DB.Exec("DELETE FROM top_ups")
 		model.DB.Exec("DELETE FROM user_subscriptions")
 		model.DB.Exec("DELETE FROM subscription_usage_dailies")
+		model.DB.Exec("DELETE FROM quota_bucket_pre_consume_allocations")
+		model.DB.Exec("DELETE FROM quota_bucket_pre_consume_records")
+		model.DB.Exec("DELETE FROM quota_buckets")
 	})
 }
 
@@ -717,4 +725,73 @@ func TestSettle_NonPerCall_AdaptorAdjustWorks(t *testing.T) {
 	log := getLastLog(t)
 	require.NotNil(t, log)
 	assert.Equal(t, model.LogTypeRefund, log.Type)
+}
+
+func TestNewBillingSessionSubscriptionFirstFallsBackToWalletWithoutActiveBucket(t *testing.T) {
+	truncate(t)
+	seedUser(t, 901, 5000)
+	seedToken(t, 901, 901, "bucket-fallback-token", 5000)
+	info := &relaycommon.RelayInfo{
+		UserId:          901,
+		TokenId:         901,
+		TokenKey:        "bucket-fallback-token",
+		RequestId:       "bucket-fallback-wallet",
+		OriginModelName: "gpt-5.5",
+		UserSetting:     dto.UserSetting{BillingPreference: "subscription_first"},
+		TokenUnlimited:  true,
+		IsPlayground:    true,
+	}
+
+	ctx := &gin.Context{}
+	session, apiErr := NewBillingSession(ctx, info, 300)
+	require.Nil(t, apiErr)
+	require.NotNil(t, session)
+	assert.Equal(t, BillingSourceWallet, info.BillingSource)
+	assert.Equal(t, 300, info.FinalPreConsumedQuota)
+
+	var recordCount int64
+	require.NoError(t, model.DB.Model(&model.QuotaBucketPreConsumeRecord{}).Where("request_id = ?", "bucket-fallback-wallet").Count(&recordCount).Error)
+	assert.Equal(t, int64(0), recordCount)
+}
+
+func TestNewBillingSessionSubscriptionFirstConsumesActiveBucket(t *testing.T) {
+	truncate(t)
+	seedUser(t, 902, 5000)
+	seedToken(t, 902, 902, "bucket-consume-token", 5000)
+	now := time.Now().Unix()
+	require.NoError(t, model.DB.Create(&model.QuotaBucket{
+		UserId:      902,
+		Title:       "test bucket",
+		AmountTotal: 1000,
+		AmountUsed:  100,
+		StartTime:   now - 60,
+		EndTime:     now + 3600,
+		Status:      model.QuotaBucketStatusActive,
+		Source:      model.QuotaBucketSourceRedemption,
+	}).Error)
+	info := &relaycommon.RelayInfo{
+		UserId:          902,
+		TokenId:         902,
+		TokenKey:        "bucket-consume-token",
+		RequestId:       "bucket-consume-active",
+		OriginModelName: "gpt-5.5",
+		UserSetting:     dto.UserSetting{BillingPreference: "subscription_first"},
+		TokenUnlimited:  true,
+		IsPlayground:    true,
+	}
+
+	ctx := &gin.Context{}
+	session, apiErr := NewBillingSession(ctx, info, 300)
+	require.Nil(t, apiErr)
+	require.NotNil(t, session)
+	assert.Equal(t, BillingSourceBucket, info.BillingSource)
+	assert.Equal(t, 300, info.FinalPreConsumedQuota)
+
+	var record model.QuotaBucketPreConsumeRecord
+	require.NoError(t, model.DB.Where("request_id = ?", "bucket-consume-active").First(&record).Error)
+	assert.Equal(t, int64(300), record.PreConsumed)
+
+	var allocation model.QuotaBucketPreConsumeAllocation
+	require.NoError(t, model.DB.Where("request_id = ?", "bucket-consume-active").First(&allocation).Error)
+	assert.Equal(t, int64(300), allocation.Amount)
 }

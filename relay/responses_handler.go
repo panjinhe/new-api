@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/sjson"
 )
 
 func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.NewAPIError) {
@@ -62,14 +63,7 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	}
 
 	stageStart = time.Now()
-	request, err := common.DeepCopy(responsesReq)
-	info.RecordGatewayStage("request_deepcopy", stageStart)
-	if err != nil {
-		return types.NewError(fmt.Errorf("failed to copy request to GeneralOpenAIRequest: %w", err), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
-	}
-
-	stageStart = time.Now()
-	err = helper.ModelMappedHelper(c, info, request)
+	err := helper.ModelMappedHelper(c, info, responsesReq)
 	info.RecordGatewayStage("model_map", stageStart)
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeChannelModelMappedError, types.ErrOptionWithSkipRetry())
@@ -89,9 +83,37 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 			return types.NewError(err, types.ErrorCodeReadRequestBodyFailed, types.ErrOptionWithSkipRetry())
 		}
 		requestBody = common.ReaderOnly(storage)
+	} else if shouldUseRawOpenAIResponsesBody(info) {
+		stageStart = time.Now()
+		jsonData, err := buildRawOpenAIResponsesBody(c, info)
+		info.RecordGatewayStage("responses_raw_body", stageStart)
+		if err != nil {
+			return types.NewError(err, types.ErrorCodeReadRequestBodyFailed, types.ErrOptionWithSkipRetry())
+		}
+
+		stageStart = time.Now()
+		jsonData, err = relaycommon.RemoveDisabledFields(jsonData, info.ChannelOtherSettings, info.ChannelSetting.PassThroughBodyEnabled)
+		info.RecordGatewayStage("remove_disabled_fields", stageStart)
+		if err != nil {
+			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
+		}
+
+		if len(info.ParamOverride) > 0 {
+			stageStart = time.Now()
+			jsonData, err = relaycommon.ApplyParamOverrideWithRelayInfo(jsonData, info)
+			info.RecordGatewayStage("param_override", stageStart)
+			if err != nil {
+				return newAPIErrorFromParamOverride(err)
+			}
+		}
+
+		if common.DebugEnabled {
+			println("requestBody: ", string(jsonData))
+		}
+		requestBody = bytes.NewBuffer(jsonData)
 	} else {
 		stageStart = time.Now()
-		convertedRequest, err := adaptor.ConvertOpenAIResponsesRequest(c, info, *request)
+		convertedRequest, err := adaptor.ConvertOpenAIResponsesRequest(c, info, *responsesReq)
 		info.RecordGatewayStage("responses_convert", stageStart)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
@@ -178,4 +200,70 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 		service.PostTextConsumeQuota(c, info, usageDto, nil)
 	}
 	return nil
+}
+
+func shouldUseRawOpenAIResponsesBody(info *relaycommon.RelayInfo) bool {
+	if info == nil || info.ChannelMeta == nil {
+		return false
+	}
+	if info.RelayMode != relayconstant.RelayModeResponses || info.RelayFormat != types.RelayFormatOpenAIResponses {
+		return false
+	}
+	if info.ApiType != appconstant.APITypeOpenAI || info.IsModelMapped {
+		return false
+	}
+	switch info.ChannelType {
+	case appconstant.ChannelTypeOpenAI, appconstant.ChannelTypeCustom:
+		return true
+	default:
+		return false
+	}
+}
+
+func buildRawOpenAIResponsesBody(c *gin.Context, info *relaycommon.RelayInfo) ([]byte, error) {
+	storage, err := common.GetBodyStorage(c)
+	if err != nil {
+		return nil, err
+	}
+	jsonData, err := storage.Bytes()
+	if err != nil {
+		return nil, err
+	}
+	return patchRawOpenAIResponsesReasoning(jsonData, info)
+}
+
+func patchRawOpenAIResponsesReasoning(jsonData []byte, info *relaycommon.RelayInfo) ([]byte, error) {
+	req, _ := info.Request.(*dto.OpenAIResponsesRequest)
+	model := ""
+	if req != nil {
+		model = req.Model
+	}
+	effort, originModel := parseResponsesReasoningEffortFromModelSuffix(model)
+	if effort == "" {
+		if req != nil && req.Reasoning != nil && req.Reasoning.Effort != "" {
+			info.ReasoningEffort = req.Reasoning.Effort
+		}
+		return jsonData, nil
+	}
+
+	patched, err := sjson.SetBytes(jsonData, "model", originModel)
+	if err != nil {
+		return nil, err
+	}
+	patched, err = sjson.SetBytes(patched, "reasoning.effort", effort)
+	if err != nil {
+		return nil, err
+	}
+	info.ReasoningEffort = effort
+	return patched, nil
+}
+
+func parseResponsesReasoningEffortFromModelSuffix(model string) (string, string) {
+	effortSuffixes := []string{"-high", "-minimal", "-low", "-medium", "-none", "-xhigh"}
+	for _, suffix := range effortSuffixes {
+		if strings.HasSuffix(model, suffix) {
+			return strings.TrimPrefix(suffix, "-"), strings.TrimSuffix(model, suffix)
+		}
+	}
+	return "", model
 }

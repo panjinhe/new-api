@@ -216,6 +216,12 @@ func EstimateRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *rela
 		return totalAudioToken, nil
 	}
 
+	if meta.FastEstimatedTokens > 0 {
+		common.SetContextKey(c, constant.ContextKeyPromptTokens, meta.FastEstimatedTokens)
+		common.SetContextKey(c, constant.ContextKeyLocalCountTokens, true)
+		return meta.FastEstimatedTokens, nil
+	}
+
 	model := common.GetContextKeyString(c, constant.ContextKeyOriginalModel)
 	tkm := 0
 
