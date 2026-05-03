@@ -198,3 +198,26 @@ func TestCreateUserSubscriptionPromotesPaidGroup(t *testing.T) {
 	}))
 	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 908))
 }
+
+func TestClassifyUsersByPaymentAndUsageTreatsQuotaBucketUsersAsPaid(t *testing.T) {
+	truncateTables(t)
+	resetRedemptionTestTables(t)
+
+	insertUserForClassificationTest(t, 910, "bucket-user", DefaultFreeloadingUserGroup, 0, common.RoleCommonUser)
+	code := seedBucketRedemptionCode(t, "bucket-classify-code", redemptionQuotaThreshold(DefaultPaidAmountThreshold), DefaultQuotaBucketDurationSeconds)
+
+	_, err := Redeem(code.Key, 910)
+	require.NoError(t, err)
+
+	result, err := ClassifyUsersByPaymentAndUsage(UserGroupClassificationOptions{
+		AmountThreshold: 50,
+		PaidGroup:       DefaultPaidUserGroup,
+		FreeGroup:       DefaultFreeloadingUserGroup,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, DefaultPaidUserGroup, getUserGroupForClassificationTest(t, 910))
+	assert.Equal(t, int64(1), result.QuotaBucketUsers)
+	assert.Equal(t, int64(1), result.PaidUsers)
+	assert.Equal(t, int64(0), result.FreeUsers)
+}

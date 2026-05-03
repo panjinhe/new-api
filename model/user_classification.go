@@ -37,6 +37,7 @@ type UserGroupClassificationResult struct {
 	UsageQualifiedUsers int64   `json:"usage_qualified_users"`
 	SubscriptionUsers   int64   `json:"subscription_users"`
 	RedemptionUsers     int64   `json:"redemption_users"`
+	QuotaBucketUsers    int64   `json:"quota_bucket_users"`
 }
 
 func normalizeUserGroupClassificationOptions(options UserGroupClassificationOptions) (UserGroupClassificationOptions, error) {
@@ -115,6 +116,10 @@ func successfulRedemptionQualifiedUserQuery(tx *gorm.DB, threshold float64) *gor
 
 func subscriptionUserQuery(tx *gorm.DB) *gorm.DB {
 	return tx.Model(&UserSubscription{}).Select("DISTINCT user_id")
+}
+
+func quotaBucketUserQuery(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&QuotaBucket{}).Select("DISTINCT user_id")
 }
 
 func classifyChangedUsers(tx *gorm.DB, ids []int, group string) ([]int, error) {
@@ -216,13 +221,20 @@ func promoteUserToPaidGroupIfRedemptionQualified(userId int) {
 	var changed bool
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var count int64
-		if err := tx.Model(&Redemption{}).
-			Where("used_user_id = ?", userId).
-			Where("status = ?", common.RedemptionCodeStatusUsed).
-			Where("redemption_type = ?", RedemptionTypeQuota).
-			Where("quota >= ?", redemptionQuotaThreshold(DefaultPaidAmountThreshold)).
+		if err := tx.Model(&QuotaBucket{}).
+			Where("user_id = ?", userId).
 			Count(&count).Error; err != nil {
 			return err
+		}
+		if count == 0 {
+			if err := tx.Model(&Redemption{}).
+				Where("used_user_id = ?", userId).
+				Where("status = ?", common.RedemptionCodeStatusUsed).
+				Where("redemption_type = ?", RedemptionTypeQuota).
+				Where("quota >= ?", redemptionQuotaThreshold(DefaultPaidAmountThreshold)).
+				Count(&count).Error; err != nil {
+				return err
+			}
 		}
 		if count == 0 {
 			return nil
@@ -296,6 +308,7 @@ func ClassifyUsersByPaymentAndUsage(options UserGroupClassificationOptions) (*Us
 		paidTopUpUsers := successfulTopUpQualifiedUserQuery(tx, options.AmountThreshold)
 		redemptionUsers := successfulRedemptionQualifiedUserQuery(tx, options.AmountThreshold)
 		subscriptionUsers := subscriptionUserQuery(tx)
+		bucketUsers := quotaBucketUserQuery(tx)
 
 		if err := commonUserQuery(tx).Count(&result.TotalUsers).Error; err != nil {
 			return err
@@ -316,6 +329,11 @@ func ClassifyUsersByPaymentAndUsage(options UserGroupClassificationOptions) (*Us
 			Scan(&result.SubscriptionUsers).Error; err != nil {
 			return err
 		}
+		if err := tx.Model(&QuotaBucket{}).
+			Select("COUNT(DISTINCT user_id)").
+			Scan(&result.QuotaBucketUsers).Error; err != nil {
+			return err
+		}
 		if err := tx.Model(&Redemption{}).
 			Select("COUNT(DISTINCT used_user_id)").
 			Where("status = ?", common.RedemptionCodeStatusUsed).
@@ -327,7 +345,7 @@ func ClassifyUsersByPaymentAndUsage(options UserGroupClassificationOptions) (*Us
 		}
 
 		err := commonUserQuery(tx).
-			Where("used_quota >= ? OR id IN (?) OR id IN (?) OR id IN (?)", usedQuotaThreshold, paidTopUpUsers, redemptionUsers, subscriptionUsers).
+			Where("used_quota >= ? OR id IN (?) OR id IN (?) OR id IN (?) OR id IN (?)", usedQuotaThreshold, paidTopUpUsers, redemptionUsers, subscriptionUsers, bucketUsers).
 			Pluck("id", &paidIDs).Error
 		if err != nil {
 			return err
