@@ -521,6 +521,7 @@ export const useChannelsData = () => {
     const { searchKeyword, searchGroup, searchModel } = getFormValues();
     if (searchKeyword !== '' || searchGroup !== '' || searchModel !== '') {
       setLoading(true);
+      setChannels([]);
       await searchChannels(
         enableTagMode,
         typeKey,
@@ -535,6 +536,7 @@ export const useChannelsData = () => {
 
     const reqId = ++requestCounter.current;
     setLoading(true);
+    setChannels([]);
     const typeParam = typeKey !== 'all' ? `&type=${typeKey}` : '';
     const statusParam = statusF !== 'all' ? `&status=${statusF}` : '';
     const res = await API.get(
