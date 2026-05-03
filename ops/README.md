@@ -94,7 +94,7 @@ echo "$TS"
 ```bash
 docker build -t new-api-local:prod .
 docker save new-api-local:prod | gzip -1 | ssh -F ops/ssh/config.local aheapi-prod "gunzip | docker load"
-ssh -F ops/ssh/config.local aheapi-prod "cd /opt/new-api/app && docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build"
+ssh -F ops/ssh/config.local aheapi-prod "cd /opt/new-api/app && docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build"
 ```
 
 - 仅在你明确需要验证完整 Docker 构建链路时，才临时使用这套。
@@ -117,20 +117,14 @@ SQL_DSN=postgresql://${POSTGRES_USER:-newapi}:${POSTGRES_PASSWORD:-change-me}@po
 
 ```bash
 cd /opt/new-api/app
-set -a
-. ./.env.prod
-set +a
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build
+docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build
 ```
 
 - 如果只想重建应用容器、不要动数据库容器，使用：
 
 ```bash
 cd /opt/new-api/app
-set -a
-. ./.env.prod
-set +a
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build --no-deps --force-recreate new-api
+docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-build --no-deps --force-recreate new-api
 ```
 
 - 部署后务必检查：
@@ -222,10 +216,7 @@ EOF
 ```bash
 ssh -F ops/ssh/config.local aheapi-prod <<'EOF'
 cd /opt/new-api/app
-set -a
-. ./.env.prod
-set +a
-docker compose -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml \
+docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml \
   up -d --no-build --no-deps --force-recreate new-api
 EOF
 ```
@@ -321,7 +312,6 @@ curl -vkI https://47.111.11.175
   - `pbroe.com`
   - `www.pbroe.com`
   - `aheapi.com`
-  - `api.aheapi.com`
   解析到源站 IP
 - 那么源站 IP 依然能被公开看到。
 - 如果后面要继续增强防护，正确方向是：

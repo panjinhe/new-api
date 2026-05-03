@@ -157,3 +157,30 @@ ssh ... "cd /opt/new-api/app && ./deploy.sh --env-name prod ..."
 ```
 
 `deploy.sh --env-name prod` is intentionally disabled and should fail fast. Use the older server-side build flow only for non-production environments or if the user explicitly asks to redesign the production deployment mechanism.
+
+### Rule 9: Production Container Restarts — Never Use Bare Compose
+
+When restarting or recreating production containers manually, NEVER run bare `docker compose up`, `docker compose restart`, or any production compose command that omits `.env.prod`.
+
+The production PostgreSQL compose file expands `SQL_DSN` from `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, and `${POSTGRES_DB}` while Docker Compose parses the YAML. The `env_file: .env.prod` entry injects variables into the container, but it must not be relied on for Compose-time interpolation. If `.env.prod` is not explicitly loaded, `SQL_DSN` can be expanded with default values such as `change-me`, causing `new-api-prod` to fail database authentication and return 502.
+
+For an app-only production restart, use the checked helper:
+
+```powershell
+pwsh ./scripts/restart-prod-app.ps1
+```
+
+If a manual SSH command is unavoidable, it MUST include `--env-file .env.prod`, for example:
+
+```bash
+cd /opt/new-api/app
+docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml up -d --no-deps new-api
+```
+
+Before and after any production restart, verify:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml config | grep SQL_DSN
+docker inspect new-api-prod --format '{{range .Config.Env}}{{println .}}{{end}}' | grep SQL_DSN
+curl -fsS https://aheapi.com/api/status
+```
