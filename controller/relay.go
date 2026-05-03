@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -371,10 +372,14 @@ func maybeFastResponsesTokenMeta(c *gin.Context, request dto.Request, relayInfo 
 	if needSensitiveCheck || relayInfo == nil || request == nil {
 		return nil, false
 	}
-	if _, ok := request.(*dto.OpenAIResponsesRequest); !ok {
+	responsesReq, ok := request.(*dto.OpenAIResponsesRequest)
+	if !ok {
 		return nil, false
 	}
 	if relayInfo.RelayMode != relayconstant.RelayModeResponses || relayInfo.RelayFormat != types.RelayFormatOpenAIResponses {
+		return nil, false
+	}
+	if hasResponsesMediaInput(responsesReq) {
 		return nil, false
 	}
 	storage, err := common.GetBodyStorage(c)
@@ -397,6 +402,29 @@ func maybeFastResponsesTokenMeta(c *gin.Context, request dto.Request, relayInfo 
 	relayInfo.FastTokenEstimateTokens = estimateTokens
 	relayInfo.FastTokenEstimateRatio = fastTokenPreconsumeRatio
 	return meta, true
+}
+
+func hasResponsesMediaInput(req *dto.OpenAIResponsesRequest) bool {
+	if req == nil {
+		return false
+	}
+	return rawContainsAny(req.Input,
+		[]byte(`"input_image"`),
+		[]byte(`"input_video"`),
+		[]byte(`"input_audio"`),
+		[]byte(`data:image/`),
+		[]byte(`data:video/`),
+		[]byte(`data:audio/`),
+	)
+}
+
+func rawContainsAny(raw []byte, needles ...[]byte) bool {
+	for _, needle := range needles {
+		if len(needle) > 0 && bytes.Contains(raw, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func acquireRelayChannelConcurrency(c *gin.Context, channel *model.Channel) (service.ChannelConcurrencyRelease, *types.NewAPIError) {

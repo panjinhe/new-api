@@ -892,6 +892,20 @@ func (r *OpenAIResponsesRequest) GetTokenCountMeta() *types.TokenCountMeta {
 						Source:   types.NewFileSourceFromData(input.FileUrl, ""),
 					})
 				}
+			} else if input.Type == "input_video" {
+				if input.VideoUrl != "" {
+					fileMeta = append(fileMeta, &types.FileMeta{
+						FileType: types.FileTypeVideo,
+						Source:   types.NewFileSourceFromData(input.VideoUrl, ""),
+					})
+				}
+			} else if input.Type == "input_audio" {
+				if input.AudioUrl != "" {
+					fileMeta = append(fileMeta, &types.FileMeta{
+						FileType: types.FileTypeAudio,
+						Source:   types.NewFileSourceFromData(input.AudioUrl, ""),
+					})
+				}
 			} else {
 				texts = append(texts, input.Text)
 			}
@@ -963,6 +977,8 @@ type MediaInput struct {
 	Text     string `json:"text,omitempty"`
 	FileUrl  string `json:"file_url,omitempty"`
 	ImageUrl string `json:"image_url,omitempty"`
+	VideoUrl string `json:"video_url,omitempty"`
+	AudioUrl string `json:"audio_url,omitempty"`
 	Detail   string `json:"detail,omitempty"` // 仅 input_image 有效
 }
 
@@ -970,7 +986,7 @@ type MediaInput struct {
 // Reference implementation mirrors Message.ParseContent:
 //   - input can be a string, treated as an input_text item
 //   - input can be an array of objects with a `type` field
-//     supported types: input_text, input_image, input_file
+//     supported types: input_text, input_image, input_file, input_video, input_audio
 func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 	if r.Input == nil {
 		return nil
@@ -992,9 +1008,21 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 
 	// Try array of parts
 	if common.GetJsonType(r.Input) == "array" {
+		var rawInputs []map[string]any
+		_ = common.Unmarshal(r.Input, &rawInputs)
+		for _, item := range rawInputs {
+			if _, ok := item["content"]; !ok {
+				mediaInputs = append(mediaInputs, mediaInputFromTypedMap(item)...)
+			}
+		}
+
 		var inputs []Input
 		_ = common.Unmarshal(r.Input, &inputs)
 		for _, input := range inputs {
+			if input.Content == nil || string(input.Content) == "null" {
+				continue
+			}
+
 			if common.GetJsonType(input.Content) == "string" {
 				var str string
 				_ = common.Unmarshal(input.Content, &str)
@@ -1016,44 +1044,73 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 					if !ok {
 						continue
 					}
-
-					typeVal, ok := item["type"].(string)
-					if !ok {
-						continue
-					}
-					switch typeVal {
-					case "input_text":
-						text, _ := item["text"].(string)
-						mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: text})
-					case "input_image":
-						// image_url may be string or object with url field
-						var imageUrl string
-						switch v := item["image_url"].(type) {
-						case string:
-							imageUrl = v
-						case map[string]any:
-							if url, ok := v["url"].(string); ok {
-								imageUrl = url
-							}
-						}
-						mediaInputs = append(mediaInputs, MediaInput{Type: "input_image", ImageUrl: imageUrl})
-					case "input_file":
-						// file_url may be string or object with url field
-						var fileUrl string
-						switch v := item["file_url"].(type) {
-						case string:
-							fileUrl = v
-						case map[string]any:
-							if url, ok := v["url"].(string); ok {
-								fileUrl = url
-							}
-						}
-						mediaInputs = append(mediaInputs, MediaInput{Type: "input_file", FileUrl: fileUrl})
-					}
+					mediaInputs = append(mediaInputs, mediaInputFromTypedMap(item)...)
 				}
 			}
 		}
 	}
 
 	return mediaInputs
+}
+
+func mediaInputFromTypedMap(item map[string]any) []MediaInput {
+	typeVal, ok := item["type"].(string)
+	if !ok {
+		return nil
+	}
+	switch typeVal {
+	case "input_text":
+		text, _ := item["text"].(string)
+		return []MediaInput{{Type: "input_text", Text: text}}
+	case "input_image":
+		// image_url may be string or object with url field
+		imageUrl := mediaURLFromItem(item, "image_url")
+		return []MediaInput{{Type: "input_image", ImageUrl: imageUrl, Detail: stringFromAny(item["detail"])}}
+	case "input_file":
+		// file_url may be string or object with url field
+		fileUrl := mediaURLFromItem(item, "file_url")
+		if fileUrl == "" {
+			fileUrl = mediaURLFromItem(item, "file")
+		}
+		return []MediaInput{{Type: "input_file", FileUrl: fileUrl}}
+	case "input_video":
+		videoUrl := mediaURLFromItem(item, "video_url")
+		if videoUrl == "" {
+			videoUrl = mediaURLFromItem(item, "input_video")
+		}
+		return []MediaInput{{Type: "input_video", VideoUrl: videoUrl}}
+	case "input_audio":
+		audioUrl := mediaURLFromItem(item, "audio_url")
+		if audioUrl == "" {
+			audioUrl = mediaURLFromItem(item, "input_audio")
+		}
+		return []MediaInput{{Type: "input_audio", AudioUrl: audioUrl}}
+	default:
+		return nil
+	}
+}
+
+func mediaURLFromItem(item map[string]any, key string) string {
+	switch v := item[key].(type) {
+	case string:
+		return v
+	case map[string]any:
+		if url, ok := v["url"].(string); ok {
+			return url
+		}
+		if fileData, ok := v["file_data"].(string); ok {
+			return fileData
+		}
+		if data, ok := v["data"].(string); ok {
+			return data
+		}
+	}
+	return ""
+}
+
+func stringFromAny(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
 }

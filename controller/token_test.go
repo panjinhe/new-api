@@ -317,6 +317,81 @@ func TestMaybeFastResponsesTokenMetaLargeRequestUsesBodyEstimate(t *testing.T) {
 	}
 }
 
+func TestMaybeFastResponsesTokenMetaSkipsLargeMediaInputs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	imageData := "data:image/png;base64," + strings.Repeat("a", largeResponsesFastTokenBytes)
+	videoData := "data:video/mp4;base64," + strings.Repeat("b", largeResponsesFastTokenBytes)
+	raw := fmt.Sprintf(`{
+		"model":"gpt-5.5",
+		"input":[{"role":"user","content":[
+			{"type":"input_text","text":"describe these"},
+			{"type":"input_image","image_url":"%s","detail":"low"},
+			{"type":"input_video","video_url":"%s"}
+		]}],
+		"max_output_tokens":123
+	}`, imageData, videoData)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(raw))
+
+	var req dto.OpenAIResponsesRequest
+	if err := common.Unmarshal([]byte(raw), &req); err != nil {
+		t.Fatalf("failed to decode responses request: %v", err)
+	}
+	info := &relaycommon.RelayInfo{
+		RelayMode:   relayconstant.RelayModeResponses,
+		RelayFormat: types.RelayFormatOpenAIResponses,
+	}
+
+	if _, ok := maybeFastResponsesTokenMeta(ctx, &req, info, false); ok {
+		t.Fatalf("expected media responses request to skip fast body-size token estimate")
+	}
+	if info.FastTokenEstimateEnabled {
+		t.Fatalf("expected fast token estimate metadata to stay disabled")
+	}
+
+	meta := req.GetTokenCountMeta()
+	if meta.CombineText != "describe these" {
+		t.Fatalf("expected only text input in CombineText, got %q", meta.CombineText)
+	}
+	if len(meta.Files) != 2 {
+		t.Fatalf("expected image and video file metas, got %d", len(meta.Files))
+	}
+	if meta.Files[0].FileType != types.FileTypeImage {
+		t.Fatalf("expected first media to be image, got %s", meta.Files[0].FileType)
+	}
+	if meta.Files[1].FileType != types.FileTypeVideo {
+		t.Fatalf("expected second media to be video, got %s", meta.Files[1].FileType)
+	}
+}
+
+func TestOpenAIResponsesTokenMetaParsesDirectMediaInputArray(t *testing.T) {
+	raw := `{
+		"model":"gpt-5.5",
+		"input":[
+			{"type":"input_text","text":"look"},
+			{"type":"input_image","image_url":{"url":"data:image/png;base64,abc"},"detail":"low"},
+			{"type":"input_video","video_url":{"url":"data:video/mp4;base64,def"}},
+			{"type":"input_audio","input_audio":{"data":"data:audio/wav;base64,ghi"}}
+		]
+	}`
+
+	var req dto.OpenAIResponsesRequest
+	if err := common.Unmarshal([]byte(raw), &req); err != nil {
+		t.Fatalf("failed to decode responses request: %v", err)
+	}
+
+	meta := req.GetTokenCountMeta()
+	if meta.CombineText != "look" {
+		t.Fatalf("expected direct text input in CombineText, got %q", meta.CombineText)
+	}
+	if len(meta.Files) != 3 {
+		t.Fatalf("expected image, video, and audio file metas, got %d", len(meta.Files))
+	}
+	if meta.Files[0].FileType != types.FileTypeImage || meta.Files[1].FileType != types.FileTypeVideo || meta.Files[2].FileType != types.FileTypeAudio {
+		t.Fatalf("unexpected media file types: %s, %s, %s", meta.Files[0].FileType, meta.Files[1].FileType, meta.Files[2].FileType)
+	}
+}
+
 func TestMaybeFastResponsesTokenMetaSkipsSmallRequestAndSensitiveCheck(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	body := `{"model":"gpt-5.5","input":"hello"}`
