@@ -17,17 +17,18 @@
 
 ## 生产部署默认约定
 
-- 以后生产发版默认永远使用“本地重建前端 + 编译 Linux 二进制 + 同步源码包 + 替换容器内 `/new-api` + 重启容器”这套快速发布流程。
+- 以后生产发版默认使用“本地构建 + 蓝绿短重叠 + Nginx upstream 切流 + 旧实例 drain”流程。
+- `deploy-fast-prod.ps1` 只保留为备用/应急路径，不再作为日常默认发布方式。
 - 不再把“本地构建镜像 + `docker save | gzip | ssh | docker load` + 服务器 `docker compose up -d --no-build`”作为日常发布方式。
 - 原因很简单：
   - 整镜像传输太慢
-  - 前后端常规改动没有必要每次都搬运整包镜像
-  - 你的当前环境更适合走二进制热更新发布
+  - 单容器原地重启会造成发布窗口内的 5xx 和流式中断
+  - 当前生产已经完成首次 blue 演练，Nginx upstream 已切到蓝绿结构
 
 ### 默认发布步骤
 
 ```powershell
-pwsh ./scripts/deploy-fast-prod.ps1
+pwsh ./scripts/deploy-bluegreen-prod.ps1
 ```
 
 - 这一步会自动：
@@ -36,22 +37,35 @@ pwsh ./scripts/deploy-fast-prod.ps1
   - 校验产物是 Linux `ELF`
   - 打包并同步当前 `HEAD` 源码
   - 上传二进制到 `aheapi-itdun`
-  - 替换 `new-api-prod` 容器内的 `/new-api`
-  - 提交容器为 `new-api-local:prod`
-  - 重启容器并等待 `/api/status` 健康检查
+  - 启动 idle color 容器并等待 `/api/status` 健康检查
+  - 切换 Nginx upstream 到新 color
+  - 公开地址 smoke test 通过后写入 `runtime-prod/active-color`
+  - 按 drain 超时停止旧 color
 
 常用变体：
 
 ```powershell
 # 前端已确认无变化时，直接跳过前端构建
-pwsh ./scripts/deploy-fast-prod.ps1 -SkipFrontendBuild
+pwsh ./scripts/deploy-bluegreen-prod.ps1 -SkipFrontendBuild
 
 # 已经手动构建过二进制，只发布现有产物
-pwsh ./scripts/deploy-fast-prod.ps1 -SkipBuild
+pwsh ./scripts/deploy-bluegreen-prod.ps1 -SkipBuild
 
 # 只替换二进制，不同步源码包
-pwsh ./scripts/deploy-fast-prod.ps1 -SkipSourceSync
+pwsh ./scripts/deploy-bluegreen-prod.ps1 -SkipSourceSync
 ```
+
+注意：首次从 legacy 切到 blue / green 时不能用 `-SkipSourceSync`，因为服务器需要同步蓝绿 compose、Nginx 模板和部署脚本。现在首次演练已完成，后续常规蓝绿切换可以按需使用 `-SkipSourceSync`，但默认仍建议同步当前 `HEAD`。
+
+### 备用发布路径
+
+如果蓝绿脚本本身需要维护，或者必须回到 legacy 单容器模式，才使用快速发布脚本：
+
+```powershell
+pwsh ./scripts/deploy-fast-prod.ps1
+```
+
+这条路径会替换 `new-api-prod` 并重启单容器，可能造成短暂中断；使用前必须明确接受这个影响。
 
 生产环境禁止在服务器上执行 `./deploy.sh --env-name prod ...`；该命令会直接退出，避免误触发服务器端 Docker build。
 
