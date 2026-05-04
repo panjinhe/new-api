@@ -62,6 +62,8 @@ func main() {
 	}
 
 	defer func() {
+		model.FlushBatchUpdates()
+		model.SaveQuotaDataCache()
 		err := model.CloseDB()
 		if err != nil {
 			common.FatalLog("failed to close database: " + err.Error())

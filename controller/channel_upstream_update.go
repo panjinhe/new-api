@@ -650,10 +650,15 @@ func StartChannelUpstreamModelUpdateTask() {
 
 		go func() {
 			common.SysLog(fmt.Sprintf("upstream model update task started: interval=%s", interval))
-			runChannelUpstreamModelUpdateTaskOnce()
+			if common.ShouldRunLeaderTasks() {
+				runChannelUpstreamModelUpdateTaskOnce()
+			}
 			ticker := time.NewTicker(interval)
 			defer ticker.Stop()
 			for range ticker.C {
+				if !common.ShouldRunLeaderTasks() {
+					continue
+				}
 				runChannelUpstreamModelUpdateTaskOnce()
 			}
 		}()

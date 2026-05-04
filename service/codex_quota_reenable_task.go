@@ -26,6 +26,10 @@ func StartCodexQuotaAutoReenableTask() {
 			defer ticker.Stop()
 
 			for {
+				if !common.ShouldRunLeaderTasks() {
+					<-ticker.C
+					continue
+				}
 				if err := runCodexQuotaAutoReenablePass(context.Background(), common.GetTimestamp()); err != nil {
 					logger.LogWarn(context.Background(), fmt.Sprintf("codex quota recovery and routing cooldown cleanup task failed: %v", err))
 				}
