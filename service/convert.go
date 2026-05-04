@@ -11,10 +11,106 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/openrouter"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/reasonmap"
+	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
 )
 
-func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.RelayInfo) (*dto.GeneralOpenAIRequest, error) {
+func claudeMediaMessageToOpenAITextAndImage(c *gin.Context, mediaMsg dto.ClaudeMediaMessage) (string, *dto.MediaContent, error) {
+	switch mediaMsg.Type {
+	case "text", "input_text":
+		return strings.TrimSpace(mediaMsg.GetText()), nil, nil
+	case "image":
+		source := mediaMsg.ToFileSource()
+		if source == nil {
+			return "", nil, nil
+		}
+		base64Data, mimeType, err := GetBase64Data(c, source, "formatting claude tool result image for OpenAI")
+		if err != nil {
+			return "", nil, fmt.Errorf("get tool result image data failed: %w", err)
+		}
+		if mimeType == "" {
+			mimeType = "image/png"
+		}
+		if !strings.HasPrefix(mimeType, "image/") {
+			return "", nil, nil
+		}
+		return "", &dto.MediaContent{
+			Type: "image_url",
+			ImageUrl: &dto.MessageImageUrl{
+				Url:      fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data),
+				Detail:   "auto",
+				MimeType: mimeType,
+			},
+		}, nil
+	default:
+		return "", nil, nil
+	}
+}
+
+func appendClaudeToolResultMedia(c *gin.Context, textContent string, mediaContents []dto.MediaContent, mediaMsg dto.ClaudeMediaMessage) (string, []dto.MediaContent, error) {
+	text, imageContent, err := claudeMediaMessageToOpenAITextAndImage(c, mediaMsg)
+	if err != nil {
+		return "", nil, err
+	}
+	if text != "" {
+		if textContent != "" {
+			textContent += "\n"
+		}
+		textContent += text
+	}
+	if imageContent != nil {
+		mediaContents = append(mediaContents, *imageContent)
+	}
+	return textContent, mediaContents, nil
+}
+
+func claudeToolResultContentToOpenAI(c *gin.Context, content any) (string, []dto.MediaContent, error) {
+	textContent := ""
+	mediaContents := make([]dto.MediaContent, 0)
+
+	switch v := content.(type) {
+	case string:
+		textContent = v
+		return textContent, mediaContents, nil
+	case []dto.ClaudeMediaMessage:
+		for _, item := range v {
+			var err error
+			textContent, mediaContents, err = appendClaudeToolResultMedia(c, textContent, mediaContents, item)
+			if err != nil {
+				return "", nil, err
+			}
+		}
+		return textContent, mediaContents, nil
+	case []any:
+		for _, item := range v {
+			mediaMsg, ok := item.(dto.ClaudeMediaMessage)
+			if !ok {
+				itemMap, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				b, err := common.Marshal(itemMap)
+				if err != nil {
+					continue
+				}
+				if err := common.Unmarshal(b, &mediaMsg); err != nil {
+					continue
+				}
+			}
+
+			var err error
+			textContent, mediaContents, err = appendClaudeToolResultMedia(c, textContent, mediaContents, mediaMsg)
+			if err != nil {
+				return "", nil, err
+			}
+		}
+		return textContent, mediaContents, nil
+	default:
+		return fmt.Sprintf("%v", content), mediaContents, nil
+	}
+}
+
+func ClaudeToOpenAIRequest(c *gin.Context, claudeRequest dto.ClaudeRequest, info *relaycommon.RelayInfo) (*dto.GeneralOpenAIRequest, error) {
 	openAIRequest := dto.GeneralOpenAIRequest{
 		Model:       claudeRequest.Model,
 		Temperature: claudeRequest.Temperature,
@@ -32,7 +128,7 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 		openAIRequest.Stream = lo.ToPtr(lo.FromPtr(claudeRequest.Stream))
 	}
 
-	isOpenRouter := info.ChannelType == constant.ChannelTypeOpenRouter
+	isOpenRouter := info != nil && info.ChannelType == constant.ChannelTypeOpenRouter
 
 	if isOpenRouter {
 		if effort := claudeRequest.GetEfforts(); effort != "" {
@@ -59,7 +155,7 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 		}
 	} else {
 		thinkingSuffix := "-thinking"
-		if strings.HasSuffix(info.OriginModelName, thinkingSuffix) &&
+		if info != nil && strings.HasSuffix(info.OriginModelName, thinkingSuffix) &&
 			!strings.HasSuffix(openAIRequest.Model, thinkingSuffix) {
 			openAIRequest.Model = openAIRequest.Model + thinkingSuffix
 		}
@@ -105,7 +201,7 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 				openAIMessage := dto.Message{
 					Role: "system",
 				}
-				isOpenRouterClaude := isOpenRouter && strings.HasPrefix(info.UpstreamModelName, "anthropic/claude")
+				isOpenRouterClaude := isOpenRouter && info != nil && strings.HasPrefix(info.UpstreamModelName, "anthropic/claude")
 				if isOpenRouterClaude {
 					systemMediaMessages := make([]dto.MediaContent, 0, len(systems))
 					for _, system := range systems {
@@ -186,15 +282,19 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 						Name:       &toolName,
 						ToolCallId: mediaMsg.ToolUseId,
 					}
-					//oaiToolMessage.SetStringContent(*mediaMsg.GetMediaContent().Text)
-					if mediaMsg.IsStringContent() {
-						oaiToolMessage.SetStringContent(mediaMsg.GetStringContent())
-					} else {
-						mediaContents := mediaMsg.ParseMediaContent()
-						encodeJson, _ := common.Marshal(mediaContents)
-						oaiToolMessage.SetStringContent(string(encodeJson))
+					textContent, imageContents, err := claudeToolResultContentToOpenAI(c, mediaMsg.Content)
+					if err != nil {
+						return nil, err
 					}
+					oaiToolMessage.SetStringContent(textContent)
 					openAIMessages = append(openAIMessages, oaiToolMessage)
+					if len(imageContents) > 0 {
+						oaiImageMessage := dto.Message{
+							Role: "user",
+						}
+						oaiImageMessage.SetMediaContent(imageContents)
+						openAIMessages = append(openAIMessages, oaiImageMessage)
+					}
 				}
 			}
 

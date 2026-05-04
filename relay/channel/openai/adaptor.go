@@ -74,7 +74,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 	//		println(fmt.Sprintf("failed to save request body to file: %v", err))
 	//	}
 	//}
-	aiRequest, err := service.ClaudeToOpenAIRequest(*request, info)
+	aiRequest, err := service.ClaudeToOpenAIRequest(c, *request, info)
 	if err != nil {
 		return nil, err
 	}
