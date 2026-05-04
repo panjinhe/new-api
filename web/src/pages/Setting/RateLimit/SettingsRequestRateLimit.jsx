@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Button, Col, Form, Row, Spin } from '@douyinfe/semi-ui';
+import { Button, Col, Form, Row, Spin, Typography } from '@douyinfe/semi-ui';
 import {
   compareObjects,
   API,
@@ -29,19 +29,22 @@ import {
 } from '../../../helpers';
 import { useTranslation } from 'react-i18next';
 
+const defaultInputs = {
+  ModelRequestRateLimitEnabled: false,
+  ModelRequestRateLimitCount: -1,
+  ModelRequestRateLimitSuccessCount: 1000,
+  ModelRequestRateLimitDurationMinutes: 1,
+  ModelRequestRateLimitGroup: '',
+  ModelRequestConcurrencyLimitEnabled: false,
+  ModelRequestConcurrencyLimit: 5,
+};
+
 export default function RequestRateLimit(props) {
   const { t } = useTranslation();
+  const { Text } = Typography;
 
   const [loading, setLoading] = useState(false);
-  const [inputs, setInputs] = useState({
-    ModelRequestRateLimitEnabled: false,
-    ModelRequestRateLimitCount: -1,
-    ModelRequestRateLimitSuccessCount: 1000,
-    ModelRequestRateLimitDurationMinutes: 1,
-    ModelRequestRateLimitGroup: '',
-    ModelRequestConcurrencyLimitEnabled: false,
-    ModelRequestConcurrencyLimit: 5,
-  });
+  const [inputs, setInputs] = useState(defaultInputs);
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
 
@@ -88,9 +91,9 @@ export default function RequestRateLimit(props) {
   }
 
   useEffect(() => {
-    const currentInputs = {};
-    for (let key in props.options) {
-      if (Object.keys(inputs).includes(key)) {
+    const currentInputs = { ...defaultInputs };
+    for (let key in currentInputs) {
+      if (Object.prototype.hasOwnProperty.call(props.options, key)) {
         currentInputs[key] = props.options[key];
       }
     }
@@ -263,7 +266,15 @@ export default function RequestRateLimit(props) {
                   min={1}
                   max={100000000}
                   suffix={t('个')}
-                  extraText={t('未单独设置的用户会使用这个默认值')}
+                  extraText={
+                    <>
+                      {t('未单独设置的用户会使用这个默认值')}
+                      <br />
+                      <Text type='tertiary'>
+                        {t('单独设置用户并发上限：用户管理 → 编辑用户 → 用户并发上限')}
+                      </Text>
+                    </>
+                  }
                   field={'ModelRequestConcurrencyLimit'}
                   onChange={(value) =>
                     setInputs({

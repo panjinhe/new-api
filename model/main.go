@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -202,7 +203,7 @@ func InitDB() (err error) {
 			//_, _ = sqlDB.Exec("ALTER TABLE channels MODIFY model_mapping TEXT;") // TODO: delete this line when most users have upgraded
 		}
 		common.SysLog("database migration started")
-		err = migrateDB()
+		err = runMigrationWithLock(DB, "new-api-main-migration", 7319773651962115072, common.UsingPostgreSQL, common.UsingMySQL, migrateDB)
 		return err
 	} else {
 		common.FatalLog(err)
@@ -239,7 +240,7 @@ func InitLogDB() (err error) {
 			return nil
 		}
 		common.SysLog("database migration started")
-		err = migrateLOGDB()
+		err = runMigrationWithLock(LOG_DB, "new-api-log-migration", 7319773651962115073, common.LogSqlType == common.DatabaseTypePostgreSQL, common.LogSqlType == common.DatabaseTypeMySQL, migrateLOGDB)
 		return err
 	} else {
 		common.FatalLog(err)
@@ -387,6 +388,55 @@ func migrateLOGDB() error {
 		return err
 	}
 	return nil
+}
+
+func runMigrationWithLock(db *gorm.DB, name string, pgKey int64, usingPostgreSQL bool, usingMySQL bool, migrate func() error) error {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case usingPostgreSQL:
+		return runPostgresMigrationWithLock(sqlDB, pgKey, migrate)
+	case usingMySQL:
+		return runMySQLMigrationWithLock(sqlDB, name, migrate)
+	default:
+		return migrate()
+	}
+}
+
+func runPostgresMigrationWithLock(sqlDB *sql.DB, key int64, migrate func() error) error {
+	common.SysLog(fmt.Sprintf("waiting for PostgreSQL migration lock %d", key))
+	if _, err := sqlDB.Exec("SELECT pg_advisory_lock($1)", key); err != nil {
+		return fmt.Errorf("acquire PostgreSQL migration lock: %w", err)
+	}
+	defer func() {
+		if _, err := sqlDB.Exec("SELECT pg_advisory_unlock($1)", key); err != nil {
+			common.SysError(fmt.Sprintf("failed to release PostgreSQL migration lock %d: %v", key, err))
+		}
+	}()
+
+	return migrate()
+}
+
+func runMySQLMigrationWithLock(sqlDB *sql.DB, name string, migrate func() error) error {
+	common.SysLog(fmt.Sprintf("waiting for MySQL migration lock %s", name))
+	var locked int
+	if err := sqlDB.QueryRow("SELECT GET_LOCK(?, 120)", name).Scan(&locked); err != nil {
+		return fmt.Errorf("acquire MySQL migration lock: %w", err)
+	}
+	if locked != 1 {
+		return fmt.Errorf("acquire MySQL migration lock %q timed out", name)
+	}
+	defer func() {
+		var released int
+		if err := sqlDB.QueryRow("SELECT RELEASE_LOCK(?)", name).Scan(&released); err != nil {
+			common.SysError(fmt.Sprintf("failed to release MySQL migration lock %s: %v", name, err))
+		}
+	}()
+
+	return migrate()
 }
 
 type sqliteColumnDef struct {

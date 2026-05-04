@@ -32,6 +32,8 @@ const RateLimitSetting = () => {
     ModelRequestRateLimitSuccessCount: 1000,
     ModelRequestRateLimitDurationMinutes: 1,
     ModelRequestRateLimitGroup: '',
+    ModelRequestConcurrencyLimitEnabled: false,
+    ModelRequestConcurrencyLimit: 5,
   });
 
   let [loading, setLoading] = useState(false);
