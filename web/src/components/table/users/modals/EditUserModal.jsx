@@ -400,7 +400,9 @@ const EditUserModal = (props) => {
                           min={0}
                           step={1}
                           suffix={t('个')}
-                          extraText={t('0 表示使用全局默认并发上限')}
+                          extraText={t(
+                            '0 表示使用全局默认并发上限；大于 0 时会覆盖全局默认值',
+                          )}
                           style={{ width: '100%' }}
                         />
                       </Col>
