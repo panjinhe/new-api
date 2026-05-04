@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -110,11 +112,59 @@ func claudeToolResultContentToOpenAI(c *gin.Context, content any) (string, []dto
 	}
 }
 
+func buildClaudePromptCacheKey(c *gin.Context, claudeRequest dto.ClaudeRequest) (string, error) {
+	prefixMessages := claudeRequest.Messages
+	if len(prefixMessages) > 0 {
+		prefixMessages = prefixMessages[:len(prefixMessages)-1]
+	}
+	normalized := map[string]any{
+		"model":           strings.TrimSpace(claudeRequest.Model),
+		"system":          claudeRequest.System,
+		"prefix_messages": prefixMessages,
+		"tools":           claudeRequest.Tools,
+	}
+	if c != nil {
+		if userID := c.GetInt("id"); userID != 0 {
+			normalized["user_id"] = userID
+		}
+		if tokenID := c.GetInt("token_id"); tokenID != 0 {
+			normalized["token_id"] = tokenID
+		}
+	}
+	if claudeRequest.Thinking != nil {
+		normalized["thinking"] = claudeRequest.Thinking
+	}
+	if claudeRequest.ToolChoice != nil {
+		normalized["tool_choice"] = claudeRequest.ToolChoice
+	}
+	if len(claudeRequest.StopSequences) > 0 {
+		normalized["stop_sequences"] = claudeRequest.StopSequences
+	}
+	if claudeRequest.TopP != nil {
+		normalized["top_p"] = *claudeRequest.TopP
+	}
+	if claudeRequest.TopK != nil {
+		normalized["top_k"] = *claudeRequest.TopK
+	}
+
+	data, err := common.Marshal(normalized)
+	if err != nil {
+		return "", fmt.Errorf("marshal claude cache key payload: %w", err)
+	}
+	sum := sha256.Sum256(data)
+	return "claude-" + hex.EncodeToString(sum[:16]), nil
+}
+
 func ClaudeToOpenAIRequest(c *gin.Context, claudeRequest dto.ClaudeRequest, info *relaycommon.RelayInfo) (*dto.GeneralOpenAIRequest, error) {
 	openAIRequest := dto.GeneralOpenAIRequest{
 		Model:       claudeRequest.Model,
 		Temperature: claudeRequest.Temperature,
 	}
+	cacheKey, err := buildClaudePromptCacheKey(c, claudeRequest)
+	if err != nil {
+		return nil, err
+	}
+	openAIRequest.PromptCacheKey = cacheKey
 	if claudeRequest.MaxTokens != nil {
 		openAIRequest.MaxTokens = lo.ToPtr(lo.FromPtr(claudeRequest.MaxTokens))
 	}
