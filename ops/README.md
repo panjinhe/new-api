@@ -55,6 +55,186 @@ pwsh ./scripts/deploy-fast-prod.ps1 -SkipSourceSync
 
 生产环境禁止在服务器上执行 `./deploy.sh --env-name prod ...`；该命令会直接退出，避免误触发服务器端 Docker build。
 
+## 蓝绿发布演练记录
+
+### 当前蓝绿发布入口
+
+首次蓝绿发布和后续蓝绿切换都使用本地脚本：
+
+```powershell
+pwsh ./scripts/deploy-bluegreen-prod.ps1
+```
+
+脚本会做这些事：
+
+1. 本地构建 Linux `amd64` 二进制。
+2. 从当前干净的 `HEAD` 打源码归档并上传到生产服务器。
+3. 在服务器使用显式 `.env.prod` 解析 compose：
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml -f docker-compose.prod.bluegreen.yml
+```
+
+4. 启动 idle color，例如首次从 legacy 切换时启动 `new-api-blue`，监听 `127.0.0.1:3001`。
+5. idle 实例健康后，修改 Nginx upstream 并 reload。
+6. 公网 `/api/status` smoke test 通过后，写入 `runtime-prod/active-color`。
+7. drain 并停止旧实例。
+
+### 2026-05-05 首次低峰演练结果
+
+- 发布版本：`3dbd2c588`
+- 起始状态：
+  - legacy `new-api-prod` 运行在 `127.0.0.1:3000`
+  - `3001` / `3002` 未占用
+  - 生产服务器资源充足：约 `79G` 磁盘可用、约 `2.9G` 内存 available
+- 目标状态：
+  - `new-api-blue` 运行在 `127.0.0.1:3001`
+  - Nginx 站点统一 `proxy_pass http://new_api_bluegreen`
+  - upstream 指向 `127.0.0.1:3001`
+  - `runtime-prod/active-color` 为 `blue`
+  - legacy `new-api-prod` 已按 `120s` drain 停止
+- 验收结果：
+  - `new-api-blue` healthy
+  - `new-api-postgres` healthy
+  - `nginx -t` 通过
+  - `https://aheapi.com/api/status` 正常
+  - 日志未发现迁移冲突、panic 或数据库认证失败
+
+### 首次演练中踩到的坑
+
+第一次自动脚本在 Nginx 切流阶段失败，原因是旧脚本把备份文件放在 `/etc/nginx/sites-enabled/` 里：
+
+```text
+/etc/nginx/sites-enabled/new-api.conf.bluegreen-backup-...
+/etc/nginx/sites-enabled/pbroe-redirect.conf.bluegreen-backup-...
+```
+
+Nginx 会加载 `sites-enabled` 下的这些备份文件，导致：
+
+```text
+duplicate listen options for [::]:443
+nginx: configuration file /etc/nginx/nginx.conf test failed
+```
+
+处理方式：
+
+1. 不删除备份，只移动到不会被 Nginx include 的目录：
+
+```bash
+mkdir -p /etc/nginx/bluegreen-backups/20260504-180346
+mv /etc/nginx/sites-enabled/*bluegreen-backup-20260504-180346 /etc/nginx/bluegreen-backups/20260504-180346/
+nginx -t
+```
+
+2. 确认当时实际状态：
+   - Nginx 站点已经被 patch 为 `proxy_pass http://new_api_bluegreen`
+   - upstream 已回滚指向 `127.0.0.1:3000`
+   - legacy `new-api-prod` 仍然 healthy
+   - 新 `new-api-blue` 已启动并 healthy
+
+3. 手动完成剩余切流：
+
+```bash
+cat >/etc/nginx/conf.d/new-api-bluegreen-upstream.conf <<'EOF'
+upstream new_api_bluegreen {
+    server 127.0.0.1:3001;
+    keepalive 32;
+}
+EOF
+nginx -t && nginx -s reload
+curl -fsS -m 10 https://aheapi.com/api/status >/dev/null
+printf 'blue\n' >/opt/new-api/app/runtime-prod/active-color
+docker stop --time 120 new-api-prod
+```
+
+脚本已修复：Nginx 站点备份现在保存到 `/etc/nginx/bluegreen-backups/<timestamp>/`，不会再留在 `sites-enabled`。
+
+### 蓝绿发布前检查清单
+
+本地：
+
+```powershell
+git status --short --branch
+go test ./model ./common
+pwsh ./scripts/deploy-bluegreen-prod.ps1 -DryRun -SkipFrontendBuild
+```
+
+要求：
+
+- 工作区必须干净；首次蓝绿发布不能使用 `-SkipSourceSync`，因为服务器需要同步 `docker-compose.prod.bluegreen.yml` 和脚本。
+- dry-run 输出的版本号必须是准备发布的 `HEAD`。
+- dry-run 必须显示 compose 命令包含 `--env-file .env.prod`。
+
+生产服务器只读检查：
+
+```bash
+cd /opt/new-api/app
+docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'
+docker compose --env-file .env.prod -f docker-compose.prod.yml -f docker-compose.prod.postgres.yml config | grep 'SQL_DSN:'
+ss -ltnp | grep -E ':(3000|3001|3002)\b' || true
+free -h
+df -h /
+nginx -t
+curl -fsS -m 8 https://aheapi.com/api/status >/dev/null
+```
+
+要求：
+
+- 当前 active 实例 healthy。
+- PostgreSQL healthy。
+- `3001` 或 `3002` 至少一个空闲。
+- `SQL_DSN` 不能出现 `change-me`。
+- Nginx 配置测试通过。
+- 公网健康检查通过。
+
+### 蓝绿发布后检查清单
+
+```bash
+cat /opt/new-api/app/runtime-prod/active-color
+cat /etc/nginx/conf.d/new-api-bluegreen-upstream.conf
+docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'
+curl -fsS -m 10 https://aheapi.com/api/status >/dev/null
+nginx -t
+docker logs --since 5m new-api-blue 2>&1 | grep -Ei 'panic|fatal|failed|error|duplicate|pg_class' | tail -80 || true
+```
+
+重点确认：
+
+- active color 和 upstream 端口一致。
+- 新 active 容器 healthy。
+- 旧容器已停止，或处于预期 drain 状态。
+- Nginx 配置仍然通过。
+- 最近日志没有迁移冲突、数据库认证失败、panic。
+
+### 手动回滚方式
+
+如果切到 blue 后公网 smoke fail，但 legacy 仍在：
+
+```bash
+cat >/etc/nginx/conf.d/new-api-bluegreen-upstream.conf <<'EOF'
+upstream new_api_bluegreen {
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+EOF
+nginx -t && nginx -s reload
+printf 'legacy\n' >/opt/new-api/app/runtime-prod/active-color
+```
+
+如果 legacy 已停，但上一个 color 仍在，例如要从 blue 回 green，改 upstream 到对应端口并 reload：
+
+```bash
+# green 为 3002，blue 为 3001
+cat >/etc/nginx/conf.d/new-api-bluegreen-upstream.conf <<'EOF'
+upstream new_api_bluegreen {
+    server 127.0.0.1:3002;
+    keepalive 32;
+}
+EOF
+nginx -t && nginx -s reload
+printf 'green\n' >/opt/new-api/app/runtime-prod/active-color
+```
+
 ### PowerShell 远程执行注意事项
 
 - 如果你在本地用 PowerShell 调 `ssh` 执行远端 shell 命令，不要把本来应该留给远端展开的 `$VAR`、`$(...)` 直接写进双引号字符串。

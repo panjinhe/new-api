@@ -250,11 +250,13 @@ EOF
 patch_nginx_sites() {
   patched=0
   ts="$(date +%Y%m%d-%H%M%S)"
+  backup_dir="/etc/nginx/bluegreen-backups/$ts"
+  mkdir -p "$backup_dir"
   for file in "${site_files[@]}"; do
     if [ ! -f "$file" ]; then
       continue
     fi
-    cp "$file" "$file.bluegreen-backup-$ts"
+    cp "$file" "$backup_dir/$(basename "$file")"
     sed -i -E \
       -e 's#proxy_pass[[:space:]]+http://127\.0\.0\.1:3000;#proxy_pass http://new_api_bluegreen;#g' \
       -e 's#proxy_pass[[:space:]]+http://127\.0\.0\.1:3001;#proxy_pass http://new_api_bluegreen;#g' \
