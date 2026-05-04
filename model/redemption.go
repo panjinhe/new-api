@@ -162,18 +162,6 @@ func welfareRedemptionClaimDate() string {
 	return time.Now().Format("2006-01-02")
 }
 
-func userEmailDomainForWelfareTx(tx *gorm.DB, userId int) (string, error) {
-	var user User
-	if err := tx.Select("email").Where("id = ?", userId).First(&user).Error; err != nil {
-		return "", err
-	}
-	domain, ok := common.NormalizeEmailDomain(user.Email)
-	if !ok {
-		return "", nil
-	}
-	return domain, nil
-}
-
 func isUniqueConstraintError(err error) bool {
 	if err == nil {
 		return false
@@ -218,17 +206,12 @@ func claimWelfareRedemptionDailyDimensionTx(tx *gorm.DB, claimDate string, dimen
 
 func claimWelfareRedemptionDailyLimitsTx(tx *gorm.DB, userId int, redemptionId int, audit RedemptionAudit) error {
 	claimDate := welfareRedemptionClaimDate()
-	domain, err := userEmailDomainForWelfareTx(tx, userId)
-	if err != nil {
-		return err
-	}
 	claims := []struct {
 		typ   string
 		value string
 	}{
 		{typ: "user", value: strconv.Itoa(userId)},
 		{typ: "ip", value: strings.TrimSpace(audit.CallerIp)},
-		{typ: "email_domain", value: domain},
 	}
 	for _, claim := range claims {
 		if err := claimWelfareRedemptionDailyDimensionTx(tx, claimDate, claim.typ, claim.value, userId, redemptionId); err != nil {
