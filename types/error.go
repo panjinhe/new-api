@@ -64,9 +64,10 @@ const (
 	ErrorCodeChannelConcurrencySaturated  ErrorCode = "channel:concurrency_saturated"
 
 	// client request error
-	ErrorCodeReadRequestBodyFailed ErrorCode = "read_request_body_failed"
-	ErrorCodeConvertRequestFailed  ErrorCode = "convert_request_failed"
-	ErrorCodeAccessDenied          ErrorCode = "access_denied"
+	ErrorCodeReadRequestBodyFailed            ErrorCode = "read_request_body_failed"
+	ErrorCodeConvertRequestFailed             ErrorCode = "convert_request_failed"
+	ErrorCodeAccessDenied                     ErrorCode = "access_denied"
+	ErrorCodeModelRequestConcurrencySaturated ErrorCode = "model_request:concurrency_saturated"
 
 	// request error
 	ErrorCodeBadRequestBody ErrorCode = "bad_request_body"

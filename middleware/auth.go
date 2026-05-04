@@ -152,6 +152,11 @@ func authHelper(c *gin.Context, minRole int) {
 	c.Set("group", session.Get("group"))
 	c.Set("user_group", session.Get("group"))
 	c.Set("use_access_token", useAccessToken)
+	if userID, ok := id.(int); ok {
+		if userCache, err := model.GetUserCache(userID); err == nil {
+			userCache.WriteContext(c)
+		}
+	}
 
 	c.Next()
 }

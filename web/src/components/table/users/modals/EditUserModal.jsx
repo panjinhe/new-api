@@ -92,6 +92,7 @@ const EditUserModal = (props) => {
     email: '',
     quota: 0,
     quota_amount: 0,
+    concurrency_limit: 0,
     group: '白嫖怪',
     remark: '',
   });
@@ -390,6 +391,18 @@ const EditUserModal = (props) => {
                             {t('调整额度')}
                           </Button>
                         </Form.Slot>
+                      </Col>
+
+                      <Col span={24}>
+                        <Form.InputNumber
+                          field='concurrency_limit'
+                          label={t('用户并发上限')}
+                          min={0}
+                          step={1}
+                          suffix={t('个')}
+                          extraText={t('0 表示使用全局默认并发上限')}
+                          style={{ width: '100%' }}
+                        />
                       </Col>
 
                       <Col span={24}>

@@ -39,6 +39,7 @@ type User struct {
 	Quota            int            `json:"quota" gorm:"type:int;default:0"`
 	UsedQuota        int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
 	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
+	ConcurrencyLimit int            `json:"concurrency_limit" gorm:"type:int;default:0"`            // user request concurrency limit
 	Group            string         `json:"group" gorm:"type:varchar(64);default:'白嫖怪'"`
 	AffCode          string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
 	AffCount         int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
@@ -56,13 +57,14 @@ type User struct {
 
 func (user *User) ToBaseUser() *UserBase {
 	cache := &UserBase{
-		Id:       user.Id,
-		Group:    user.Group,
-		Quota:    user.Quota,
-		Status:   user.Status,
-		Username: user.Username,
-		Setting:  user.Setting,
-		Email:    user.Email,
+		Id:               user.Id,
+		Group:            user.Group,
+		Quota:            user.Quota,
+		Status:           user.Status,
+		Username:         user.Username,
+		ConcurrencyLimit: user.ConcurrencyLimit,
+		Setting:          user.Setting,
+		Email:            user.Email,
 	}
 	return cache
 }
@@ -525,10 +527,11 @@ func (user *User) Edit(updatePassword bool) error {
 
 	newUser := *user
 	updates := map[string]interface{}{
-		"username":     newUser.Username,
-		"display_name": newUser.DisplayName,
-		"group":        newUser.Group,
-		"remark":       newUser.Remark,
+		"username":          newUser.Username,
+		"display_name":      newUser.DisplayName,
+		"group":             newUser.Group,
+		"remark":            newUser.Remark,
+		"concurrency_limit": newUser.ConcurrencyLimit,
 	}
 	if updatePassword {
 		updates["password"] = newUser.Password
@@ -540,6 +543,9 @@ func (user *User) Edit(updatePassword bool) error {
 	}
 
 	// Update cache
+	if err = DB.Where("id = ?", user.Id).First(user).Error; err != nil {
+		return err
+	}
 	return updateUserCache(*user)
 }
 

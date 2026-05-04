@@ -44,6 +44,12 @@ func Playground(c *gin.Context) {
 		return
 	}
 	userCache.WriteContext(c)
+	concurrencyRelease, concurrencyErr := middleware.AcquireModelRequestConcurrency(c)
+	if concurrencyErr != nil {
+		newAPIError = concurrencyErr
+		return
+	}
+	defer concurrencyRelease()
 
 	tempToken := &model.Token{
 		UserId: userId,

@@ -590,6 +590,10 @@ func UpdateUser(c *gin.Context) {
 	if updatedUser.Password == "" {
 		updatedUser.Password = "$I_LOVE_U" // make Validator happy :)
 	}
+	if updatedUser.ConcurrencyLimit < 0 {
+		common.ApiErrorMsg(c, "并发上限不能小于 0")
+		return
+	}
 	if err := common.Validate.Struct(&updatedUser); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgUserInputInvalid, map[string]any{"Error": err.Error()})
 		return
@@ -863,13 +867,18 @@ func CreateUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserCannotCreateHigherLevel)
 		return
 	}
+	if user.ConcurrencyLimit < 0 {
+		common.ApiErrorMsg(c, "并发上限不能小于 0")
+		return
+	}
 	// Even for admin users, we cannot fully trust them!
 	cleanUser := model.User{
-		Username:    user.Username,
-		Password:    user.Password,
-		DisplayName: user.DisplayName,
-		Role:        user.Role, // 保持管理员设置的角色
-		RegisterIp:  c.ClientIP(),
+		Username:         user.Username,
+		Password:         user.Password,
+		DisplayName:      user.DisplayName,
+		Role:             user.Role, // 保持管理员设置的角色
+		ConcurrencyLimit: user.ConcurrencyLimit,
+		RegisterIp:       c.ClientIP(),
 	}
 	if err := cleanUser.Insert(0); err != nil {
 		common.ApiError(c, err)

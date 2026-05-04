@@ -39,6 +39,8 @@ export default function RequestRateLimit(props) {
     ModelRequestRateLimitSuccessCount: 1000,
     ModelRequestRateLimitDurationMinutes: 1,
     ModelRequestRateLimitGroup: '',
+    ModelRequestConcurrencyLimitEnabled: false,
+    ModelRequestConcurrencyLimit: 5,
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -105,7 +107,7 @@ export default function RequestRateLimit(props) {
           getFormApi={(formAPI) => (refForm.current = formAPI)}
           style={{ marginBottom: 15 }}
         >
-          <Form.Section text={t('模型请求速率限制')}>
+        <Form.Section text={t('模型请求速率限制')}>
             <Row gutter={16}>
               <Col xs={24} sm={12} md={8} lg={8} xl={8}>
                 <Form.Switch
@@ -232,6 +234,49 @@ export default function RequestRateLimit(props) {
             <Row>
               <Button size='default' onClick={onSubmit}>
                 {t('保存模型速率限制')}
+              </Button>
+            </Row>
+          </Form.Section>
+          <Form.Section text={t('用户模型并发限制')}>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.Switch
+                  field={'ModelRequestConcurrencyLimitEnabled'}
+                  label={t('启用用户模型并发限制（会限制同一用户同时进行中的请求数）')}
+                  size='default'
+                  checkedText='｜'
+                  uncheckedText='〇'
+                  onChange={(value) => {
+                    setInputs({
+                      ...inputs,
+                      ModelRequestConcurrencyLimitEnabled: value,
+                    });
+                  }}
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.InputNumber
+                  label={t('全局默认并发上限')}
+                  step={1}
+                  min={1}
+                  max={100000000}
+                  suffix={t('个')}
+                  extraText={t('未单独设置的用户会使用这个默认值')}
+                  field={'ModelRequestConcurrencyLimit'}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      ModelRequestConcurrencyLimit: String(value),
+                    })
+                  }
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Button size='default' onClick={onSubmit}>
+                {t('保存用户并发限制')}
               </Button>
             </Row>
           </Form.Section>
