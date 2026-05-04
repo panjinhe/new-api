@@ -23,82 +23,56 @@
 - 对普通短请求做到无感切换。
 - 对流式请求 / SSE / 长连接做到尽量不被强断。
 
-### 当前现状
+### 当前进展
 
-- 当前部署脚本是 `deploy.sh`，核心方式是 `docker compose up -d --build --remove-orphans`。
-- 当前生产 Compose 只有一个 `new-api` 服务实例，对外固定绑定 `127.0.0.1:3000:3000`。
 - 当前应用入口已改为 `http.Server` 启动，并监听 `SIGTERM` / `SIGINT` 做优雅停机。
-- 现状下发布新版本时，会先替换旧容器，因此存在短暂中断窗口。
+- 已新增蓝绿部署配置：`new-api-blue` 绑定 `127.0.0.1:3001`，`new-api-green` 绑定 `127.0.0.1:3002`。
+- 已新增 `scripts/deploy-bluegreen-prod.ps1`，继续走本地构建上传路径，不在生产服务器做 Docker build。
+- 已新增 Nginx upstream 模板，发布时切 upstream 并 reload Nginx。
+- 已新增 active-color 机制，蓝绿实例都可承接 HTTP，但只有 active 实例运行后台维护任务。
+- 已在停机路径 flush 批量用量、配额和数据看板缓存，降低旧实例 drain 后丢数据的风险。
 
-### 结论
+### 数据同步策略
 
-- 以当前架构，无法做到严格无中断发布。
-- 要实现无中断或接近无中断，建议改为“蓝绿部署”方案。
+- PostgreSQL 是唯一事实源，蓝绿实例共用同一个 `SQL_DSN`，不做应用到应用的数据复制。
+- JWT 登录态不依赖单实例 session，切流不会踢用户下线。
+- 配额、用量、请求数通过数据库原子增量和停机 flush 保证不丢。
+- Redis 暂不是 v1 前置条件；如果后续做长期双活，再把分布式限流、缓存一致性和分布式锁作为 Redis 专项推进。
+- 文件状态保持最小共享：`data-prod` 共用，日志按 blue / green 分目录。
 
-### 推荐方案
+### 发布流程
 
-- 保留 Nginx 作为入口层。
-- 同时维护两套应用实例，例如：
-  - `new-api-blue`
-  - `new-api-green`
-- 新版本先在未承载流量的实例上启动并完成健康检查。
-- 健康检查通过后，Nginx upstream 切流到新实例。
-- 观察无异常后，再下线旧实例。
+1. 本地构建 Linux binary。
+2. 上传源码归档和 binary 到服务器。
+3. 检测当前 active color，选择 idle color。
+4. 启动 idle 实例并替换 `/new-api` binary。
+5. 等待 idle 实例本地健康检查通过。
+6. 原子切换 Nginx upstream 并 reload。
+7. 公开地址 smoke test 通过后，切换 active-color 标记。
+8. 旧实例按 `GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS` / compose `stop_grace_period` drain 后停止。
 
-### 必做改造项
+### 已实现项
 
-#### 1. 应用优雅停机已完成
+- `docker-compose.prod.bluegreen.yml`
+- `scripts/deploy-bluegreen-prod.ps1`
+- `ops/nginx/new-api-bluegreen-upstream.conf`
+- `ops/nginx/new-api-bluegreen-proxy-snippet.conf`
+- `BACKGROUND_TASKS_ENABLED` / `INSTANCE_COLOR` / `ACTIVE_COLOR_FILE` 运行时控制
+- `model.FlushBatchUpdates()` 停机落库
 
-- 当前应用已支持 `http.Server` 启动。
-- 当前应用已监听 `SIGTERM` / `SIGINT`。
-- 当前收到停止信号后会调用 `Shutdown(ctx)` 等待存量请求完成。
-- 后续只需继续校准流式请求的等待时间上限。
+### 后续待做
 
-#### 2. 增加双实例部署配置
-
-- 新增蓝绿部署专用 Compose 配置。
-- 两个实例分别监听不同本地端口，例如：
-  - blue: `127.0.0.1:3001`
-  - green: `127.0.0.1:3002`
-- 两个实例共用同一数据库与必要挂载目录。
-
-#### 3. Nginx 支持动态切流
-
-- 增加 upstream 配置，支持在 blue / green 之间切换。
-- 发布时仅 reload Nginx，不重启 Nginx。
-- 切流前必须先验证目标实例健康状态。
-
-#### 4. 发布脚本升级
-
-- 新增 `deploy-zero-downtime.sh`。
-- 发布流程建议为：
-  1. 构建新镜像
-  2. 启动空闲颜色实例
-  3. 等待健康检查通过
-  4. 切换 Nginx upstream
-  5. 观察日志和健康状态
-  6. 下线旧实例
-
-#### 5. 数据库迁移规范
-
-- 所有迁移必须优先保证前后版本兼容。
-- 禁止在切流阶段执行破坏性迁移。
-- 推荐采用“两阶段迁移”：
-  - 第一阶段：先加字段 / 加索引 / 兼容旧逻辑
-  - 第二阶段：待旧版本完全下线后，再清理旧结构
+- 先用 `-DryRun` 检查发布参数和远端路径。
+- 首次线上演练建议低峰执行，并实时观察 `/api/status`、Nginx 5xx、容器健康状态。
+- 完成至少 3 次连续 blue / green 切换演练后，再把 `deploy-fast-prod.ps1` 标记为备用路径。
+- 所有数据库迁移仍需前后版本兼容，禁止切流阶段执行破坏性迁移。
 
 ### 风险点
 
 - 流式请求在旧实例下线时，仍可能因为等待时间不足而中断。
 - 如果新旧版本共享状态但数据结构不兼容，蓝绿部署也会失败。
-- 如果 Nginx 切流逻辑或健康检查条件不严谨，可能把流量切到未完全就绪的新实例。
-
-### 建议实施顺序
-
-1. 先做应用优雅停机。
-2. 再做双实例 Compose 配置。
-3. 再做 Nginx upstream 切换模板。
-4. 最后实现零停机发布脚本并做完整演练。
+- 首次从 legacy `new-api-prod` 迁移到 blue / green 时，需要确认 Nginx 站点配置能被脚本正确 patch。
+- 若后续改成长时间双活，需要补 Redis 或分布式锁策略。
 
 ### 验收标准
 

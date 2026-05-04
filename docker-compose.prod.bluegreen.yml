@@ -1,0 +1,90 @@
+services:
+  new-api:
+    profiles:
+      - legacy
+
+  new-api-blue:
+    image: new-api-local:prod
+    container_name: new-api-blue
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 120s
+    command: ["--port", "3000", "--log-dir", "/app/logs"]
+    ports:
+      - "127.0.0.1:3001:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - .env.prod
+    environment:
+      SQL_DSN: postgresql://${POSTGRES_USER:-newapi}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-newapi}?sslmode=disable
+      SQLITE_PATH: /data/one-api.db
+      TARGET_DATA_DIR: /data
+      LEGACY_SEED_ROOT: /seed/workspace
+      ENABLE_LEGACY_SEED: "true"
+      INSTANCE_COLOR: blue
+      NODE_NAME: new-api-blue
+      ACTIVE_COLOR_FILE: /app/runtime/active-color
+      BACKGROUND_TASKS_ENABLED: "true"
+      GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS: "120"
+    volumes:
+      - ./data-prod:/data
+      - ./logs-prod/blue:/app/logs
+      - ./runtime-prod:/app/runtime
+      - ./:/seed/workspace:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:3000/api/status | grep -Eq '\"success\":[[:space:]]*true'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  new-api-green:
+    image: new-api-local:prod
+    container_name: new-api-green
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 120s
+    command: ["--port", "3000", "--log-dir", "/app/logs"]
+    ports:
+      - "127.0.0.1:3002:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - .env.prod
+    environment:
+      SQL_DSN: postgresql://${POSTGRES_USER:-newapi}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-newapi}?sslmode=disable
+      SQLITE_PATH: /data/one-api.db
+      TARGET_DATA_DIR: /data
+      LEGACY_SEED_ROOT: /seed/workspace
+      ENABLE_LEGACY_SEED: "true"
+      INSTANCE_COLOR: green
+      NODE_NAME: new-api-green
+      ACTIVE_COLOR_FILE: /app/runtime/active-color
+      BACKGROUND_TASKS_ENABLED: "true"
+      GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS: "120"
+    volumes:
+      - ./data-prod:/data
+      - ./logs-prod/green:/app/logs
+      - ./runtime-prod:/app/runtime
+      - ./:/seed/workspace:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:3000/api/status | grep -Eq '\"success\":[[:space:]]*true'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s

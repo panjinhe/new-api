@@ -44,8 +44,13 @@ func StartCodexCredentialAutoRefreshTask() {
 			ticker := time.NewTicker(codexCredentialRefreshTickInterval)
 			defer ticker.Stop()
 
-			runCodexCredentialAutoRefreshOnce()
+			if common.ShouldRunLeaderTasks() {
+				runCodexCredentialAutoRefreshOnce()
+			}
 			for range ticker.C {
+				if !common.ShouldRunLeaderTasks() {
+					continue
+				}
 				runCodexCredentialAutoRefreshOnce()
 			}
 		})

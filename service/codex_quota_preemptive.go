@@ -96,8 +96,13 @@ func StartCodexQuotaPreemptiveRefreshTask() {
 			ticker := time.NewTicker(codexQuotaPreemptiveTickInterval)
 			defer ticker.Stop()
 
-			runCodexQuotaPreemptiveRefreshOnce()
+			if common.ShouldRunLeaderTasks() {
+				runCodexQuotaPreemptiveRefreshOnce()
+			}
 			for range ticker.C {
+				if !common.ShouldRunLeaderTasks() {
+					continue
+				}
 				runCodexQuotaPreemptiveRefreshOnce()
 			}
 		})

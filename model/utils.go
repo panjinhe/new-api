@@ -34,7 +34,7 @@ func InitBatchUpdater() {
 	gopool.Go(func() {
 		for {
 			time.Sleep(time.Duration(common.BatchUpdateInterval) * time.Second)
-			batchUpdate()
+			FlushBatchUpdates()
 		}
 	})
 }
@@ -49,7 +49,7 @@ func addNewRecord(type_ int, id int, value int) {
 	}
 }
 
-func batchUpdate() {
+func FlushBatchUpdates() {
 	// check if there's any data to update
 	hasData := false
 	for i := 0; i < BatchUpdateTypeCount; i++ {
@@ -67,6 +67,8 @@ func batchUpdate() {
 	}
 
 	common.SysLog("batch update started")
+	usedQuotaStore := make(map[int]int)
+	requestCountStore := make(map[int]int)
 	for i := 0; i < BatchUpdateTypeCount; i++ {
 		batchUpdateLocks[i].Lock()
 		store := batchUpdateStores[i]
@@ -86,13 +88,20 @@ func batchUpdate() {
 					common.SysLog("failed to batch update token quota: " + err.Error())
 				}
 			case BatchUpdateTypeUsedQuota:
-				updateUserUsedQuota(key, value)
+				usedQuotaStore[key] += value
 			case BatchUpdateTypeRequestCount:
-				updateUserRequestCount(key, value)
+				requestCountStore[key] += value
 			case BatchUpdateTypeChannelUsedQuota:
 				updateChannelUsedQuota(key, value)
 			}
 		}
+	}
+	for key, quota := range usedQuotaStore {
+		updateUserUsedQuotaAndRequestCount(key, quota, requestCountStore[key])
+		delete(requestCountStore, key)
+	}
+	for key, count := range requestCountStore {
+		updateUserRequestCount(key, count)
 	}
 	common.SysLog("batch update finished")
 }
