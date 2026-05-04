@@ -87,6 +87,7 @@ const RegisterForm = () => {
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailRegister, setShowEmailRegister] = useState(false);
   const [wechatLoading, setWechatLoading] = useState(false);
@@ -215,6 +216,11 @@ const RegisterForm = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   }
 
+  const resetTurnstile = () => {
+    setTurnstileToken('');
+    setTurnstileWidgetKey((key) => key + 1);
+  };
+
   async function handleSubmit(e) {
     if (password.length < 8) {
       showInfo('密码长度不得小于 8 位！');
@@ -251,9 +257,11 @@ const RegisterForm = () => {
           navigate('/login');
           showSuccess('注册成功！');
         } else {
+          resetTurnstile();
           showError(message);
         }
       } catch (error) {
+        resetTurnstile();
         showError('注册失败，请重试');
       } finally {
         setRegisterLoading(false);
@@ -276,10 +284,13 @@ const RegisterForm = () => {
       if (success) {
         showSuccess('验证码发送成功，请检查你的邮箱！');
         setDisableButton(true); // 发送成功后禁用按钮，开始倒计时
+        resetTurnstile();
       } else {
+        resetTurnstile();
         showError(message);
       }
     } catch (error) {
+      resetTurnstile();
       showError('发送验证码失败，请重试');
     } finally {
       setVerificationCodeLoading(false);
@@ -797,10 +808,15 @@ const RegisterForm = () => {
         {turnstileEnabled && (
           <div className='flex justify-center mt-6'>
             <Turnstile
+              key={turnstileWidgetKey}
               sitekey={turnstileSiteKey}
               onVerify={(token) => {
                 setTurnstileToken(token);
               }}
+              refreshExpired='auto'
+              onExpire={() => setTurnstileToken('')}
+              onTimeout={() => setTurnstileToken('')}
+              onError={() => setTurnstileToken('')}
             />
           </div>
         )}

@@ -88,6 +88,7 @@ const LoginForm = () => {
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileWidgetKey, setTurnstileWidgetKey] = useState(0);
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailLogin, setShowEmailLogin] = useState(false);
   const [wechatLoading, setWechatLoading] = useState(false);
@@ -215,6 +216,15 @@ const LoginForm = () => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   }
 
+  const resetTurnstile = () => {
+    setTurnstileToken('');
+    setTurnstileWidgetKey((key) => key + 1);
+  };
+
+  const handleTurnstileError = () => {
+    resetTurnstile();
+  };
+
   async function handleSubmit(e) {
     if ((hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms) {
       showInfo(t('请先阅读并同意用户协议和隐私政策'));
@@ -229,7 +239,7 @@ const LoginForm = () => {
     try {
       if (username && password) {
         const res = await API.post(
-          `/api/user/login?turnstile=${turnstileToken}`,
+          `/api/user/login?turnstile=${encodeURIComponent(turnstileToken)}`,
           {
             username,
             password,
@@ -257,6 +267,9 @@ const LoginForm = () => {
           }
           navigate('/console');
         } else {
+          if (message?.includes('Turnstile')) {
+            resetTurnstile();
+          }
           showError(message);
         }
       } else {
@@ -967,10 +980,15 @@ const LoginForm = () => {
         {turnstileEnabled && (
           <div className='flex justify-center mt-6'>
             <Turnstile
+              key={turnstileWidgetKey}
               sitekey={turnstileSiteKey}
               onVerify={(token) => {
                 setTurnstileToken(token);
               }}
+              refreshExpired='auto'
+              onExpire={handleTurnstileError}
+              onTimeout={handleTurnstileError}
+              onError={handleTurnstileError}
             />
           </div>
         )}

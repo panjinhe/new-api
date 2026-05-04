@@ -264,7 +264,7 @@ func TestRedeemOneTimeWelfareCodeBlocksSameIpDaily(t *testing.T) {
 	assert.Equal(t, 0, getRedemptionUserQuota(t, 116))
 }
 
-func TestRedeemOneTimeWelfareCodeBlocksSameEmailDomainDaily(t *testing.T) {
+func TestRedeemOneTimeWelfareCodeAllowsSamePublicEmailDomainDaily(t *testing.T) {
 	truncateTables(t)
 	resetRedemptionTestTables(t)
 	seedRedemptionUserWithEmail(t, 117, "first@example.com")
@@ -276,14 +276,14 @@ func TestRedeemOneTimeWelfareCodeBlocksSameEmailDomainDaily(t *testing.T) {
 	_, err := RedeemWithAudit(first.Key, 117, RedemptionAudit{CallerIp: "203.0.113.11"})
 	require.NoError(t, err)
 	result, err := RedeemWithAudit(second.Key, 118, RedemptionAudit{CallerIp: "203.0.113.12"})
-	require.Error(t, err)
+	require.NoError(t, err)
 
-	require.Nil(t, result)
-	assert.True(t, errors.Is(err, ErrRedemptionWelfareDailyLimit))
+	require.NotNil(t, result)
+	assert.Equal(t, welfareQuota, result.Quota)
 	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, first.Id))
-	assert.Equal(t, common.RedemptionCodeStatusEnabled, getRedemptionStatus(t, second.Id))
+	assert.Equal(t, common.RedemptionCodeStatusUsed, getRedemptionStatus(t, second.Id))
 	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 117))
-	assert.Equal(t, 0, getRedemptionUserQuota(t, 118))
+	assert.Equal(t, welfareQuota, getRedemptionUserQuota(t, 118))
 }
 
 func TestRedeemNonWelfareCodeNotLimitedByDailyWelfareClaims(t *testing.T) {
