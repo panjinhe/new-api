@@ -49,6 +49,10 @@ const Home = () => {
   const serverAddress =
     statusState?.status?.server_address || `${window.location.origin}`;
   const systemName = statusState?.status?.system_name || 'aheapi';
+  const heroDescription = t(
+    '快响应、Plus / Pro 号池、配置简单，打开网站就能清楚知道怎么接入，日常调用更省心。',
+  );
+  const heroDescriptionTail = '日常调用更省心。';
   const serviceAdvantageCards = [
     {
       code: t('01'),
@@ -162,9 +166,17 @@ const Home = () => {
                 <div className='mt-4 text-2xl font-bold leading-tight text-semi-color-text-0 md:text-3xl'>
                   {t('稳定快速的 API 服务')}
                 </div>
-                <p className='mx-auto mt-5 max-w-2xl text-base leading-8 text-semi-color-text-1 md:text-lg'>
-                  {t(
-                    '快响应、Plus / Pro 号池、配置简单，打开网站就能清楚知道怎么接入，日常调用更省心。',
+                <p className='mx-auto mt-5 max-w-3xl text-base leading-8 text-semi-color-text-1 md:text-lg'>
+                  {i18n.language.startsWith('zh') &&
+                  heroDescription.endsWith(heroDescriptionTail) ? (
+                    <>
+                      {heroDescription.slice(0, -heroDescriptionTail.length)}
+                      <span className='whitespace-nowrap'>
+                        {heroDescriptionTail}
+                      </span>
+                    </>
+                  ) : (
+                    heroDescription
                   )}
                 </p>
                 <div className='mt-8 flex flex-col justify-center gap-3 sm:flex-row sm:items-center'>
