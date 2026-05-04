@@ -149,6 +149,33 @@ docker stop --time 120 new-api-prod
 
 脚本已修复：Nginx 站点备份现在保存到 `/etc/nginx/bluegreen-backups/<timestamp>/`，不会再留在 `sites-enabled`。
 
+#### 高频错误：本地 PowerShell 抢先展开远端 shell 变量
+
+这次演练后续手动修复时又踩了一次老坑：在本地 PowerShell 里用双引号执行远端 `ssh` 命令，导致本应在服务器上展开的 `$backup_dir`、`$f`、`$(cat ...)` 被本地 PowerShell 先处理，最终远端拿到的是残缺命令。
+
+典型错误现象：
+
+```text
+bash: -c: line 1: syntax error near unexpected token `do'
+Cannot find path 'E:\opt\new-api\app\runtime-prod\active-color'
+```
+
+错误写法：
+
+```powershell
+ssh -F ops/ssh/config.local aheapi-itdun "backup_dir=/etc/nginx/bluegreen-backups/ts; for f in /etc/nginx/sites-enabled/*backup*; do mv "$f" "$backup_dir/"; done"
+ssh -F ops/ssh/config.local aheapi-itdun "echo 'active='$(cat /opt/new-api/app/runtime-prod/active-color)"
+```
+
+正确写法：
+
+```powershell
+ssh -F ops/ssh/config.local aheapi-itdun 'backup_dir=/etc/nginx/bluegreen-backups/ts; for f in /etc/nginx/sites-enabled/*backup*; do mv "$f" "$backup_dir/"; done'
+ssh -F ops/ssh/config.local aheapi-itdun 'printf "active="; cat /opt/new-api/app/runtime-prod/active-color'
+```
+
+强制约定：凡是远端命令里出现 `$变量`、`$(...)`、循环、here-doc、awk 这类 shell 语法，默认使用单引号包整段远端命令，或使用 PowerShell here-string 管道到 `ssh ... bash -s`。不要再用双引号。
+
 ### 蓝绿发布前检查清单
 
 本地：
@@ -237,7 +264,8 @@ printf 'green\n' >/opt/new-api/app/runtime-prod/active-color
 
 ### PowerShell 远程执行注意事项
 
-- 如果你在本地用 PowerShell 调 `ssh` 执行远端 shell 命令，不要把本来应该留给远端展开的 `$VAR`、`$(...)` 直接写进双引号字符串。
+- 这是高频错误；如果你在本地用 PowerShell 调 `ssh` 执行远端 shell 命令，不要把本来应该留给远端展开的 `$VAR`、`$(...)` 直接写进双引号字符串。
+- 判断规则很简单：远端命令只要包含 `$`，默认不要用双引号。
 - 典型错误写法：
 
 ```powershell
