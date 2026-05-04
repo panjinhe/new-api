@@ -8,6 +8,11 @@ services:
     restart: unless-stopped
     init: true
     stop_grace_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
     command: ["--port", "3000", "--log-dir", "/app/logs"]
     ports:
       - "127.0.0.1:3000:3000"
